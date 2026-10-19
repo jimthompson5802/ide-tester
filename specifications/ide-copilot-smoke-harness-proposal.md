@@ -166,7 +166,7 @@ class Copilot(Protocol):
 
 **Contract rules:**
 
-- File and extension adapters receive the same IDE instance as a dependency and target its session. Only the IDE adapter owns launch and process cleanup; `close()` preserves the persistent test profile and supports cleanup after a failed launch.
+- File and extension adapters receive the same IDE instance at construction time and target its session. Only the IDE adapter owns launch and process cleanup; `close()` preserves the persistent test profile and supports cleanup after a failed launch.
 - The IDE must be ready before file or extension actions. Timeout values are expressed in seconds.
 - `EditorFiles` performs edits through the IDE. `replace_contents()` and `save()` target the file most recently opened through `open_file()`; the adapter must ensure that file is active or raise an error. Independent disk-content verification remains outside this contract.
 - `Copilot.open_chat()` makes chat usable before `send_prompt()` is called. `wait_for_response()` waits for the submitted prompt's completed response and returns its raw text; partial streaming text does not count as completion.
