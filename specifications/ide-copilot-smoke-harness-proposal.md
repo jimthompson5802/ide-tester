@@ -127,45 +127,52 @@ flowchart TD
 
 Run IDEs **sequentially** to avoid desktop focus collisions. Use explicit timeouts, bounded retries for known transient issues, and deterministic cleanup. Do not delete the persistent authenticated profile.
 
-## 5. Common adapter contract
+## 5. Adapter contracts
 
-The following interface is illustrative; refine exceptions, state models, and lifecycle semantics during implementation.
+Use three separate contracts: IDE lifecycle, editor file operations, and Copilot behavior. Compose adapters around the same IDE session rather than combining all responsibilities in one class. The following interfaces are illustrative; refine exceptions and state models during implementation. Concrete implementations are deferred to the relevant implementation milestone.
 
 ```python
-from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Protocol
 
-class IDEAdapter(ABC):
-    @abstractmethod
+
+class IDE(Protocol):
     def launch(self, workspace: Path) -> None: ...
 
-    @abstractmethod
     def wait_until_ready(self, timeout: int) -> None: ...
 
-    @abstractmethod
+    def get_version(self) -> str: ...
+
+    def close(self) -> None: ...
+
+
+class EditorFiles(Protocol):
     def open_file(self, path: Path) -> None: ...
 
-    @abstractmethod
-    def replace_file_contents(self, text: str) -> None: ...
+    def replace_contents(self, text: str) -> None: ...
 
-    @abstractmethod
-    def save_file(self) -> None: ...
+    def save(self) -> None: ...
 
-    @abstractmethod
-    def open_copilot_chat(self) -> None: ...
 
-    @abstractmethod
-    def send_copilot_prompt(self, prompt: str) -> None: ...
+class Copilot(Protocol):
+    def open_chat(self) -> None: ...
 
-    @abstractmethod
-    def wait_for_copilot_response(self, timeout: int) -> str: ...
+    def send_prompt(self, prompt: str) -> None: ...
 
-    @abstractmethod
-    def get_versions(self) -> dict[str, str]: ...
+    def wait_for_response(self, timeout: int) -> str: ...
 
-    @abstractmethod
-    def close(self) -> None: ...
+    def get_version(self) -> str: ...
 ```
+
+**Contract rules:**
+
+- File and extension adapters receive the same IDE instance as a dependency and target its session. Only the IDE adapter owns launch and process cleanup; `close()` preserves the persistent test profile and supports cleanup after a failed launch.
+- The IDE must be ready before file or extension actions. Timeout values are expressed in seconds.
+- `EditorFiles` performs edits through the IDE. `replace_contents()` and `save()` target the file most recently opened through `open_file()`; the adapter must ensure that file is active or raise an error. Independent disk-content verification remains outside this contract.
+- `Copilot.open_chat()` makes chat usable before `send_prompt()` is called. `wait_for_response()` waits for the submitted prompt's completed response and returns its raw text; partial streaming text does not count as completion.
+- Timeouts and interaction failures raise exceptions rather than returning success-shaped values. Authentication failures must remain distinguishable so the orchestrator can report **BLOCKED**.
+- Each adapter reports its own installed version. The orchestrator combines IDE and extension versions for reporting.
+- Additional extensions get their own contracts and adapters suited to their features. They reuse the IDE session without adding extension-specific methods to `IDE` or `EditorFiles`.
 
 Possible later refinements: `probe_authentication()`, `capture_diagnostics()`, `capabilities()`, typed failure reasons, and explicit response-completion state.
 
