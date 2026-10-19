@@ -1,0 +1,60 @@
+# macOS
+.DS_Store
+._*
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+.hypothesis/
+
+# Virtual environments and local Python configuration
+.venv/
+venv/
+env/
+.python-version
+
+# Python packaging and build output
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Coverage and test output
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+junit*.xml
+.tox/
+.nox/
+
+# Harness reports, screenshots, logs, and other diagnostic artifacts
+/reports/*
+!/reports/.gitkeep
+*.log
+
+# Local harness configuration, persistent authenticated profiles, and workspaces
+/.ide-smoke/
+/profiles/
+/workspaces/
+/config/*.local.yaml
+/config/*.local.yml
+
+# Credentials and environment overrides (keep sanitized examples trackable)
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+
+# Local editor settings
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
