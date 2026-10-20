@@ -9,6 +9,7 @@ A planned smoke-test harness for Visual Studio Code or IntelliJ IDEA and selecte
 - [Milestone 0 environment setup](specifications/ide-milestone0-environment-setup.md) — macOS setup with uv, a Python virtual environment, and supporting software tooling.
 - [Harness proposal](specifications/ide-copilot-smoke-harness-proposal.md) — architecture, test scope, isolation strategy, reporting, risks, and delivery milestones.
 - [Milestone 1 user stories](specifications/ide-copilot-milestone1-user-stories.md) — VS Code proof-of-concept backlog, acceptance criteria, implementation slices, and developer validation gates.
+- [VS Code testing overview](docs/vscode-testing-overview.md) — background notes on VS Code's testing layers, extension host/API tests, and integration test runner.
 
 ## Planned behavior
 
@@ -86,6 +87,8 @@ For now, read the proposal and Milestone 1 backlog, resolve the feasibility ques
 ```text
 .
 ├── README.md
+├── docs/
+│   └── vscode-testing-overview.md
 └── specifications/
     ├── ide-milestone0-environment-setup.md
     ├── ide-copilot-smoke-harness-proposal.md
