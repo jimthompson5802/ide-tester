@@ -45,6 +45,15 @@ These requirements come from the Milestone 0 setup guide and the proposal's tech
 
 Known Python package choices are not yet declared or version-locked:
 
+M0-01 baseline inspection on 2026-10-20 verified macOS 15.7.9 (24G830),
+`uname -m` reporting `x86_64`, and working Git 2.54.0. Neither `.venv` nor
+`.python-version` exists. Existing uv 0.13.1 runs, but its symlink and version
+output identify a Homebrew installation reporting `aarch64-apple-darwin`.
+Resolve this installation against the standalone requirement before M0-02
+mutation; Python compatibility remains unverified. No software was installed.
+See [M0-01 results](docs/implementation-plans/M0-01.md#execution-results).
+Developer validated M0-01 on 2026-10-20; later setup remains outside this execution.
+
 | Package / capability | Status and intended use |
 | --- | --- |
 | `pytest` | Planned test runner for assertions, parametrization, and JUnit XML reporting. |
