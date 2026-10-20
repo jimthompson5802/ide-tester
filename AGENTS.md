@@ -76,7 +76,7 @@ Install harness and automation packages only when justified by current Milestone
 
 Use prebuilt applications and Python, plus pure-Python packages or compatible prebuilt wheels, with dependency source builds disabled. Reconsider dependencies that require native compilation; compiler toolchain installation is outside this project's workflow.
 
-M0-03 review on 2026-10-20 observed the current agent context and selected Python reporting arm64. Recheck architecture in the execution context; a verified native agent may execute separately authorized setup. Follow the [M0-03 plan](docs/implementation-plans/M0-03.md) for approved patch tolerance, offline uv commands, inherited-setting checks, isolation checks, and partial-failure preservation. M0-03 execution on 2026-10-20 created the ignored local `3.12` pin and unseeded `.venv` using those offline commands. Independent checks passed for Python 3.12.15 arm64, selected Homebrew base identity, checkout prefix, disabled system/user site packages, and zero installed distributions. The sandbox initially denied uv cache locks; identical commands succeeded after approved escalation. Developer validated M0-03 on 2026-10-20. M0-04 and later setup remain pending separate authorization.
+M0-03 review on 2026-10-20 observed the current agent context and selected Python reporting arm64. Recheck architecture in the execution context; a verified native agent may execute separately authorized setup. Follow the [M0-03 plan](docs/implementation-plans/M0-03.md) for approved patch tolerance, offline uv commands, inherited-setting checks, isolation checks, and partial-failure preservation. M0-03 execution on 2026-10-20 created the ignored local `3.12` pin and unseeded `.venv` using those offline commands. Independent checks passed for Python 3.12.15 arm64, selected Homebrew base identity, checkout prefix, disabled system/user site packages, and zero installed distributions. The sandbox initially denied uv cache locks; identical commands succeeded after approved escalation. Developer validated M0-03 on 2026-10-20. Subsequent M0-04 validation and M0-05 final checks are recorded below.
 
 ## Isolation
 
@@ -90,7 +90,15 @@ and satisfaction of editor interpreter selection or the permitted unavailable-UI
 deferral; the combined confirmation does not distinguish the interpreter outcomes. Independent checkout Python
 3.12.15 isolation checks passed again. No editor settings or installations were
 changed. See [M0-04 results](docs/implementation-plans/M0-04.md#execution-results--2026-10-20).
-M0-04 is complete and developer validated on 2026-10-20; M0-05 remains separately authorized work.
+M0-04 is complete and developer validated on 2026-10-20.
+M0-05 final checks on 2026-10-20 passed in a fresh native arm64 agent login
+PTY: Git 2.54.0, Homebrew uv 0.13.1, Python 3.12.15 with checkout isolation,
+and VS Code CLI 1.135.0 arm64. Bare `code` now resolves in that context;
+its version command exits 0 with the previously observed `task_name_for_pid`
+diagnostic. Local environment, pin, settings and evidence remain ignored and
+untracked. No software or compiler tools were installed and no source builds
+occurred during Milestone 0. See [M0-05 results](docs/implementation-plans/M0-05.md#execution-results--2026-10-20).
+Developer accepted Milestone 0 on 2026-10-20; M1-00 requires separate authorization.
 
 Run GUI automation sequentially against dedicated persistent test profiles and fresh disposable workspaces. Preserve authenticated profiles, target only test-owned processes/windows, and constrain cleanup to harness-owned paths.
 

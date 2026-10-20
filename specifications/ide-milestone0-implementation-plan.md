@@ -1,10 +1,10 @@
 # Milestone 0 — Technical Implementation Plan
 
-**Status:** Proposed execution plan; no setup commands have been run as part of writing this document. Unchecked tasks are pending, not evidence of a missing installation.  
+**Status:** M0-01–M0-04 completed and developer validated on 2026-10-20; M0-05 final technical checks passed on 2026-10-20. Developer accepted Milestone 0 on 2026-10-20. See [M0-05 consolidated evidence](../docs/implementation-plans/M0-05.md#execution-results--2026-10-20). Unchecked lists below preserve the original execution checklist; current results and decisions are recorded in the story plans.
 **Scope:** Prepare one macOS checkout for Milestone 1 using prebuilt software, the existing Homebrew uv installation, Python 3.12, and a repository-local `.venv`.
 **Source of requirements:** [Milestone 0 environment setup](ide-milestone0-environment-setup.md). See also the [README](../README.md), [harness proposal](ide-copilot-smoke-harness-proposal.md), and [Milestone 1 backlog](ide-copilot-milestone1-user-stories.md).
 
-This is a documentation deliverable. Executing this plan is separate work. Commands below are planned operator steps from the setup guide, not verified working commands on this host. Run them as the normal user from the checkout root unless stated otherwise.
+This document originated as a planning deliverable. Authorized execution and validation are now recorded in [M0-01](../docs/implementation-plans/M0-01.md), [M0-02](../docs/implementation-plans/M0-02.md), [M0-03](../docs/implementation-plans/M0-03.md), [M0-04](../docs/implementation-plans/M0-04.md) and [M0-05](../docs/implementation-plans/M0-05.md). Commands below remain operator steps; consult those results for checks actually performed. Run commands as the normal user from the checkout root unless stated otherwise.
 
 ## Delivery approach and boundaries
 

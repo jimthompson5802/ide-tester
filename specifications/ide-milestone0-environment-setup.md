@@ -1,6 +1,6 @@
 # Milestone 0 — Environment Setup with uv
 
-**Status:** Setup guide for the proposed harness; commands have not been validated end to end on the target host.  
+**Status:** M0-01–M0-04 developer validated on 2026-10-20; M0-05 final availability/isolation checks passed on 2026-10-20. Developer accepted Milestone 0 on 2026-10-20. See [consolidated evidence](../docs/implementation-plans/M0-05.md#execution-results--2026-10-20); harness behavior remains proposed.
 **Target:** macOS, uv, Python 3.12, and supporting development tools.  
 **Related:** [Harness proposal](ide-copilot-smoke-harness-proposal.md) and [Milestone 1 user stories](ide-copilot-milestone1-user-stories.md).
 
@@ -116,13 +116,13 @@ Do not install harness or automation libraries during Milestone 0. Milestone 1 w
 
 ## 8. Milestone 0 completion checklist
 
-- [ ] Record macOS version and architecture.
-- [ ] Verify Git is available; use a prebuilt distribution if installation is needed.
-- [ ] Verify existing uv and record its provenance, version, and reuse outcome.
-- [ ] Verify the selected Homebrew Python 3.12 and record its provenance, architecture, and resolved patch version.
-- [ ] Create `.venv` and verify that its interpreter belongs to this checkout.
-- [ ] Install VS Code and verify the `code` CLI is available.
-- [ ] Confirm `.venv/` and the local `.python-version` remain ignored by Git.
-- [ ] Complete setup without installing compiler tools or performing native source builds.
+- [x] Record macOS version and architecture.
+- [x] Verify Git is available; use a prebuilt distribution if installation is needed.
+- [x] Verify existing uv and record its provenance, version, and reuse outcome.
+- [x] Verify the selected Homebrew Python 3.12 and record its provenance, architecture, and resolved patch version.
+- [x] Create `.venv` and verify that its interpreter belongs to this checkout.
+- [x] Reuse or install VS Code and verify the `code` CLI is available.
+- [x] Confirm `.venv/` and the local `.python-version` remain ignored by Git.
+- [x] Complete setup without installing compiler tools or performing native source builds.
 
-Milestone 0 is complete when the Python environment and supporting software are available. Continue with M1-00 for IDE configuration and feasibility work, followed by the existing Milestone 1 review gates.
+Technical checklist passed on 2026-10-20; existing software was reused, and M0-03 created the local environment/pin. Developer accepted Milestone 0 on 2026-10-20; the milestone is complete. M1-00 configuration and feasibility require separate authorization and the existing Milestone 1 review gates. Runtime harness tests are unavailable; these setup checks do not establish GUI or Copilot feasibility.
