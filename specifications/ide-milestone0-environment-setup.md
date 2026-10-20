@@ -34,22 +34,23 @@ git --version
 
 If Git is unavailable or macOS offers to install developer tools, use an organization-approved prebuilt Git distribution that does not require a compiler toolchain. Verify `git --version` before continuing.
 
-## 3. Install uv
+## 3. Verify existing uv
 
-Use Astral's standalone installer; no package manager or build toolchain is needed:
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-Open a new terminal afterward, or follow the installer's PATH instructions, then check:
+The developer selected reuse of the existing Homebrew uv installation on
+2026-10-20. No additional uv installation or update is needed. In the native
+arm64 terminal intended for subsequent setup, check:
 
 ```bash
+uname -m
 command -v uv
+type -a uv
 uv --version
 ```
 
-Update this standalone installation with `uv self update`. Record the installed uv version. See the official [installation guide](https://docs.astral.sh/uv/getting-started/installation/).
+Record the resolved executable, Homebrew provenance, version, and reuse outcome.
+Preserve the existing installation. If command resolution fails, report the
+blocker and agree on the correction before changing shell configuration.
+See the [M0-02 plan](../docs/implementation-plans/M0-02.md).
 
 ## 4. Create the Milestone 0 Python environment
 
@@ -116,7 +117,7 @@ Do not install harness or automation libraries during Milestone 0. Milestone 1 w
 
 - [ ] Record macOS version and architecture.
 - [ ] Verify Git is available; use a prebuilt distribution if installation is needed.
-- [ ] Install uv and record its version.
+- [ ] Verify existing uv and record its provenance, version, and reuse outcome.
 - [ ] Install Python 3.12 through uv and record the resolved patch version.
 - [ ] Create `.venv` and verify that its interpreter belongs to this checkout.
 - [ ] Install VS Code and verify the `code` CLI is available.

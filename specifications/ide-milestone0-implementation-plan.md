@@ -1,7 +1,7 @@
 # Milestone 0 — Technical Implementation Plan
 
 **Status:** Proposed execution plan; no setup commands have been run as part of writing this document. Unchecked tasks are pending, not evidence of a missing installation.  
-**Scope:** Prepare one macOS checkout for Milestone 1 using prebuilt software, Astral's standalone uv installation, Python 3.12, and a repository-local `.venv`.  
+**Scope:** Prepare one macOS checkout for Milestone 1 using prebuilt software, the existing Homebrew uv installation, Python 3.12, and a repository-local `.venv`.
 **Source of requirements:** [Milestone 0 environment setup](ide-milestone0-environment-setup.md). See also the [README](../README.md), [harness proposal](ide-copilot-smoke-harness-proposal.md), and [Milestone 1 backlog](ide-copilot-milestone1-user-stories.md).
 
 This is a documentation deliverable. Executing this plan is separate work. Commands below are planned operator steps from the setup guide, not verified working commands on this host. Run them as the normal user from the checkout root unless stated otherwise.
@@ -51,45 +51,29 @@ Dedicated IDE profiles, disposable workspaces, manual Copilot authentication, GU
 
   The first command should identify both ignore rules; the second should return no tracked paths. An ignore rule alone does not untrack an existing file. Investigate any discrepancy before proceeding; do not silently remove tracked files.
 
-- [ ] Check whether `.venv`, `.python-version`, and a standalone uv installation already exist. Preserve existing contents until their compatibility and ownership are understood.
+- [ ] Check whether `.venv`, `.python-version`, and a uv installation already exist. Preserve existing contents until their compatibility and ownership are understood.
 - [ ] Create local setup notes, for example `reports/milestone0-setup.local.md`. If using that location, first verify it is ignored with `git check-ignore -v reports/milestone0-setup.local.md`; create the directory only if needed. Record commands, results, timestamps, and blockers without credentials or unrelated host details.
 
 **Exit check:** Host identity, checkout identity, Git availability, ignore rules, and existing local environment state are documented. Missing prerequisites are resolved or explicitly marked blocked.
 
-## Phase 2 — Establish standalone uv
+## Phase 2 — Verify existing uv
 
-**User story M0-02:** As a developer, I want a verified standalone uv installation so that I can manage prebuilt Python without introducing a package manager or compiler toolchain.
+**User story M0-02:** As a developer, I want to verify the existing uv installation so that subsequent setup can reuse it.
+
+**Developer decision (2026-10-20):** Reuse existing Homebrew uv; no additional installation is needed. This supersedes the earlier standalone-only requirement locally. The external issue has not been updated.
 
 **Acceptance criteria:**
 
-- [ ] `command -v uv` resolves the intended standalone installation and `uv --version` succeeds in the terminal used for subsequent setup.
-- [ ] Evidence records the installation method, resolved executable path, version, and whether the installation was reused, installed, or updated.
-- [ ] Any conflicting installation has been resolved before a new installation is made; any update has a recorded reason and before/after versions.
-- [ ] Installation completes without native compilation or added compiler tools; unresolved download or PATH failures remain explicit blockers.
+- [ ] In the native arm64 terminal used for subsequent setup, bare `uv` resolves to the intended existing Homebrew executable and `uv --version` succeeds.
+- [ ] Evidence records terminal architecture, resolved executable path, Homebrew provenance, version, and reuse outcome.
+- [ ] No uv installation, update, uninstall, native compilation, or added compiler tools occurs.
+- [ ] Any resolution failure remains an explicit blocker; existing software and unrelated work are preserved.
 
 **Dependency:** Phase 1 complete.
 
-- [ ] Check for an existing uv executable with `command -v uv` and, if found, `uv --version`.
-- [ ] Determine whether the existing installation uses Astral's standalone installer. Do not run a second installation over an installation managed by another tool without resolving the conflict.
-- [ ] If standalone uv is absent, install it using the setup guide's command:
+Follow the [M0-02 verification plan](../docs/implementation-plans/M0-02.md). Check `uname -m`, `command -v uv`, `type -a uv`, and `uv --version` in the intended native terminal. Record actual results and reuse provenance. Report failures before changing configuration. No installer download or additional binary is required.
 
-  ```bash
-  curl -LsSf https://astral.sh/uv/install.sh | sh
-  ```
-
-- [ ] Follow the installer's PATH instructions or open a fresh terminal. Return to the same checkout if opening a new terminal.
-- [ ] Verify executable resolution and record the installed version:
-
-  ```bash
-  command -v uv
-  uv --version
-  ```
-
-- [ ] Record whether uv was reused or newly installed, its resolved location, and its version. No uv version is currently pinned by the project.
-- [ ] If an update is necessary to resolve a demonstrated issue, use `uv self update` only for the standalone installation and record the before/after versions and reason. Updating is not a completion requirement.
-- [ ] Resolve managed-network download failures through approved proxy/certificate configuration. Record only sanitized symptoms; never place credentials in setup notes.
-
-**Exit check:** The current terminal resolves a working standalone uv executable, and its installation method, path, and version are recorded.
+**Exit check:** Native-terminal uv resolution, provenance, version, and reuse are documented and presented for developer validation before subsequent setup.
 
 ## Phase 3 — Install Python and create the standalone environment
 
@@ -214,7 +198,7 @@ Dedicated IDE profiles, disposable workspaces, manual Copilot authentication, GU
 | --- | --- |
 | Execution context | Date, macOS version, architecture; checkout location kept local |
 | Git | Version, availability result, installation source if installed |
-| uv | Standalone installation provenance, version, resolved path |
+| uv | Existing Homebrew installation provenance, version, resolved path, reuse outcome |
 | Python | Exact 3.12 patch version, uv-managed installation, virtual-environment assertions |
 | Local environment | `.venv` ownership result, local `3.12` pin, ignore and tracked-file checks |
 | VS Code | CLI location and version output, installation/reuse outcome |

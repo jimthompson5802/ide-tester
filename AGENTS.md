@@ -36,7 +36,7 @@ Keep contracts, logical tests, orchestration, and verification platform-neutral.
 
 These requirements come from the Milestone 0 setup guide and the proposal's technology choices. They describe the intended environment, not a verified installation on this host.
 
-- **Environment manager:** Use `uv` to install prebuilt Python and manage the repository-local `.venv`. Milestone 0 specifies Astral's standalone uv installation; no uv version is pinned yet.
+- **Environment manager:** Use `uv` to install prebuilt Python and manage the repository-local `.venv`. Reuse the existing Homebrew uv installation per the developer's 2026-10-20 direction; no additional uv installation is needed and no uv version is pinned yet.
 - **Python:** Use **3.12** as the initial baseline within the proposal's Python 3.12+ requirement. Record the resolved patch version for reproducibility.
 - **Interpreter:** Use `.venv/bin/python` explicitly during standalone setup and select it as the editor interpreter. Keep the system Python unchanged.
 - **Project lifecycle:** Until `pyproject.toml` exists, use the standalone environment workflow rather than `uv sync`. Project initialization, dependency declarations, and version locking belong to the Milestone 1 foundation.
@@ -49,10 +49,21 @@ M0-01 baseline inspection on 2026-10-20 verified macOS 15.7.9 (24G830),
 `uname -m` reporting `x86_64`, and working Git 2.54.0. Neither `.venv` nor
 `.python-version` exists. Existing uv 0.13.1 runs, but its symlink and version
 output identify a Homebrew installation reporting `aarch64-apple-darwin`.
-Resolve this installation against the standalone requirement before M0-02
-mutation; Python compatibility remains unverified. No software was installed.
+The developer selected reuse of this installation on 2026-10-20; developer-provided
+native arm64 terminal output verified its resolution and version under M0-02. Python
+environment compatibility remains unverified. No software was installed.
 See [M0-01 results](docs/implementation-plans/M0-01.md#execution-results).
 Developer validated M0-01 on 2026-10-20; later setup remains outside this execution.
+
+Architecture follow-up on 2026-10-20 established an Apple Silicon host and
+Rosetta translation for this agent session. The developer reports a separate
+native arm64 terminal. M0-02 verification on 2026-10-20 reconfirmed Homebrew
+uv 0.13.1 and its arm64 executable. An attempted arm64 login shell still
+reported `uname -m=x86_64`. Subsequent developer-provided output confirms
+`arm64` in the intended native terminal and an existing alias to the same
+Homebrew uv executable, with successful uv 0.13.1 version output. M0-02
+verification is complete and developer validated on 2026-10-20. Preserve/reuse
+uv without installation or shell changes; M0-03 has not started. See [M0-02 observations](docs/implementation-plans/M0-02.md#scope-dependencies-and-current-state).
 
 | Package / capability | Status and intended use |
 | --- | --- |
