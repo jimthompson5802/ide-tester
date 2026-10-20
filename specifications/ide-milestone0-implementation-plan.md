@@ -81,27 +81,31 @@ Follow the [M0-02 verification plan](../docs/implementation-plans/M0-02.md). Che
 
 **Acceptance criteria:**
 
-- [ ] `.venv/bin/python` reports Python 3.12, and evidence records its exact patch version and uv-managed prebuilt provenance.
+- [ ] `.venv/bin/python` reports Python 3.12, and evidence records its exact patch version and existing Homebrew prebuilt provenance (developer-approved Homebrew requirement).
 - [ ] Interpreter assertions pass: `sys.prefix != sys.base_prefix`, and the resolved `sys.prefix` equals this checkout's resolved `.venv` path.
 - [ ] `.python-version` contains `3.12`; it and `.venv/` remain ignored and untracked.
 - [ ] Existing environment conflicts were resolved without silently overwriting unrelated state, and system Python remains unchanged.
 - [ ] No harness or automation packages, project metadata, or lockfile were introduced, and setup did not use `uv sync` or native source builds.
 
-**Dependency:** Phase 2 complete.
+**Dependency:** Phase 2 complete and developer validated.
+
+**Developer decision (2026-10-20):** Reuse `/opt/homebrew/bin/python3.12`, observed as Python 3.12.15 arm64. Do not download another Python. Follow the detailed [M0-03 plan](../docs/implementation-plans/M0-03.md); issue #4 has been aligned with this approved replacement for its original uv-managed provenance criterion.
+
+Before running these commands, follow the [M0-03 preflight and verification controls](../docs/implementation-plans/M0-03.md): verify a native arm64 execution context, block conflicting inherited uv settings and nonempty `PYTHONPATH`/`PYTHONHOME`, and verify disabled user-site access. An existing newer Homebrew 3.12.x patch is acceptable if all checks pass. Preserve partial artifacts and failure evidence without automatic rollback. Execution requires separate authorization.
 
 - [ ] Inspect an existing `.python-version`, if present. Confirm that changing its local value to `3.12` will not overwrite unrelated setup intentions; resolve conflicts before changing it.
-- [ ] Install uv-managed prebuilt Python and set the local minor-version pin:
+- [ ] Verify the selected Homebrew Python and set the local minor-version pin:
 
   ```bash
-  uv python install 3.12
-  uv python pin 3.12
+  /opt/homebrew/bin/python3.12 --version
+  uv python pin --no-config --offline --no-python-downloads --no-managed-python 3.12
   ```
 
 - [ ] Confirm that `.python-version` contains `3.12` and remains ignored. The minor-version pin is not an exact reproducibility lock.
 - [ ] If `.venv` does not exist, create it:
 
   ```bash
-  uv venv --python 3.12 .venv
+  uv venv --no-config --offline --no-python-downloads --no-managed-python --python /opt/homebrew/bin/python3.12 .venv
   ```
 
 - [ ] If `.venv` exists, inspect its interpreter using the checks below before deciding whether it can be reused. Do not delete or overwrite an incompatible environment automatically. Preserve it and agree on replacement before recreating the required `.venv` path.
@@ -199,7 +203,7 @@ Follow the [M0-02 verification plan](../docs/implementation-plans/M0-02.md). Che
 | Execution context | Date, macOS version, architecture; checkout location kept local |
 | Git | Version, availability result, installation source if installed |
 | uv | Existing Homebrew installation provenance, version, resolved path, reuse outcome |
-| Python | Exact 3.12 patch version, uv-managed installation, virtual-environment assertions |
+| Python | Exact 3.12 patch version, selected Homebrew provenance and architecture, virtual-environment assertions |
 | Local environment | `.venv` ownership result, local `3.12` pin, ignore and tracked-file checks |
 | VS Code | CLI location and version output, installation/reuse outcome |
 | Editor | Interpreter-selection result or explicit optional deferral |

@@ -6,7 +6,7 @@
 
 ## 1. Objective and boundaries
 
-Prepare the local macOS Python environment for the IDE Smoke Test Harness and install only the software tooling needed for Milestone 1: the initial VS Code and GitHub Copilot Chat proof of concept. The broader harness targets VS Code or IntelliJ IDEA and selected extensions. Use uv to install prebuilt Python and create a repository-local virtual environment.
+Prepare the local macOS Python environment for the IDE Smoke Test Harness and install only the software tooling needed for Milestone 1: the initial VS Code and GitHub Copilot Chat proof of concept. The broader harness targets VS Code or IntelliJ IDEA and selected extensions. Use uv to create a repository-local virtual environment from the developer-selected existing prebuilt Homebrew Python.
 
 Apply YAGNI (You Aren’t Gonna Need It): add tools only for demonstrated needs in the current milestone. Local native compilation is outside the intended setup and execution workflow. Do not install Xcode, Apple’s Command Line Tools, compilers, or SDKs for this project. If a dependency requires a native source build, reconsider the dependency or automation approach instead of adding a build toolchain.
 
@@ -54,15 +54,16 @@ See the [M0-02 plan](../docs/implementation-plans/M0-02.md).
 
 ## 4. Create the Milestone 0 Python environment
 
-Use Python 3.12 as the initial baseline, consistent with the proposal's Python 3.12+ requirement:
+Use Python 3.12 as the initial baseline, consistent with the proposal's Python 3.12+ requirement. On 2026-10-20 the developer selected the existing `/opt/homebrew/bin/python3.12` (observed Python 3.12.15, arm64); this supersedes the earlier uv-managed download requirement for this host. Preserve that installation and use the native arm64 terminal validated in M0-02. See the [M0-03 plan](../docs/implementation-plans/M0-03.md) for preflight and verification requirements. The commands below were executed successfully during M0-03 on 2026-10-20, using uv 0.13.1 and Python 3.12.15 arm64. Independent isolation checks passed; the developer validated M0-03 on 2026-10-20. Sandbox cache-lock denials required approved escalation for both uv commands. See the plan’s execution results:
 
 ```bash
-uv python install 3.12
-uv python pin 3.12
-uv venv --python 3.12 .venv
+uv python pin --no-config --offline --no-python-downloads --no-managed-python 3.12
+uv venv --no-config --offline --no-python-downloads --no-managed-python --python /opt/homebrew/bin/python3.12 .venv
 .venv/bin/python --version
 .venv/bin/python -c 'import sys; print(sys.executable); assert sys.prefix != sys.base_prefix'
 ```
+
+Before running these commands, follow the [M0-03 preflight and verification controls](../docs/implementation-plans/M0-03.md): verify a native arm64 execution context, block conflicting inherited uv settings and nonempty `PYTHONPATH`/`PYTHONHOME`, and verify disabled user-site access. An existing newer Homebrew 3.12.x patch is acceptable if all checks pass. Preserve partial artifacts and failure evidence without automatic rollback. Execution requires separate authorization.
 
 The executable should be inside this checkout's `.venv`. No system Python changes or environment activation are required. The `3.12` pin selects a minor version; record the resolved patch version from `python --version` for reproducibility.
 
@@ -118,7 +119,7 @@ Do not install harness or automation libraries during Milestone 0. Milestone 1 w
 - [ ] Record macOS version and architecture.
 - [ ] Verify Git is available; use a prebuilt distribution if installation is needed.
 - [ ] Verify existing uv and record its provenance, version, and reuse outcome.
-- [ ] Install Python 3.12 through uv and record the resolved patch version.
+- [ ] Verify the selected Homebrew Python 3.12 and record its provenance, architecture, and resolved patch version.
 - [ ] Create `.venv` and verify that its interpreter belongs to this checkout.
 - [ ] Install VS Code and verify the `code` CLI is available.
 - [ ] Confirm `.venv/` and the local `.python-version` remain ignored by Git.
