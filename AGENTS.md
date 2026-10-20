@@ -36,8 +36,8 @@ Keep contracts, logical tests, orchestration, and verification platform-neutral.
 
 These requirements come from the Milestone 0 setup guide and the proposal's technology choices. They describe the intended environment, not a verified installation on this host.
 
-- **Environment manager:** Use `uv` to install prebuilt Python and manage the repository-local `.venv`. Reuse the existing Homebrew uv installation per the developer's 2026-10-20 direction; no additional uv installation is needed and no uv version is pinned yet.
-- **Python:** Use **3.12** as the initial baseline within the proposal's Python 3.12+ requirement. Record the resolved patch version for reproducibility.
+- **Environment manager:** Use `uv` to manage the repository-local `.venv`. Reuse the existing Homebrew uv installation per the developer's 2026-10-20 direction; no additional uv installation is needed and no uv version is pinned yet.
+- **Python:** Use **3.12** as the initial baseline. The developer selected existing `/opt/homebrew/bin/python3.12` on 2026-10-20; M0-02 read-only checks observed Python 3.12.15 arm64. Reuse it as the explicit base for uv environment creation; do not download another Python. Record the resolved patch version and Homebrew provenance during M0-03. Environment isolation remains unverified. See [M0-03 plan](docs/implementation-plans/M0-03.md).
 - **Interpreter:** Use `.venv/bin/python` explicitly during standalone setup and select it as the editor interpreter. Keep the system Python unchanged.
 - **Project lifecycle:** Until `pyproject.toml` exists, use the standalone environment workflow rather than `uv sync`. Project initialization, dependency declarations, and version locking belong to the Milestone 1 foundation.
 - **Python pin:** `.python-version` is currently ignored and remains local during Milestone 0. When the foundation establishes the shared version, remove that ignore entry and commit the agreed pin with the package configuration.
@@ -75,6 +75,8 @@ uv without installation or shell changes; M0-03 has not started. See [M0-02 obse
 Install harness and automation packages only when justified by current Milestone 1 work; Milestone 0 installs none of them.
 
 Use prebuilt applications and Python, plus pure-Python packages or compatible prebuilt wheels, with dependency source builds disabled. Reconsider dependencies that require native compilation; compiler toolchain installation is outside this project's workflow.
+
+M0-03 review on 2026-10-20 observed the current agent context and selected Python reporting arm64. Recheck architecture in the execution context; a verified native agent may execute separately authorized setup. Follow the [M0-03 plan](docs/implementation-plans/M0-03.md) for approved patch tolerance, offline uv commands, inherited-setting checks, isolation checks, and partial-failure preservation. Environment creation remains pending.
 
 ## Isolation
 
