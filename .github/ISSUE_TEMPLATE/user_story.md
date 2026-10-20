@@ -1,4 +1,3 @@
-
 ---
 name: User Story / Feature Request
 about: Propose a new capability or improvement
