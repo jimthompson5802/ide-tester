@@ -80,6 +80,18 @@ M0-03 review on 2026-10-20 observed the current agent context and selected Pytho
 
 ## Isolation
 
+M0-04 execution on 2026-10-20 verified the existing VS Code 1.135.0
+application executable as arm64 and its bundled CLI version output as arm64.
+Bare `code` did not resolve in the agent shell. Subsequent developer-terminal
+output resolves `code` to `/usr/local/bin/code` and reports the matching version,
+commit and arm64 architecture. The CLI symlink targets the inspected application.
+The developer confirmed fresh-terminal provenance, visible checkout/README opening,
+and satisfaction of editor interpreter selection or the permitted unavailable-UI
+deferral; the combined confirmation does not distinguish the interpreter outcomes. Independent checkout Python
+3.12.15 isolation checks passed again. No editor settings or installations were
+changed. See [M0-04 results](docs/implementation-plans/M0-04.md#execution-results--2026-10-20).
+M0-04 is complete and developer validated on 2026-10-20; M0-05 remains separately authorized work.
+
 Run GUI automation sequentially against dedicated persistent test profiles and fresh disposable workspaces. Preserve authenticated profiles, target only test-owned processes/windows, and constrain cleanup to harness-owned paths.
 
 Authentication is established manually. Never automate passwords or MFA, extract credentials, or copy authenticated profiles between hosts. Classify expired authentication as blocked. Keep tokens, private conversations, and unrelated desktop content out of committed evidence and diagnostics.
