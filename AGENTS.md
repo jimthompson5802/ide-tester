@@ -34,10 +34,10 @@ Keep contracts, logical tests, orchestration, and verification platform-neutral.
 
 ## Technical environment
 
-These requirements come from the Milestone 0 setup guide and the proposal's technology choices. They describe the intended environment, not a verified installation on this host.
+These requirements come from the Milestone 0 setup guide and the proposal's technology choices. Python environment observations are recorded below; remaining tooling and harness requirements are design targets.
 
 - **Environment manager:** Use `uv` to manage the repository-local `.venv`. Reuse the existing Homebrew uv installation per the developer's 2026-10-20 direction; no additional uv installation is needed and no uv version is pinned yet.
-- **Python:** Use **3.12** as the initial baseline. The developer selected existing `/opt/homebrew/bin/python3.12` on 2026-10-20; M0-02 read-only checks observed Python 3.12.15 arm64. Reuse it as the explicit base for uv environment creation; do not download another Python. Record the resolved patch version and Homebrew provenance during M0-03. Environment isolation remains unverified. See [M0-03 plan](docs/implementation-plans/M0-03.md).
+- **Python:** Use **3.12** as the initial baseline. The developer selected existing `/opt/homebrew/bin/python3.12` on 2026-10-20; M0-02 read-only checks observed Python 3.12.15 arm64. Reuse it as the explicit base for uv environment creation; do not download another Python. M0-03 verified Python 3.12.15 arm64 and checkout-local environment isolation on 2026-10-20; developer validated M0-03 on 2026-10-20. See [M0-03 plan](docs/implementation-plans/M0-03.md).
 - **Interpreter:** Use `.venv/bin/python` explicitly during standalone setup and select it as the editor interpreter. Keep the system Python unchanged.
 - **Project lifecycle:** Until `pyproject.toml` exists, use the standalone environment workflow rather than `uv sync`. Project initialization, dependency declarations, and version locking belong to the Milestone 1 foundation.
 - **Python pin:** `.python-version` is currently ignored and remains local during Milestone 0. When the foundation establishes the shared version, remove that ignore entry and commit the agreed pin with the package configuration.
@@ -46,12 +46,12 @@ These requirements come from the Milestone 0 setup guide and the proposal's tech
 Known Python package choices are not yet declared or version-locked:
 
 M0-01 baseline inspection on 2026-10-20 verified macOS 15.7.9 (24G830),
-`uname -m` reporting `x86_64`, and working Git 2.54.0. Neither `.venv` nor
-`.python-version` exists. Existing uv 0.13.1 runs, but its symlink and version
+`uname -m` reporting `x86_64`, and working Git 2.54.0. At that baseline, neither `.venv` nor
+`.python-version` existed. Existing uv 0.13.1 runs, but its symlink and version
 output identify a Homebrew installation reporting `aarch64-apple-darwin`.
 The developer selected reuse of this installation on 2026-10-20; developer-provided
 native arm64 terminal output verified its resolution and version under M0-02. Python
-environment compatibility remains unverified. No software was installed.
+environment compatibility was unverified at that baseline. No software was installed.
 See [M0-01 results](docs/implementation-plans/M0-01.md#execution-results).
 Developer validated M0-01 on 2026-10-20; later setup remains outside this execution.
 
@@ -63,7 +63,7 @@ reported `uname -m=x86_64`. Subsequent developer-provided output confirms
 `arm64` in the intended native terminal and an existing alias to the same
 Homebrew uv executable, with successful uv 0.13.1 version output. M0-02
 verification is complete and developer validated on 2026-10-20. Preserve/reuse
-uv without installation or shell changes; M0-03 has not started. See [M0-02 observations](docs/implementation-plans/M0-02.md#scope-dependencies-and-current-state).
+uv without installation or shell changes; M0-03 results follow. See [M0-02 observations](docs/implementation-plans/M0-02.md#scope-dependencies-and-current-state).
 
 | Package / capability | Status and intended use |
 | --- | --- |
@@ -76,7 +76,7 @@ Install harness and automation packages only when justified by current Milestone
 
 Use prebuilt applications and Python, plus pure-Python packages or compatible prebuilt wheels, with dependency source builds disabled. Reconsider dependencies that require native compilation; compiler toolchain installation is outside this project's workflow.
 
-M0-03 review on 2026-10-20 observed the current agent context and selected Python reporting arm64. Recheck architecture in the execution context; a verified native agent may execute separately authorized setup. Follow the [M0-03 plan](docs/implementation-plans/M0-03.md) for approved patch tolerance, offline uv commands, inherited-setting checks, isolation checks, and partial-failure preservation. Environment creation remains pending.
+M0-03 review on 2026-10-20 observed the current agent context and selected Python reporting arm64. Recheck architecture in the execution context; a verified native agent may execute separately authorized setup. Follow the [M0-03 plan](docs/implementation-plans/M0-03.md) for approved patch tolerance, offline uv commands, inherited-setting checks, isolation checks, and partial-failure preservation. M0-03 execution on 2026-10-20 created the ignored local `3.12` pin and unseeded `.venv` using those offline commands. Independent checks passed for Python 3.12.15 arm64, selected Homebrew base identity, checkout prefix, disabled system/user site packages, and zero installed distributions. The sandbox initially denied uv cache locks; identical commands succeeded after approved escalation. Developer validated M0-03 on 2026-10-20. M0-04 and later setup remain pending separate authorization.
 
 ## Isolation
 

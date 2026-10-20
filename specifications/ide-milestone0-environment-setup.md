@@ -54,7 +54,7 @@ See the [M0-02 plan](../docs/implementation-plans/M0-02.md).
 
 ## 4. Create the Milestone 0 Python environment
 
-Use Python 3.12 as the initial baseline, consistent with the proposal's Python 3.12+ requirement. On 2026-10-20 the developer selected the existing `/opt/homebrew/bin/python3.12` (observed Python 3.12.15, arm64); this supersedes the earlier uv-managed download requirement for this host. Preserve that installation and use the native arm64 terminal validated in M0-02. See the [M0-03 plan](../docs/implementation-plans/M0-03.md) for preflight and verification requirements. The commands below remain proposed until execution:
+Use Python 3.12 as the initial baseline, consistent with the proposal's Python 3.12+ requirement. On 2026-10-20 the developer selected the existing `/opt/homebrew/bin/python3.12` (observed Python 3.12.15, arm64); this supersedes the earlier uv-managed download requirement for this host. Preserve that installation and use the native arm64 terminal validated in M0-02. See the [M0-03 plan](../docs/implementation-plans/M0-03.md) for preflight and verification requirements. The commands below were executed successfully during M0-03 on 2026-10-20, using uv 0.13.1 and Python 3.12.15 arm64. Independent isolation checks passed; the developer validated M0-03 on 2026-10-20. Sandbox cache-lock denials required approved escalation for both uv commands. See the plan’s execution results:
 
 ```bash
 uv python pin --no-config --offline --no-python-downloads --no-managed-python 3.12
