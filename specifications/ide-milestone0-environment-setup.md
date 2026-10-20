@@ -6,7 +6,7 @@
 
 ## 1. Objective and boundaries
 
-Prepare the local Python environment and install only the software tooling needed for Milestone 1. Use uv to install prebuilt Python and create a repository-local virtual environment.
+Prepare the local macOS Python environment for the IDE Smoke Test Harness and install only the software tooling needed for Milestone 1: the initial VS Code and GitHub Copilot Chat proof of concept. The broader harness targets VS Code or IntelliJ IDEA and selected extensions. Use uv to install prebuilt Python and create a repository-local virtual environment.
 
 Apply YAGNI (You Aren’t Gonna Need It): add tools only for demonstrated needs in the current milestone. Local native compilation is outside the intended setup and execution workflow. Do not install Xcode, Apple’s Command Line Tools, compilers, or SDKs for this project. If a dependency requires a native source build, reconsider the dependency or automation approach instead of adding a build toolchain.
 

@@ -1,4 +1,4 @@
-# GitHub Copilot IDE Smoke-Test Harness — Proposal
+# IDE Smoke Test Harness
 
 **Status:** Draft for analysis and refinement with an AI coding assistant  
 **Target platforms:** macOS first; Windows after successful macOS proof of concept and developer approval<br>
@@ -8,7 +8,7 @@
 
 ## 1. Purpose
 
-Build a lightweight, largely unattended smoke-test harness that verifies basic IDE functionality and GitHub Copilot behavior after IDE or Copilot updates. Favor a small, repeatable set of observable assertions over broad end-to-end coverage.
+Build a lightweight, largely unattended smoke-test harness for Visual Studio Code or IntelliJ IDEA and selected extensions/plugins after IDE or extension updates. Favor a small, repeatable set of observable assertions over broad end-to-end coverage. GitHub Copilot Chat is the initial extension target; the harness should accommodate other selected extensions through their own contracts, adapters, and tests.
 
 Prove feasibility with VS Code and Copilot on macOS first. After developer approval, validate the same smoke tests on Windows before expanding to IntelliJ. Windows support requires its own feasibility validation; macOS success does not establish Windows compatibility.
 
@@ -16,11 +16,12 @@ Prove feasibility with VS Code and Copilot on macOS first. After developer appro
 
 - Launch each IDE and verify readiness.
 - Open a disposable project and file; edit and save; independently verify file contents.
+- Verify selected extensions through extension-specific adapters and observable assertions; begin with GitHub Copilot Chat.
 - Open GitHub Copilot Chat, submit a simple prompt, and verify a completed response.
 - Later, request a code edit and verify it with an executable test.
 - Reuse authenticated test profiles without automating passwords or MFA.
-- Record host OS and version, IDE and Copilot versions, results, timings, logs, and failure screenshots.
-- Eventually trigger testing on newly detected IDE or Copilot releases with minimal human intervention.
+- Record host OS and version, IDE and selected extension versions, results, timings, logs, and failure screenshots.
+- Eventually trigger testing on newly detected IDE or selected extension releases with minimal human intervention.
 
 ### Non-goals for the initial release
 
@@ -76,6 +77,8 @@ Keep contracts, logical tests, orchestration, fixtures, and verification platfor
 **Risk:** GitHub Copilot Chat UI automation is the critical feasibility spike. Confirm selectors, response-completion detection, and authentication reuse for each IDE/OS combination before committing to broader implementation.
 
 ## 3. Initial smoke tests
+
+T01–T03 cover basic IDE functionality. T04–T05 cover the initial selected extension, GitHub Copilot Chat. Additional selected extensions will have their own smoke tests and acceptance criteria in later scoped work.
 
 | ID | Test | Expected outcome | Priority |
 |---|---|---|---|
@@ -136,7 +139,7 @@ Run IDEs **sequentially** to avoid desktop focus collisions. Use explicit timeou
 
 ## 5. Adapter contracts
 
-Use three separate contracts: IDE lifecycle, editor file operations, and Copilot behavior. Compose adapters around the same IDE session rather than combining all responsibilities in one class. The following interfaces are illustrative; refine exceptions and state models during implementation. Concrete implementations are deferred to the relevant implementation milestone.
+Separate IDE lifecycle, editor file operations, and extension behavior into distinct contracts. `Copilot` is the initial extension-specific contract; other selected extensions define contracts suited to their features. Compose adapters around the same IDE session rather than combining all responsibilities in one class. The following interfaces are illustrative; refine exceptions and state models during implementation. Concrete implementations are deferred to the relevant implementation milestone.
 
 ```python
 from pathlib import Path
@@ -313,18 +316,18 @@ flowchart LR
     A -- No --> C[Continue testing]
 ```
 
-Do not export/copy secrets or OS credential-store contents, automate MFA, or silently use personal projects. When authentication expires, classify the run as **BLOCKED** rather than a Copilot functional failure.
+Do not export/copy secrets or OS credential-store contents, automate MFA, or silently use personal projects. When authentication expires, classify the run as **BLOCKED** rather than an extension functional failure.
 
 ## 9. Release monitoring
 
-Initially test **already installed** versions on demand. Later, poll authoritative IDE and plugin release metadata and compare the detected `(IDE version, Copilot version, channel, platform)` combination with prior runs. Record version sources and installed versions separately; a published release is not necessarily installed or compatible.
+Initially test **already installed** versions on demand. Later, poll authoritative IDE and selected extension/plugin release metadata and compare the detected `(IDE version, selected extension identifiers and versions, channel, platform)` combination with prior runs. Record version sources and installed versions separately; a published release is not necessarily installed or compatible. Initially the selected extension inventory contains Copilot.
 
 ```mermaid
 flowchart TD
     S([Scheduled release check]) --> M[Retrieve release metadata]
     M --> D{Untested version combination?}
     D -- No --> N[No action]
-    D -- Yes --> P[Provision candidate IDE and Copilot versions]
+    D -- Yes --> P[Provision candidate IDE and selected extension versions]
     P --> C{Provisioning succeeded?}
     C -- No --> E[Report environment/setup failure]
     C -- Yes --> T[Run smoke suite]

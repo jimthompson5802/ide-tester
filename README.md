@@ -1,6 +1,6 @@
-# IDE Tester
+# IDE Smoke Test Harness
 
-A planned smoke-test harness for checking basic IDE functionality and GitHub Copilot Chat after IDE or extension updates. Prove feasibility on macOS first, then add Windows support after developer approval.
+A planned smoke-test harness for Visual Studio Code or IntelliJ IDEA and selected extensions/plugins after IDE or extension updates. GitHub Copilot Chat is the initial extension target. Prove feasibility on macOS first, then add Windows support after developer approval.
 
 **Status:** Design and planning. This repository currently contains a draft proposal and Milestone 1 user stories. There is no implemented harness, installable package, or runnable test suite yet.
 
@@ -28,7 +28,7 @@ Milestones define delivery outcomes. Implementation phases within each milestone
 
 ## Planned architecture
 
-Three separate adapter contracts cover IDE lifecycle (`IDE`), editor file operations (`EditorFiles`), and extension behavior (`Copilot`). File and extension adapters receive the IDE instance at construction time and target that session. Additional extensions can introduce their own contracts and adapters without adding extension-specific methods to the IDE contract.
+Separate adapter contracts cover IDE lifecycle (`IDE`), editor file operations (`EditorFiles`), and extension behavior, initially `Copilot`. File and extension adapters receive the IDE instance at construction time and target that session. Additional selected extensions introduce their own contracts, adapters, and tests without adding extension-specific methods to the IDE contract.
 
 Contracts, logical tests, orchestration, and verification remain platform-neutral. UI automation, process handling, and scheduling have platform-specific implementations, selected for the configured IDE and local host OS. Windows dependencies and implementation are deferred until Milestone 2.
 
@@ -60,7 +60,7 @@ Windows environment setup and support, IntelliJ IDEA support, release monitoring
 ## Planned operating environment
 
 - A usable, logged-in graphical session on each host and the platform-specific automation permissions established by its feasibility spike; initially macOS, with Windows validated in Milestone 2.
-- A dedicated persistent IDE test profile on each host, with Copilot installed and signed in manually during setup.
+- A dedicated persistent IDE test profile on each host, with selected extensions installed and authenticated manually where required; initially Copilot.
 - Fresh disposable workspaces for each run, separate from personal projects and the persistent profile.
 - Sequential GUI execution to avoid keyboard-focus conflicts.
 - Valid authentication and network/service availability for Copilot Chat tests.

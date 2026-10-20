@@ -1,4 +1,4 @@
-# Milestone 1 User Stories — VS Code + GitHub Copilot Smoke-Test Harness
+# IDE Smoke Test Harness — Milestone 1 User Stories
 
 **Status:** Draft backlog for review and refinement  
 **Source:** `ide-copilot-smoke-harness-proposal.md`  
@@ -8,6 +8,8 @@
 **Out of scope:** IntelliJ IDEA, release monitoring, automatic IDE upgrades, Copilot inline completion, agent mode, comprehensive code-generation tests, local native compilation, custom native helpers, and compiler toolchain installation.
 
 ## 1. Milestone objective and success criteria
+
+The harness targets VS Code or IntelliJ IDEA and selected extensions. This milestone proves the initial combination: VS Code and GitHub Copilot Chat on macOS. Other extensions and IDE/platform combinations remain later scoped work.
 
 Deliver a local proof of concept that starts a **test instance of VS Code**, opens a disposable workspace, edits and saves a file, opens **GitHub Copilot Chat**, submits a simple prompt, and determines whether a completed response was received. The run must produce clear pass/fail/blocked results and useful diagnostics without changing the user's regular VS Code settings or projects.
 
