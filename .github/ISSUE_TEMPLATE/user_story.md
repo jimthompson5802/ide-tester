@@ -2,6 +2,7 @@
 ---
 name: User Story / Feature Request
 about: Propose a new capability or improvement
+type: Feature
 title: "[Feature]: "
 labels: enhancement
 assignees: ""
