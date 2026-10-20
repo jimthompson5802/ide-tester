@@ -1,4 +1,4 @@
-# IDE Smoke Test Harness
+# IDE Smoke Test Harness Proof-of-Concept
 
 A planned smoke-test harness for Visual Studio Code or IntelliJ IDEA and selected extensions/plugins after IDE or extension updates. GitHub Copilot Chat is the initial extension target. Prove feasibility on macOS first, then add Windows support after developer approval.
 
