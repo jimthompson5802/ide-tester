@@ -18,7 +18,7 @@ WORKER = Path(__file__).with_name("run_worker.py")
 @pytest.fixture
 def runs(tmp_path):
     children = []
-    def launch(name, *, finish=False):
+    def launch(name, *, finish=False, retain=False):
         cwd = tmp_path / name
         cwd.mkdir()
         executable = cwd / "bin" / "fake-ide"
@@ -33,7 +33,7 @@ def runs(tmp_path):
         )
         config = cwd / f"{name}.yaml"
         config.write_text(yaml.safe_dump({
-            "harness": {"platform": "macos", "execution_mode": "sequential",
+            "harness": {"workspace": {"retain_on_failure": retain}, "platform": "macos", "execution_mode": "sequential",
                         "timeouts": {"ide_startup_seconds": 1, "copilot_response_seconds": 2}},
             "ides": {"vscode": {"executable": "./bin/fake-ide", "profile_root": "./profile"}},
         }))
@@ -76,6 +76,8 @@ def test_cli_overlap_keeps_owner_and_evidence_independent(runs, tmp_path):
     assert owner_action.with_suffix(".profile-check").exists()
     assert not rejected_action.with_suffix(".cleanup").exists()
     blocked = read_summary(contender_cwd)
+    assert blocked["workspace"]["disposition"] == "not_created"
+    assert not (contender_cwd / "source-checkout" / "workspaces").exists()
     assert blocked["result"]["reason"] == "active_run_conflict"
     assert all(t["outcome"] == "SKIP" for t in blocked["tests"])
     assert owner.poll() is None
@@ -99,12 +101,15 @@ def test_cli_overlap_keeps_owner_and_evidence_independent(runs, tmp_path):
     assert lock.stat().st_ino == inode
 
 
-def test_sigint_finalizes_and_releases_for_next_cli_run(runs):
-    owner, cwd, action, _ = runs("interrupted")
+@pytest.mark.parametrize("retain", [False, True])
+def test_sigint_finalizes_and_releases_for_next_cli_run(runs, retain):
+    owner, cwd, action, _ = runs("interrupted", retain=retain)
     wait_until(action.exists)
     owner.send_signal(signal.SIGINT)
     assert owner.wait(timeout=5) == 130
     data = read_summary(cwd)
+    assert data["workspace"]["disposition"] == ("retained" if retain else "removed")
+    assert Path(data["workspace"]["target_path"]).exists() is retain
     assert data["issues"][0]["reason"] == "interrupted"
     assert all(t["outcome"] == "SKIP" for t in data["tests"])
     assert action.with_suffix(".cleanup").exists()

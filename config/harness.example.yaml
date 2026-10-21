@@ -1,8 +1,11 @@
-# Copy to harness.local.yaml and edit; no profile or workspace is created.
+# Copy to harness.local.yaml and edit. Loading configuration is read-only.
+# Admitted guarded runs create a fresh workspace; profiles are never created.
 # Only this small schema is supported; the proposal's larger example is not.
 harness:
   platform: macos
   execution_mode: sequential
+  workspace:
+    retain_on_failure: false  # Keep an owned workspace on known nonpassing outcomes.
   timeouts:
     ide_startup_seconds: 30
     copilot_response_seconds: 120

@@ -157,7 +157,7 @@ def check_configured_profile(root, executable):
     try:
         home = Path.home()
         checkout = source_checkout()
-        protected = (*macos_protected_paths(home), installation_path(executable))
+        protected = (*macos_protected_paths(home), installation_path(executable), checkout / "workspaces")
     except (OSError, RuntimeError):
         return Result(Outcome.ERROR, Reason.PROFILE_INSPECTION_UNKNOWN, key="profile")
     return check_profile_safety(root, home=home, protected_paths=protected, checkout=checkout)

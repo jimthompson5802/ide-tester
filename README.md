@@ -2,7 +2,7 @@
 
 A planned smoke-test harness for Visual Studio Code or IntelliJ IDEA and selected extensions/plugins after IDE or extension updates. GitHub Copilot Chat is the initial extension target. Prove feasibility on macOS first, then add Windows support after developer approval.
 
-**Status:** Milestone 0 and M1-00 (Slice 0) were completed and developer validated on 2026-10-20. M1-01 is complete and developer validated: Phase 1 and Phase 2 were accepted on 2026-10-20. Phase 2 adds strict YAML configuration, guarded runs, structured events, saved summaries, and non-GUI acceptance tests. IDE operations remain explicitly unavailable. See the [M1-01 evidence](docs/reports/M1-01-phase2.md). M1-02 profile safety is complete and developer validated on 2026-10-21. See the [M1-02 evidence](docs/reports/M1-02-phase2.md).
+**Status:** Milestone 0 and M1-00 (Slice 0) were completed and developer validated on 2026-10-20. M1-01 is complete and developer validated: Phase 1 and Phase 2 were accepted on 2026-10-20. Phase 2 adds strict YAML configuration, guarded runs, structured events, saved summaries, and non-GUI acceptance tests. IDE operations remain explicitly unavailable. See the [M1-01 evidence](docs/reports/M1-01-phase2.md). M1-02 profile safety is complete and developer validated on 2026-10-21. See the [M1-02 evidence](docs/reports/M1-02-phase2.md). M1-03 workspace safety is complete and developer validated on 2026-10-21; combined Slice 1 acceptance remains pending.
 
 ## Completed work
 
@@ -103,7 +103,7 @@ Milestone 1 targets **Visual Studio Code and GitHub Copilot Chat on macOS**. The
 
 The project follows YAGNI: install tools and dependencies only for demonstrated needs in the current milestone. Setup and execution use prebuilt software and pure-Python packages or compatible prebuilt wheels, with dependency source builds disabled. Local native compilation and compiler toolchain installation are out of scope; any dependency requiring them must be reconsidered.
 
-**M1-00: Validate Copilot Chat automation feasibility** is complete for the reduced request/response scope. **M1-01: Bootstrap the Python project and CLI** is complete and developer validated on 2026-10-20. It provides the foundation, with IDE operations explicitly unavailable. M1-02 profile safety is complete and developer validated on 2026-10-21. M1-03 disposable workspace safety and the Slice 1 checkpoint remain outstanding.
+**M1-00: Validate Copilot Chat automation feasibility** is complete for the reduced request/response scope. **M1-01: Bootstrap the Python project and CLI** is complete and developer validated on 2026-10-20. It provides the foundation, with IDE operations explicitly unavailable. M1-02 profile safety is complete and developer validated on 2026-10-21. M1-03 disposable workspace safety is complete and developer validated on 2026-10-21; combined Slice 1 acceptance remains pending. See the [execution report](docs/reports/M1-03-phase1.md).
 
 Implementation proceeds in reviewable slices: feasibility, foundation, IDE file operations, Copilot Chat, and repeatability/reporting. Each slice requires developer validation. Milestone 1 acceptance includes five consecutive unattended passing runs on unchanged IDE and Copilot versions.
 
@@ -146,7 +146,7 @@ Preserve an existing `.venv`. Install locked dependency/backend wheels, then ins
 
 Keep both installation steps: the first prohibits third-party source builds and preserves spike packages; the second uses the wheel-installed backend without resolving dependencies or isolated build requirements. Avoid plain `uv sync`, which can prune the spike packages and does not enforce this recipe. Exact versions and clean-environment evidence are in the [Phase 1 report](docs/reports/M1-01-phase1.md); `uv.lock` is the version source of truth. No compiler setup is required.
 
-Use `.venv/bin/ide-smoke` explicitly, or activate `.venv` to put the bare command on PATH. Copy [config/harness.example.yaml](config/harness.example.yaml) to `config/harness.local.yaml`, then edit the executable and existing dedicated-profile paths. The larger configuration in the proposal is illustrative and is not accepted by this CLI. Configuration never creates a profile or workspace. Follow the
+Use `.venv/bin/ide-smoke` explicitly, or activate `.venv` to put the bare command on PATH. Copy [config/harness.example.yaml](config/harness.example.yaml) to `config/harness.local.yaml`, then edit the executable and existing dedicated-profile paths. The larger configuration in the proposal is illustrative and is not accepted by this CLI. Configuration loading is read-only. Admitted runs create a fresh disposable workspace after availability and profile safety pass. Follow the
 [profile safety setup guide](docs/vscode-test-profile-setup.md) for the required
 real `user-data`/`extensions` directories and dedication marker. Guarded runs now
 validate profile safety after basic availability: unsafe profiles block with exit 3,
@@ -159,7 +159,41 @@ ide-smoke run --ide vscode
 
 **With valid configuration, available resources, and a profile-safety pass, this exits 4:** IDE operations are not implemented. It saves all T01–T05 entries as `SKIP` with that run-level `HARNESS ERROR` origin. Help exits successfully. Passing synthetic development tests does not establish IDE/Copilot behavior.
 
-The default config path is relative to the caller's current working directory. An explicit `--config PATH` is also relative to that directory; `~` is expanded. Paths inside YAML are relative to the configuration file, with `~` expansion; a bare executable name is searched on PATH. Selecting a config elsewhere does not relocate reports. Run evidence is saved as `reports/<run-id>/summary.json` and `events.jsonl` under the caller's working directory.
+The default config path is relative to the caller's current working directory. An explicit `--config PATH` is also relative to that directory; `~` is expanded. Paths inside YAML are relative to the configuration file, with `~` expansion; a bare executable name is searched on PATH. Selecting a config elsewhere does not relocate reports. Run evidence is saved as `reports/<run-id>/summary.json`, `workspace.json`, and `events.jsonl` under the caller's working directory.
+
+Workspace paths are fixed beneath the actual editable-source checkout's ignored
+`workspaces/` root, independently of cwd and config location. Each admitted run
+exclusively creates a generated child with `example.py` containing
+`message = "original fixture"` and a trailing newline. Existing roots require
+`.ide-smoke-workspaces.json` with exactly
+`{"schema_version":1,"purpose":"ide-smoke-workspaces"}`; unmarked roots block
+without adoption or repair. Profiles remain separate and persistent.
+
+Optional `harness.workspace.retain_on_failure` accepts only a boolean and defaults
+to `false`. By default, owned workspaces are removed on pass and nonpass. With
+`true`, known nonpassing runs retain them locally, including today's public
+unimplemented exit 4. Operation/process cleanup failure or inability to save
+initial ownership metadata also preserves the workspace. Uncertain ownership
+is preserved for inspection. Required removal refusal/failure is a cleanup error.
+A final report or guard-release failure discovered after deletion cannot restore
+the workspace; evidence records its actual disposition.
+
+Each report includes a `workspace` manifest in `summary.json` and an atomic
+`workspace.json` sidecar. It records schema/run identity, generated paths, fixed
+target name, initial fixture SHA-256, requested retention, disposition, and a
+controlled reason; it excludes contents and cleanup authority. Dispositions are
+`not_created`, `created`, `removed`, `retained`, and `cleanup_failed`. The initial
+manifest precedes deletion. If an update fails, a sidecar can remain at an earlier
+disposition; a successfully saved summary reports that evidence error.
+
+Retained or abandoned workspaces are never automatically reused or swept. To
+recover one, identify the exact run and generated direct child from its report,
+confirm no run/process is using it, inspect its contents and current real path,
+and deliberately remove only that identified child using your file manager.
+Preserve the root marker, other children, and profiles. An on-disk marker alone
+does not authorize cleanup. Hard kills can leave resources and incomplete reports.
+See the [M1-03 report](docs/reports/M1-03-phase1.md) for the qualified deletion
+mechanism, safety tests, installed-console status, and limitations.
 
 Every admitted run contends nonblocking on `~/.ide-smoke/desktop-run.lock` before configuration is loaded. The OS-held lock serializes cooperating invocations for one macOS user across checkouts and configurations, remains held through cleanup and reporting, and is never unlinked during release. A contender writes its own blocked report and cannot act on the owner's resources. Help does not acquire the lock. OS lock release after termination does not establish cleanup of future IDE processes.
 
@@ -180,7 +214,7 @@ Runtime severity is `HARNESS ERROR` before `FAIL` before `BLOCKED`; skipped or i
 
 Terminal output is brief: outcome, controlled explanation, and the saved summary path. Report failures explicitly state that no summary was saved, with nonzero status; partial event/temporary files may remain. Structured diagnostics contain run/test metadata, controlled reason codes/messages, and relevant configuration keys/resource paths. They omit configuration contents, credentials, environment dumps, prompts/responses, and arbitrary exception text/tracebacks. Unknown-key diagnostics identify the supported parent section without echoing arbitrary key names.
 
-The [Phase 2 report](docs/reports/M1-01-phase2.md) records test coverage and local evidence paths. Actual graphical-session readiness, fixture management, IDE operations, and richer reporting remain later work.
+The [Phase 2 report](docs/reports/M1-01-phase2.md) records test coverage and local evidence paths. Actual graphical-session readiness, IDE operations, and richer reporting remain later work.
 
 Future runs will execute on the local host using platform-specific executable and profile paths. The proposal's illustrative configuration targets macOS; Windows setup and configuration will be established in Milestone 2.
 
@@ -200,7 +234,7 @@ Historical qualification and decisions remain in the
 
 Profile safety establishes no executable, session, permission, settings, Copilot,
 or authentication readiness. Future GUI runs still require an unlocked,
-exclusively reserved desktop. M1-03 requires separate authorization, and Slice 1
+exclusively reserved desktop. M1-03 is complete and developer validated on 2026-10-21; combined Slice 1
 validation remains pending before GUI implementation.
 
 ## Repository contents

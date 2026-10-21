@@ -51,3 +51,12 @@ class InertGuard:
 @pytest.fixture
 def guard():
     return InertGuard()
+
+@pytest.fixture(autouse=True)
+def isolated_workspace_checkout(tmp_path, monkeypatch):
+    """No unit test may write workspace resources into the actual checkout."""
+    from ide_smoke import workspace
+    checkout = tmp_path / 'source-checkout'
+    checkout.mkdir()
+    monkeypatch.setattr(workspace, 'source_checkout', lambda: checkout, raising=False)
+    return checkout

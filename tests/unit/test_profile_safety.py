@@ -395,3 +395,19 @@ def test_unqualified_source_layout_fails_closed(layout, tmp_path, monkeypatch):
     result = probe.check_configured_profile(layout, tmp_path / 'bin/editor')
     assert result.outcome == Outcome.ERROR
     assert result.reason.code == 'profile_inspection_unknown'
+
+
+def test_configured_profile_protects_fixed_workspace_root(tmp_path, monkeypatch):
+    from ide_smoke.results import Reason
+    from ide_smoke import profile_safety
+    checkout = tmp_path / 'checkout-workspace-policy'
+    checkout.mkdir()
+    root = checkout / 'workspaces' / 'profile'
+    root.mkdir(parents=True)
+    (root / 'user-data').mkdir()
+    (root / 'extensions').mkdir()
+    (root / '.ide-smoke-profile.json').write_text('{"schema_version":1,"purpose":"ide-smoke-dedicated-vscode"}')
+    monkeypatch.setattr(profile_safety, 'source_checkout', lambda: checkout)
+    result = profile_safety.check_configured_profile(root, tmp_path / 'bin' / 'fake')
+    assert result.outcome == Outcome.BLOCKED
+    assert result.reason == Reason.PROFILE_PROTECTED_OVERLAP

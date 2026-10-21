@@ -55,10 +55,10 @@ without running or authenticating the executable. Guarded runs use the same
 first regular file selected by foundation PATH lookup, preserving its
 wrong-kind/error behavior, without a second PATH selection.
 Custom everyday locations must be supplied as protected context when known;
-these defaults cannot discover every personal resource. No workspace path exists
-in current configuration. Explicit workspace context can be protected with the
-same overlap rule; M1-03 must ensure mutual separation when adding workspace
-lifecycle, without adding its configuration in this story.
+these defaults cannot discover every personal resource. M1-03 now protects the
+fixed `<actual-source-checkout>/workspaces/` root in production profile admission.
+Workspace creation also protects the selected profile root, enforcing separation
+in both directions. Workspace location is not a configuration option.
 
 Known unsafe/missing resources and invalid markers are `BLOCKED`. Permission or
 other indeterminate metadata/read/resolve failures are `HARNESS ERROR`. Findings
