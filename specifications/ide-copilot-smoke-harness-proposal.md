@@ -6,6 +6,13 @@
 **Initial extension/plugin:** GitHub Copilot  
 **Authentication:** Reuse a previously authenticated session in dedicated persistent test profiles
 
+**Current work scope — 2026-10-20:** The developer narrowed Copilot work to
+submitting one request (`Reply with exactly the word READY.`) through the UI and
+requiring `response.strip() == "READY"` for its assistant response. The
+[revised M1-00 plan](../docs/implementation-plans/M1-00.md) governs this task.
+Broader completion, cancellation, robustness and restart requirements below are
+draft future design, outside the current work.
+
 ## 1. Purpose
 
 Build a lightweight, largely unattended smoke-test harness for Visual Studio Code or IntelliJ IDEA and selected extensions/plugins after IDE or extension updates. Favor a small, repeatable set of observable assertions over broad end-to-end coverage. GitHub Copilot Chat is the initial extension target; the harness should accommodate other selected extensions through their own contracts, adapters, and tests.

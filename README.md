@@ -2,7 +2,7 @@
 
 A planned smoke-test harness for Visual Studio Code or IntelliJ IDEA and selected extensions/plugins after IDE or extension updates. GitHub Copilot Chat is the initial extension target. Prove feasibility on macOS first, then add Windows support after developer approval.
 
-**Status:** Design and planning. This repository currently contains a draft proposal and Milestone 1 user stories. There is no implemented harness, installable package, or runnable test suite yet.
+**Status:** M1-00 is scoped to submitting `Reply with exactly the word READY.` through Copilot Chat and requiring `response.strip() == "READY"` for its response. Saved host evidence now verifies the exact assertion; the developer validated M1-00 on 2026-10-20; additional completion, cancellation, usability and restart testing are outside the current work. See the [revised plan](docs/implementation-plans/M1-00.md) and [execution report](docs/reports/M1-00-phase1.md). There is no implemented harness or installable package; the broader behavior below is future design, not the current task.
 
 ## Start here
 
@@ -67,7 +67,7 @@ Milestone 1 targets **Visual Studio Code and GitHub Copilot Chat on macOS**. The
 
 The project follows YAGNI: install tools and dependencies only for demonstrated needs in the current milestone. Setup and execution use prebuilt software and pure-Python packages or compatible prebuilt wheels, with dependency source builds disabled. Local native compilation and compiler toolchain installation are out of scope; any dependency requiring them must be reconsidered.
 
-The first step is **M1-00: Validate Copilot Chat automation feasibility**. It must establish reliable UI interaction, response-completion detection, test-instance isolation, and authentication reuse before the main harness is implemented.
+The first step is **M1-00: Validate Copilot Chat automation feasibility**. Its current outcome is one UI request and an assistant response matching `READY` after whitespace trimming. The broader harness remains separately scoped and authorized work.
 
 Implementation proceeds in reviewable slices: feasibility, foundation, IDE file operations, Copilot Chat, and repeatability/reporting. Each slice requires developer validation. Milestone 1 acceptance includes five consecutive unattended passing runs on unchanged IDE and Copilot versions.
 

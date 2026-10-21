@@ -7,6 +7,15 @@
 **Execution model:** Existing macOS login; attended setup followed by unattended runs with exclusive desktop use<br>
 **Out of scope:** IntelliJ IDEA, release monitoring, automatic IDE upgrades, Copilot inline completion, agent mode, comprehensive code-generation tests, local native compilation, custom native helpers, and compiler toolchain installation.
 
+**Current Copilot scope — developer revision, 2026-10-20:** Only submitting one
+request (`Reply with exactly the word READY.`) through the Copilot Chat UI and
+requiring `response.strip() == "READY"` for its assistant response is required now. The [revised M1-00 plan](../docs/implementation-plans/M1-00.md)
+and M1-00 story below govern the current task. Completion-state qualification,
+cancellation/error testing, stale-history challenges,
+restart reuse and repeated-run requirements are outside this work. Broader later
+stories and earlier clarification tables remain future/historical design context;
+they do not authorize or gate the current reduced task.
+
 ## 1. Milestone objective and success criteria
 
 The harness targets VS Code or IntelliJ IDEA and selected extensions. This milestone proves the initial combination: VS Code and GitHub Copilot Chat on macOS. Other extensions and IDE/platform combinations remain later scoped work.
@@ -38,7 +47,7 @@ These developer-confirmed Milestone 1 decisions refine the draft proposal: a sep
 | T02 | Open fixture workspace/file | Correct disposable workspace and target file are open |
 | T03 | Edit and save file | On-disk file content matches expected text after an IDE save |
 | T04 | Open Copilot Chat | Chat UI is visible and available for interaction; authentication problems are separately classified |
-| T05 | Send Copilot prompt | A fresh assistant response to this run's prompt completes within timeout and equals `READY` after trimming leading/trailing whitespace only |
+| T05 | Send Copilot prompt | Current scope: submit `Reply with exactly the word READY.` through the UI and require `response.strip() == "READY"` for its assistant response within a bounded wait |
 
 ### Result classification and dependent tests
 
@@ -83,28 +92,40 @@ flowchart LR
 
 ### Spike M1-00 — Validate Copilot Chat automation feasibility
 
-**Priority:** Critical | **Type:** Time-boxed research spike | **Dependencies:** Milestone 0 accepted; separate spike-plan approval and execution authorization
+**Priority:** Critical | **Type:** Minimal feasibility spike | **Dependencies:** Accepted Milestone 0 environment; existing dedicated signed-in test profile
 
 **Slice:** 0 — Feasibility
 
-**As a** harness developer, **I want** to establish which VS Code and Copilot UI interactions can be automated on my macOS installation, **so that** the design relies on demonstrated capabilities rather than assumptions.
+**Execution status:** Developer validated M1-00 on 2026-10-20; Slice 0 is complete. M1-01 execution requires separate authorization.
+The [saved-evidence review](../docs/reports/M1-00-phase1.md#reduced-scope-result--saved-evidence-review)
+establishes submission and exact `READY` matching; no additional exchange was needed.
+
+**Scope revision:** The developer narrowed this task on 2026-10-20 to sending one
+request and receiving a response. This replaces the earlier ten-criterion
+M1-00 specification and its multi-launch/completion/cancellation requirements.
+
+**As a** harness developer, **I want** to submit a simple request through Copilot
+Chat and verify its response equals `READY`, **so that** I know the basic IDE integration can
+be automated.
 
 **Acceptance criteria**
 
-- [ ] Record macOS, architecture, VS Code, Copilot extension, and Python versions; note the VS Code distribution/channel, install paths, interface language, and relevant test-profile/Chat settings. Identify restrictions supported by evidence and obtain developer approval of material limitations.
-- [ ] Demonstrate that the proposed automation dependencies install without native source builds on the target host, with source builds disabled. Select only what the spike needs; treat PyObjC as a candidate subject to compatible prebuilt wheel availability. If no approach meets this constraint and the required UI checks, report no-go and document the limitation.
-- [ ] Verify that a test VS Code instance can be launched without taking over the user's regular workspace; document any instance/profile isolation caveats.
-- [ ] Inspect macOS Accessibility representation of VS Code and Copilot Chat; record selectors or other stable interaction methods actually observed.
-- [ ] Demonstrate automated end-to-end Chat interaction across at least two IDE launches, proving correct test-instance targeting, fresh-response detection, observable response completion, and authentication reuse. Record missing capabilities explicitly if this cannot be demonstrated.
-- [ ] Establish a response-completion signal associated with the submitted response, with checks for observable error/cancellation states; unchanged text or a fixed sleep alone is insufficient. Demonstrate that echoed prompts and stale history cannot count as a fresh response, and investigate detection of an authentication-required state.
-- [ ] Validate that a dedicated test profile can retain a signed-in Copilot session across IDE restarts without copying credentials or bypassing authentication.
-- [ ] Record required Accessibility, Automation, Screen Recording, and Keychain permissions **as observed**, not as assumed requirements.
-- [ ] Produce a feasibility decision: **go**, **go with limitations**, or **no-go**, with a fallback option and known risks. A go decision requires all core guarantees above; limitations may narrow supported conditions but cannot waive those guarantees. If response completion cannot be distinguished from an error or cancellation, return for a design decision before feasibility approval.
-- [ ] If feasibility remains unresolved after one working day of active investigation, excluding waits for developer setup/responses, present the findings and remaining uncertainties for a developer decision before extending investigation. Honor the repository's four-unsuccessful-fix-round limit.
+- [x] AC1 — Automation enters and submits `Reply with exactly the word READY.` through the Copilot Chat UI in the dedicated VS Code instance.
+- [x] AC2 — Read the associated assistant response within a bounded wait and require `response.strip() == "READY"`. Whitespace trimming only is allowed: `READY\n` passes; different capitalization, punctuation, Markdown wrapping and extra words fail. Prompt text alone does not satisfy receipt. No full-generation completion detector is required.
+- [x] AC3 — Record the observed submission/receipt and exact-match result, tested configuration, minimal reproduction path and any practical prerequisite or limitation in a short sanitized report.
 
-**Evidence:** Short spike report separating observations from assumptions, redacted accessibility observations, proof-of-concept scripts, and automated demonstration evidence across at least two IDE launches covering the core guarantees. Never store tokens or private chat content in the repository.
+Reuse existing host evidence when it establishes these outcomes; another run is
+not required solely because the scope changed. Keep the existing profile and
+ownership/cleanup safeguards. Cancellation, negative-path/error discrimination,
+stale-history challenges, restart authentication reuse,
+repeated launches and other Copilot usability/feature tests are out of scope now.
 
-**Developer gate:** Review the demonstrations, configuration restrictions, and feasibility decision; approve Slice 0 before M1-01 or any main-harness implementation begins.
+**Evidence:** One observed automated request/reply exchange with exact `READY` matching, a short result
+and reproduction note. Keep credentials and private content out of tracked files.
+
+**Developer gate:** Review the reduced M1-00 result before any separately
+authorized M1-01 or main-harness work. See the
+[revised plan](../docs/implementation-plans/M1-00.md).
 
 ---
 
@@ -251,6 +272,11 @@ flowchart LR
 
 ### Story M1-07 — Submit a Copilot Chat prompt and verify completion (T05)
 
+**Future design:** The broader criteria in this story are outside the current
+reduced Copilot task. They are not prerequisites for M1-00 and require separate
+scope/plan review before implementation; the current M1-00 does not deliver a
+qualified completion detector.
+
 **Priority:** Must | **Dependencies:** M1-06
 
 **Slice:** 3 — Copilot
@@ -348,7 +374,7 @@ flowchart TD
 
 | Slice | Stories | Demonstration | Required approval |
 |---|---|---|---|
-| 0 — Feasibility | M1-00 | Automated Chat across at least two launches; completion, freshness, targeting, auth reuse; feasibility report | Approve approach and limitations before foundation |
+| 0 — Feasibility | M1-00 | Current scope: one automated UI request and exact `READY` response assertion; short evidence note | Review reduced result before separately authorized foundation work |
 | 1 — Foundation | M1-01–M1-03 | CLI, validated config, safe fixture, preflight, basic saved results, overlap prevention | Validate safe environment and setup before IDE basics |
 | 2 — IDE basics | M1-04–M1-05 | T01–T03, including disk assertion | Validate reliable file operations before Copilot integration |
 | 3 — Copilot | M1-06–M1-07 | T04–T05 with fresh completed response satisfying `READY` assertion | Validate Chat verification before hardening |
@@ -416,6 +442,10 @@ Every implementation story is done only when:
 
 ### Developer-confirmed decisions — 2026-10-20
 
+The current-scope revision at the top of this document supersedes the broader
+Copilot requirements below for this task. Retain these earlier decisions as
+historical/future backlog context, not current M1-00 acceptance conditions.
+
 The developer confirmed shared understanding of Q1–Q16 before requesting incorporation into this backlog. These are requirements for future work, not completed acceptance checks or authorization to implement.
 
 | Decision | Agreed clarification | Applied in |
@@ -463,8 +493,8 @@ Use this document as the **Milestone 1 product backlog**, not as proof that the 
 4. Use deterministic checks for filesystem operations; use explicit observable UI signals for Copilot Chat. Never treat an API-only Copilot response as evidence that the IDE extension works.
 5. Do not expand into Windows, IntelliJ, release monitoring, automatic upgrades, background scheduling, or Copilot agent/code-edit workflows during Milestone 1 without an explicit scope change. Recording installed versions for qualification and reports is in scope.
 6. When an assumption proves false, propose a design change and its trade-offs rather than silently substituting a weaker test.
-7. Apply the confirmed decisions in Section 7. Do not relax response completion, assertion, or repeatability criteria without developer review. Apply the spike review point and the repository's four-unsuccessful-fix-round limit independently.
+7. Apply the developer's current-scope revision above for M1-00. Earlier completion and repeatability requirements are outside this task; the exact `READY` assertion remains in scope. Apply the spike review point and the repository's four-unsuccessful-fix-round limit independently.
 
 ### Suggested first prompt
 
-> Review `ide-copilot-smoke-harness-proposal.md` and `ide-copilot-milestone1-user-stories.md`, including the confirmed decisions in Section 7. Focus **only on planning M1-00**, the macOS VS Code + GitHub Copilot Chat automation feasibility spike. Identify concrete checks, commands or scripts, expected evidence across at least two IDE launches, safety precautions, the one-active-working-day review point, and go/no-go criteria. Flag unverified assumptions. Present the spike plan for review and wait for separate execution authorization. **Do not implement the main harness or proceed to M1-01 before the Slice 0 feasibility gate is approved.**
+> Review the current scope revision and `docs/implementation-plans/M1-00.md`. Plan only one request (`Reply with exactly the word READY.`) through Copilot Chat and the exact assertion `response.strip() == "READY"` for its response. Reuse existing evidence when sufficient. Completion, cancellation/error discrimination, usability tests and restart/repeated-run qualification are outside this task. Do not begin the main harness or later stories.
