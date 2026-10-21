@@ -2,7 +2,7 @@
 
 ## Current state
 
-This repository contains design documents for an IDE smoke-test harness. There is no implemented harness, Python project configuration, or runnable test suite yet. Treat proposed commands, source layouts, APIs, and configuration schemas as design targets until implementation establishes them.
+This repository contains design documents and an M1-00 prerequisite probe for an IDE smoke-test harness. There is no implemented harness, Python project configuration, or runnable test suite yet. Treat proposed commands, source layouts, APIs, and configuration schemas as design targets until implementation establishes them.
 
 Keep documentation changes within the requested scope; a documentation task does not initiate environment setup or harness implementation.
 
@@ -99,6 +99,21 @@ diagnostic. Local environment, pin, settings and evidence remain ignored and
 untracked. No software or compiler tools were installed and no source builds
 occurred during Milestone 0. See [M0-05 results](docs/implementation-plans/M0-05.md#execution-results--2026-10-20).
 Developer accepted Milestone 0 on 2026-10-20; M1-00 requires separate authorization.
+
+M1-00 execution was authorized on 2026-10-20 and Phase 1 is partial; see the
+[execution report](docs/reports/M1-00-phase1.md) before resuming feasibility work.
+The binary-only PyObjC installation/import checks passed on Python 3.12.15 arm64;
+use the [spike requirements and commands](scripts/spikes/m1_00/README.md) for exact
+tested dependencies. Host execution reports Accessibility trusted and a visible
+graphical session; sandbox checks report different visibility. VS Code 1.135.0
+bundles GitHub.copilot-chat 0.63.0. Attended probes established scoped lifecycle,
+regular-window coexistence, Chat toggle, Ask selection via the Command Palette,
+and unsent keyboard input. The diagnosed input false negative requires verified
+`editor.accessibilitySupport=on` for editor-text readback in this tested setup;
+`AXManualAccessibility` exposes the app tree but alone did not establish reliable
+editor readback. Test-profile settings were restored after diagnosis. Authentication
+and response completion remain unverified; Phase 1 validation is required before
+Phase 2. No main harness exists.
 
 Run GUI automation sequentially against dedicated persistent test profiles and fresh disposable workspaces. Preserve authenticated profiles, target only test-owned processes/windows, and constrain cleanup to harness-owned paths.
 

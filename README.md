@@ -2,7 +2,7 @@
 
 A planned smoke-test harness for Visual Studio Code or IntelliJ IDEA and selected extensions/plugins after IDE or extension updates. GitHub Copilot Chat is the initial extension target. Prove feasibility on macOS first, then add Windows support after developer approval.
 
-**Status:** Design and planning. This repository currently contains a draft proposal and Milestone 1 user stories. There is no implemented harness, installable package, or runnable test suite yet.
+**Status:** M1-00 feasibility discovery is in progress. Dependency checks, isolated lifecycle and unsent Chat keyboard input have observed evidence; authentication and response-completion discovery remain pending. See the [Phase 1 execution report](docs/reports/M1-00-phase1.md). There is no implemented harness, installable package, or runnable test suite yet.
 
 ## Start here
 
