@@ -152,7 +152,19 @@ The [Phase 2 report](docs/reports/M1-01-phase2.md) records test coverage and loc
 
 Future runs will execute on the local host using platform-specific executable and profile paths. The proposal's illustrative configuration targets macOS; Windows setup and configuration will be established in Milestone 2.
 
-[M1-01 is developer validated](docs/implementation-plans/M1-01.md#phase-2-execution--2026-10-20). M1-02/M1-03 remain pending separate authorization, followed by the Slice 1 checkpoint before GUI implementation.
+[M1-01 is developer validated](docs/implementation-plans/M1-01.md#phase-2-execution--2026-10-20).
+M1-02 Phase 1 was authorized on 2026-10-21 and partially executed; its
+[qualification report](docs/reports/M1-02-phase1.md) records the observed signals
+and remaining checks. The developer accepted a limited prerequisite snapshot and
+deferred automated screen-lock detection: future preflight may pass with that
+state explicitly unassessed. An unlocked, exclusively reserved desktop remains
+an operating requirement; locked desktops and focus interference can cause later
+GUI failures despite passing preflight. See the
+[accepted implications and risks](docs/implementation-plans/M1-02.md#accepted-limitation-and-risks--2026-10-21).
+The [dedicated-profile setup guide](docs/vscode-test-profile-setup.md) is a draft for
+review. Production preflight remains unimplemented; Phase 2 awaits remaining
+qualification and the Phase 1 checkpoint. M1-03 remains pending separate
+authorization, followed by the Slice 1 checkpoint before GUI implementation.
 
 ## Repository contents
 

@@ -161,6 +161,19 @@ See the [follow-up execution results](docs/implementation-plans/M1-01-path-looku
 
 Run GUI automation sequentially against dedicated persistent test profiles and fresh disposable workspaces. Preserve authenticated profiles, target only test-owned processes/windows, and constrain cleanup to harness-owned paths.
 
+M1-02 Phase 1 was authorized and partially executed on 2026-10-21. Before resuming
+M1-02, read the [Phase 1 report](docs/reports/M1-02-phase1.md). On 2026-10-21 the
+developer accepted the limited console/login/current-user and permission snapshot
+and deferred automated screen-lock detection. Follow the
+[revised boundary and risks](docs/implementation-plans/M1-02.md#accepted-limitation-and-risks--2026-10-21):
+record screen-lock state as unassessed without making that omission a block/error;
+unlocked, exclusive desktop use remains an operating requirement. No detector,
+heuristic, or CLI confirmation prompt was approved. Effective settings, remaining
+identity/inventory checks, and controlled cases still need qualification. The
+setup guide is a draft; the earlier 147 non-GUI tests passed. No new runtime
+evidence accompanies the scope revision. Complete the Phase 1 checkpoint before
+Phase 2; production preflight remains unavailable and Slice 1 is not validated.
+
 Authentication is established manually. Never automate passwords or MFA, extract credentials, or copy authenticated profiles between hosts. Classify expired authentication as blocked. Keep tokens, private conversations, and unrelated desktop content out of committed evidence and diagnostics.
 
 ## Validation and documentation

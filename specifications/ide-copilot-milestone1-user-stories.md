@@ -166,10 +166,19 @@ authorized M1-01 or main-harness work. See the
 
 **As a** developer, **I want** the harness to check its environment before starting GUI tests, **so that** missing prerequisites do not appear as IDE regressions.
 
+**Developer-approved scope revision — 2026-10-21:** Accept the limited documented
+console/login/current-user and permission snapshot. Automated screen-lock
+detection is deferred; preflight may succeed with screen-lock state explicitly
+unassessed. An unlocked, exclusively reserved desktop remains an operating
+requirement; actual IDE/window interaction belongs to T01. See the
+[implementation plan's implications and risks](../docs/implementation-plans/M1-02.md#accepted-limitation-and-risks--2026-10-21).
+Other criteria and validation gates remain pending; this revision is not story
+acceptance. The GitHub issue has not been edited.
+
 **Acceptance criteria**
 
 - [ ] Verify the configured VS Code executable exists and is runnable.
-- [ ] Check that the intended macOS graphical session is usable; fail as `BLOCKED` if the UI cannot be driven.
+- [ ] Check the intended macOS console/login/current-user session and required permissions as a limited prerequisite snapshot; identify unavailable prerequisites as `BLOCKED`. Record screen-lock state as unassessed without failing preflight for that accepted omission; do not claim actual IDE/window usability.
 - [ ] Check the required automation permissions using feasible documented checks or a minimal interaction probe; do not claim a permission was verified if it was not.
 - [ ] Validate test-profile paths and the presence of the expected Copilot extension; distinguish missing extension from authentication failure.
 - [ ] Do not automate passwords, MFA, or Keychain extraction.
