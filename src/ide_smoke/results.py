@@ -15,6 +15,12 @@ class Outcome(str, Enum):
 
 
 class Reason(Enum):
+    WORKSPACE_CREATED = ("workspace_created", "The owned fixture workspace was initialized.")
+    WORKSPACE_REMOVED = ("workspace_removed", "The owned workspace was removed.")
+    WORKSPACE_RETAINED = ("workspace_retained", "The workspace candidate was preserved for inspection.")
+    WORKSPACE_UNSAFE = ("workspace_unsafe", "Workspace prerequisites are unsafe.")
+    WORKSPACE_UNKNOWN = ("workspace_unavailable", "Workspace setup or inspection could not be completed.")
+    WORKSPACE_EVIDENCE = ("workspace_manifest_failed", "Workspace metadata could not be saved.")
     PASSED = ("assertion_passed", "The observable assertion passed.")
     MISMATCH = ("content_mismatch", "Observed content did not match the required assertion.")
     PREREQUISITE = ("prerequisite_missing", "A required prerequisite is unavailable; establish it before retrying.")

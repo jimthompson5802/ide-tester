@@ -2,7 +2,7 @@
 
 ## Current state
 
-This repository contains design documents, the accepted M1-00 probe, and the implemented M1-01 foundation with non-GUI tests. Both phases and M1-01 are complete and developer validated on 2026-10-20. Strict configuration, results, summaries, and CLI exclusion exist. M1-02 profile safety is complete and developer validated on 2026-10-21. IDE operations remain explicitly unavailable. Treat remaining proposed commands, APIs, and schemas as design targets.
+This repository contains design documents, the accepted M1-00 probe, and the implemented M1-01 foundation with non-GUI tests. Both phases and M1-01 are complete and developer validated on 2026-10-20. Strict configuration, results, summaries, and CLI exclusion exist. M1-02 profile safety is complete and developer validated on 2026-10-21. M1-03 workspace safety is complete and developer validated on 2026-10-21; combined Slice 1 was developer validated on 2026-10-21. IDE operations remain explicitly unavailable. Treat remaining proposed commands, APIs, and schemas as design targets.
 
 Keep documentation changes within the requested scope; a documentation task does not initiate environment setup or harness implementation.
 
@@ -154,8 +154,7 @@ Use `.venv/bin/ide-smoke run --ide vscode` with an edited local config per
 unimplemented result (exit 4), with five skipped tests and saved evidence.
 Reports/config defaults follow the caller's working directory; YAML paths follow
 the config directory. Preserve reports' diagnostic allowlist and controlled
-reasons when adding behavior. The developer accepted Phase 2 and validated M1-01 on 2026-10-20. Slice 1 validation remains pending. Do not
-start M1-02/M1-03 or GUI work without separate authorization and applicable gates.
+reasons when adding behavior. The developer accepted Phase 2 and validated M1-01 on 2026-10-20. At that checkpoint Slice 1 validation was pending; acceptance on 2026-10-21 is recorded below. Subsequent M1-02 acceptance and authorized M1-03 execution are recorded below; GUI work still requires the applicable gates.
 
 The authorized M1-01 PATH lookup follow-up was implemented on 2026-10-20;
 developer validation is pending. Bare command names now search past directory
@@ -198,8 +197,8 @@ successful cleanup, unchanged narrow metadata, and guard reacquisition. Syntheti
 invalid markers block with exit 3; uncertain inspection is an error. All 294
 non-GUI tests passed using the existing environment. No dependencies or GUI
 behavior were added. Metadata checks do not prove arbitrary-content integrity
-or authentication validity. M1-02 is developer accepted within this scope. Slice 1 remains pending;
-M1-03 requires separate authorization.
+or authentication validity. M1-02 is developer accepted within this scope. Slice 1 acceptance is recorded below;
+M1-03 execution was subsequently authorized; see its execution entry below.
 
 The authorized M1-02 review fix on 2026-10-21 recognizes enclosing `.app`
 suffixes case-insensitively. Regression tests through `check_configured_profile`
@@ -222,3 +221,28 @@ Test non-GUI logic independently; validate GUI behavior on the target host. When
 **Stop after four unsuccessful fix rounds for the same error and ask the developer for guidance.** A round consists of applying a proposed fix and rerunning the check that exposed the error. Report the error, the four attempted fixes, their results, and relevant diagnostic paths. Do not begin a fifth round or work around the failing requirement until the developer provides guidance.
 
 Report checks actually performed, their results, and remaining limitations. Until project tooling exists, state that runtime tests are unavailable rather than presenting proposed CLI examples as working commands.
+
+## M1-03 workspace execution — 2026-10-21
+
+M1-03 execution is authorized. Read the [plan](docs/implementation-plans/M1-03.md)
+and [execution report](docs/reports/M1-03-phase1.md) before changing workspace
+admission, cleanup, retention, or manifest behavior. Fixed root: actual editable
+source checkout/workspaces, independent of cwd/config. Existing roots require the
+exact purpose marker; automatic adoption/repair and stale-resource sweeps are
+outside scope. Cleanup authority is a manager-issued in-memory handle with
+qualified descriptors. Initial metadata precedes deletion; late evidence errors
+cannot restore removed data. Config loading remains read-only; admitted runs now
+create fixtures while public IDE operations remain unimplemented.
+
+The developer explicitly authorized moving the pre-existing unmarked workspace
+root on 2026-10-21; it is preserved intact by rename under ignored
+`reports/m1-03/preserved-workspaces/`. The harness exclusively created a fresh
+marked root. Three installed-console runs verified removal, configured retention,
+and successor removal preserving the retained fixture; all produced expected
+unimplemented exit 4 with five skips, unchanged synthetic sentinels, and matching
+manifests. All 367 non-GUI tests passed. P1-01–P1-09 are implementation verified.
+The developer validated M1-03 on 2026-10-21 and requested a commit, explicitly
+prohibiting advancement to another phase or milestone. The developer separately stated “i also validate slice1” on 2026-10-21, closing
+the combined foundation checkpoint. The instruction to stop remains in force;
+no next phase or milestone is authorized. No dependencies, authenticated profile changes, or GUI behavior were added. M1-04 requires separate
+authorization and accepted Slice 1 validation.

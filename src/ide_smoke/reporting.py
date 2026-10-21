@@ -38,6 +38,17 @@ class Reporter:
         except OSError:
             raise EvidenceError from None
 
+    def workspace_manifest(self, manifest):
+        from ide_smoke.workspace import WorkspaceManifest
+        if not isinstance(manifest, WorkspaceManifest):
+            raise EvidenceError
+        temporary = self.directory / "workspace.tmp"
+        try:
+            temporary.write_text(json.dumps(manifest.as_dict(), indent=2, allow_nan=False) + "\n", encoding="utf-8")
+            os.replace(temporary, self.directory / "workspace.json")
+        except OSError:
+            raise EvidenceError from None
+
     def finalize(self, summary: dict):
         temporary = self.directory / "summary.tmp"
         try:

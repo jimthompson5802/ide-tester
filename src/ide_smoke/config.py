@@ -38,12 +38,13 @@ class Config:
     profile_root: Path
     ide_startup_seconds: float
     copilot_response_seconds: float
+    retain_workspace_on_failure: bool = False
 
 
-def _section(value, required: tuple[str, ...], key: str) -> dict:
+def _section(value, required: tuple[str, ...], key: str, optional: tuple[str, ...] = ()) -> dict:
     if not isinstance(value, dict) or any(not isinstance(k, str) for k in value):
         raise ConfigError(Reason.CONFIG_MAPPING, key)
-    if value.keys() - set(required):
+    if value.keys() - set(required + optional):
         # Never echo arbitrary user-supplied keys or their values.
         raise ConfigError(Reason.CONFIG_UNKNOWN, key)
     for name in required:
@@ -99,13 +100,18 @@ def load_config(path: Path) -> Config:
         raise ConfigError(error.result.reason, error.result.key, str(path)) from None
     try:
         root = _section(document, ("harness", "ides"), "document")
-        harness = _section(root["harness"], ("platform", "execution_mode", "timeouts"), "harness")
+        harness = _section(root["harness"], ("platform", "execution_mode", "timeouts"), "harness", ("workspace",))
+        workspace = _section(harness.get("workspace", {}), (), "harness.workspace", ("retain_on_failure",))
+        retain = workspace.get("retain_on_failure", False)
+        if type(retain) is not bool:
+            raise ConfigError(Reason.CONFIG_TYPE, "harness.workspace.retain_on_failure")
         _choice(harness["platform"], "macos", "harness.platform", Reason.CONFIG_PLATFORM)
         _choice(harness["execution_mode"], "sequential", "harness.execution_mode", Reason.CONFIG_MODE)
         timeouts = _section(harness["timeouts"], ("ide_startup_seconds", "copilot_response_seconds"), "harness.timeouts")
         ides = _section(root["ides"], ("vscode",), "ides")
         vscode = _section(ides["vscode"], ("executable", "profile_root"), "ides.vscode")
         return Config(
+            retain_workspace_on_failure=retain,
             executable=_path(vscode["executable"], path.parent, "ides.vscode.executable", allow_name=True),
             profile_root=_path(vscode["profile_root"], path.parent, "ides.vscode.profile_root"),
             ide_startup_seconds=_timeout(timeouts["ide_startup_seconds"], "harness.timeouts.ide_startup_seconds"),
