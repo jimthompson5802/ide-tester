@@ -131,6 +131,8 @@ authorized M1-01 or main-harness work. See the
 
 ### Story M1-01 — Bootstrap the Python project and CLI
 
+**Execution status:** Phase 1 and Phase 2 developer validated on 2026-10-20; M1-01 is complete. See the [Phase 2 report](../docs/reports/M1-01-phase2.md). The developer explicitly accepted Phase 2 on 2026-10-20. Slice 1 acceptance remains pending; M1-02/M1-03 require separate authorization.
+
 **Priority:** Must | **Dependencies:** M1-00 approved
 
 **Slice:** 1 — Foundation
@@ -139,16 +141,16 @@ authorized M1-01 or main-harness work. See the
 
 **Acceptance criteria**
 
-- [ ] Define a Python package and development dependencies in `pyproject.toml` with documented setup steps.
-- [ ] Include only dependencies justified by current stories; lock the selected versions and document installation with dependency source builds disabled. Verify that setup needs no compiler toolchain or native source builds on the target host.
-- [ ] Provide `ide-smoke --help` and `ide-smoke run --ide vscode`; unimplemented operations fail clearly rather than silently succeeding.
-- [ ] Read and validate YAML configuration; report invalid keys, missing paths, and invalid timeout values with actionable errors.
-- [ ] Provide structured logging with run identifier and timestamps.
-- [ ] Define `PASS`, `FAIL`, `BLOCKED`, `HARNESS ERROR`, and dependent-test `SKIP` according to the classification rules above, preserving uncertainty instead of guessing at causes.
-- [ ] Provide a minimal saved run summary and documented exit codes before richer reporting in M1-08; include available results and reasons after blocked prerequisites, exceptions, and timeouts. Unimplemented tests cannot yield an all-pass run.
-- [ ] Define fail-fast behavior: stop dependent GUI actions after a prerequisite failure, preserve the originating outcome, mark dependent tests `SKIP` with reasons, and ensure cleanup is attempted.
-- [ ] Reject overlapping GUI-run invocations in the same desktop session with a nonzero result and actionable message before the second invocation launches an IDE or sends GUI actions; a rejected invocation must not interfere with the active run.
-- [ ] Add unit tests for configuration parsing, CLI argument validation, result classification, basic summaries/exit codes, dependent-test skipping, and overlap prevention.
+- [x] Define a Python package and development dependencies in `pyproject.toml` with documented setup steps.
+- [x] Include only dependencies justified by current stories; lock the selected versions and document installation with dependency source builds disabled. Verify that setup needs no compiler toolchain or native source builds on the target host.
+- [x] Provide `ide-smoke --help` and `ide-smoke run --ide vscode`; unimplemented operations fail clearly rather than silently succeeding.
+- [x] Read and validate YAML configuration; report invalid keys, missing paths, and invalid timeout values with actionable errors.
+- [x] Provide structured logging with run identifier and timestamps.
+- [x] Define `PASS`, `FAIL`, `BLOCKED`, `HARNESS ERROR`, and dependent-test `SKIP` according to the classification rules above, preserving uncertainty instead of guessing at causes.
+- [x] Provide a minimal saved run summary and documented exit codes before richer reporting in M1-08; include available results and reasons after blocked prerequisites, exceptions, and timeouts. Unimplemented tests cannot yield an all-pass run.
+- [x] Define fail-fast behavior: stop dependent GUI actions after a prerequisite failure, preserve the originating outcome, mark dependent tests `SKIP` with reasons, and ensure cleanup is attempted.
+- [x] Reject overlapping GUI-run invocations in the same desktop session with a nonzero result and actionable message before the second invocation launches an IDE or sends GUI actions; a rejected invocation must not interfere with the active run.
+- [x] Add unit tests for configuration parsing, CLI argument validation, result classification, basic summaries/exit codes, dependent-test skipping, and overlap prevention.
 
 **Evidence:** CLI output, sample basic summaries including a blocked/error outcome, a controlled overlapping-invocation check, and passing unit-test report.
 

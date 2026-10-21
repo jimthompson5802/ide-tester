@@ -1,0 +1,20 @@
+[build-system]
+requires = ["flit_core==3.12.0"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "ide-smoke"
+version = "0.1.0"
+description = "Foundation for a local IDE smoke-test harness"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = ["PyYAML>=6,<7"]
+
+[project.scripts]
+ide-smoke = "ide_smoke.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "flit_core==3.12.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

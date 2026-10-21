@@ -2,7 +2,7 @@
 
 A planned smoke-test harness for Visual Studio Code or IntelliJ IDEA and selected extensions/plugins after IDE or extension updates. GitHub Copilot Chat is the initial extension target. Prove feasibility on macOS first, then add Windows support after developer approval.
 
-**Status:** Milestone 0 and M1-00 (Slice 0) were completed and developer validated on 2026-10-20. The repository contains design documents, implementation plans, an execution report, and macOS feasibility scripts. There is no main harness, installable package, project configuration (`pyproject.toml`), or runnable harness test suite yet. M1-01 and main-harness implementation require separate authorization.
+**Status:** Milestone 0 and M1-00 (Slice 0) were completed and developer validated on 2026-10-20. M1-01 is complete and developer validated: Phase 1 and Phase 2 were accepted on 2026-10-20. Phase 2 adds strict YAML configuration, guarded runs, structured events, saved summaries, and non-GUI acceptance tests. IDE operations remain explicitly unavailable. See the [M1-01 evidence](docs/reports/M1-01-phase2.md).
 
 ## Completed work
 
@@ -72,11 +72,11 @@ Generating a backlog, creating issues, and approving a plan do not authorize imp
 
 ## Milestone 1 scope
 
-Milestone 1 targets **Visual Studio Code and GitHub Copilot Chat on macOS**. The initial Python baseline is 3.12. The feasibility spike uses PyObjC for macOS Accessibility automation; pytest, YAML configuration, and the main harness package remain planned.
+Milestone 1 targets **Visual Studio Code and GitHub Copilot Chat on macOS**. The package supports Python 3.12 only; 3.12.15 arm64 is the qualified interpreter. The feasibility spike uses PyObjC for macOS Accessibility automation. Foundation now locks PyYAML, pytest, and the pure-Python Flit Core backend; configuration handling is implemented for the small schema in [the example](config/harness.example.yaml).
 
 The project follows YAGNI: install tools and dependencies only for demonstrated needs in the current milestone. Setup and execution use prebuilt software and pure-Python packages or compatible prebuilt wheels, with dependency source builds disabled. Local native compilation and compiler toolchain installation are out of scope; any dependency requiring them must be reconsidered.
 
-**M1-00: Validate Copilot Chat automation feasibility** is complete for the reduced request/response scope. The next story is **M1-01: Bootstrap the Python project and CLI**, subject to separate execution authorization. The remaining foundation slice also covers configuration, preflight, and disposable workspace safety.
+**M1-00: Validate Copilot Chat automation feasibility** is complete for the reduced request/response scope. **M1-01: Bootstrap the Python project and CLI** is complete and developer validated on 2026-10-20. It provides the foundation, with IDE operations explicitly unavailable. The remaining foundation slice also covers configuration, preflight, and disposable workspace safety.
 
 Implementation proceeds in reviewable slices: feasibility, foundation, IDE file operations, Copilot Chat, and repeatability/reporting. Each slice requires developer validation. Milestone 1 acceptance includes five consecutive unattended passing runs on unchanged IDE and Copilot versions.
 
@@ -102,17 +102,57 @@ The existing spike can verify retained local evidence without launching VS Code 
 
 This command requires the ignored observation/tree artifacts from the original host run; they are not included in a fresh checkout. See the [spike README](scripts/spikes/m1_00/README.md#current-result-and-offline-reproduction) for prerequisites and reproduction details. These scripts are experimental feasibility tools, not a general harness.
 
-Harness installation and execution instructions will be added when it exists. The specifications propose commands such as:
+The foundation package and development tests can be installed from this checkout using the existing Homebrew Python and uv. For a fresh checkout, first create the local environment (no Python download):
+
+```bash
+/opt/homebrew/bin/uv venv --python /opt/homebrew/bin/python3.12 --no-python-downloads --offline .venv
+```
+
+Preserve an existing `.venv`. Install locked dependency/backend wheels, then install only the local pure-Python package offline:
+
+```bash
+/opt/homebrew/bin/uv sync --locked --inexact --no-install-project --no-build --no-python-downloads --python /opt/homebrew/bin/python3.12 --cache-dir reports/m1-01/uv-cache
+/opt/homebrew/bin/uv pip install --python .venv/bin/python --no-python-downloads --no-deps --no-build-isolation --offline --cache-dir reports/m1-01/uv-cache --editable .
+.venv/bin/ide-smoke --help
+.venv/bin/python -m pytest
+```
+
+Keep both installation steps: the first prohibits third-party source builds and preserves spike packages; the second uses the wheel-installed backend without resolving dependencies or isolated build requirements. Avoid plain `uv sync`, which can prune the spike packages and does not enforce this recipe. Exact versions and clean-environment evidence are in the [Phase 1 report](docs/reports/M1-01-phase1.md); `uv.lock` is the version source of truth. No compiler setup is required.
+
+Use `.venv/bin/ide-smoke` explicitly, or activate `.venv` to put the bare command on PATH. Copy [config/harness.example.yaml](config/harness.example.yaml) to `config/harness.local.yaml`, then edit the executable and existing dedicated-profile paths. The larger configuration in the proposal is illustrative and is not accepted by this CLI. Configuration never creates a profile or workspace. Run:
 
 ```bash
 ide-smoke run --ide vscode
 ```
 
-**This command is a design target and is not currently available.** Configuration examples and source layouts in the specifications are also proposals.
+**With valid settings and available resources, this exits 4:** IDE operations are not implemented. It saves all T01–T05 entries as `SKIP` with that run-level `HARNESS ERROR` origin. Help exits successfully. Passing synthetic development tests does not establish IDE/Copilot behavior.
 
-Runs execute on the local host using configuration for its platform (`macos` or `windows`), including platform-specific executable and profile paths. The proposal's current configuration example targets macOS; Windows setup and configuration will be established in Milestone 2.
+The default config path is relative to the caller's current working directory. An explicit `--config PATH` is also relative to that directory; `~` is expanded. Paths inside YAML are relative to the configuration file, with `~` expansion; a bare executable name is searched on PATH. Selecting a config elsewhere does not relocate reports. Run evidence is saved as `reports/<run-id>/summary.json` and `events.jsonl` under the caller's working directory.
 
-For the next implementation step, review the accepted M1-00 evidence, the M1-01 story in the backlog, and the proposed [M1-01 implementation plan](docs/implementation-plans/M1-01.md), then obtain separate authorization for foundation execution.
+Every admitted run contends nonblocking on `~/.ide-smoke/desktop-run.lock` before configuration is loaded. The OS-held lock serializes cooperating invocations for one macOS user across checkouts and configurations, remains held through cleanup and reporting, and is never unlinked during release. A contender writes its own blocked report and cannot act on the owner's resources. Help does not acquire the lock. OS lock release after termination does not establish cleanup of future IDE processes.
+
+The supported schema requires `macos`, `sequential`, positive finite numeric timeouts, an executable path/name, and an explicit dedicated-profile directory. Unknown or duplicate keys, malformed/empty YAML, missing fields, wrong types, and invalid timeouts are usage errors. Positive absence of an executable/profile is `BLOCKED`; indeterminate access is `HARNESS ERROR`. Availability checks do not launch anything or inspect profile contents. Existing nonexecutable files are not described as missing; runnability, permissions, session, profile identity, and authentication readiness belong to M1-02.
+
+Results use `PASS`, `FAIL`, `BLOCKED`, `HARNESS ERROR`, and dependent `SKIP`. An observed assertion mismatch is `FAIL`; an unexplained timeout is `HARNESS ERROR`, with its cause left unknown. Dependent operations stop after the first nonpass result, retain its cause, and attempt registered cleanup. Cleanup errors preserve individual results and make the run nonzero.
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | All five assertions passed with successful cleanup; also ordinary help. Public foundation runs cannot pass yet. |
+| `1` | Functional `FAIL` without a harness error. |
+| `2` | Argument/configuration usage error; parsed runs save configuration errors where possible. |
+| `3` | Identified prerequisite `BLOCKED`, including an active competing run. |
+| `4` | Runtime `HARNESS ERROR`, unimplemented execution, cleanup failure, or evidence-writing failure. |
+| `130` | Handled Ctrl-C; cleanup/evidence failures override this with `4`. |
+
+Runtime severity is `HARNESS ERROR` before `FAIL` before `BLOCKED`; skipped or incomplete suites cannot erase their origin or yield success. A handled interruption preserves completed tests, skips remaining tests with the interruption origin, attempts cleanup, and finalizes evidence. Hard kills and machine failures cannot guarantee evidence or future IDE cleanup.
+
+Terminal output is brief: outcome, controlled explanation, and the saved summary path. Report failures explicitly state that no summary was saved, with nonzero status; partial event/temporary files may remain. Structured diagnostics contain run/test metadata, controlled reason codes/messages, and relevant configuration keys/resource paths. They omit configuration contents, credentials, environment dumps, prompts/responses, and arbitrary exception text/tracebacks. Unknown-key diagnostics identify the supported parent section without echoing arbitrary key names.
+
+The [Phase 2 report](docs/reports/M1-01-phase2.md) records test coverage and local evidence paths. Actual graphical-session readiness, fixture management, IDE operations, and richer reporting remain later work.
+
+Future runs will execute on the local host using platform-specific executable and profile paths. The proposal's illustrative configuration targets macOS; Windows setup and configuration will be established in Milestone 2.
+
+[M1-01 is developer validated](docs/implementation-plans/M1-01.md#phase-2-execution--2026-10-20). M1-02/M1-03 remain pending separate authorization, followed by the Slice 1 checkpoint before GUI implementation.
 
 ## Repository contents
 
@@ -120,6 +160,10 @@ For the next implementation step, review the accepted M1-00 evidence, the M1-01 
 .
 ├── AGENTS.md                       # Repository instructions and validated environment notes
 ├── LICENSE
+├── pyproject.toml / uv.lock       # Foundation metadata and locked dependencies
+├── .python-version               # Shared Python 3.12 series pin
+├── src/ide_smoke/                 # CLI, configuration, results, reporting, and lock
+├── tests/                        # Non-GUI unit and process qualification
 ├── README.md
 ├── .agents/skills/                 # Repository workflow skills
 ├── docs/
@@ -141,4 +185,4 @@ For the next implementation step, review the accepted M1-00 evidence, the M1-01 
     └── ide-copilot-milestone1-user-stories.md
 ```
 
-The local `.venv/`, `.python-version`, test profiles, disposable workspaces, and raw evidence are ignored and are not distributed with the repository.
+The local `.venv/`, test profiles, disposable workspaces, and raw evidence under `reports/` are ignored and are not distributed with the repository. `.python-version` is now a shared project file. Reports outside this checkout do not inherit its ignore rules.
