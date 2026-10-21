@@ -161,18 +161,21 @@ See the [follow-up execution results](docs/implementation-plans/M1-01-path-looku
 
 Run GUI automation sequentially against dedicated persistent test profiles and fresh disposable workspaces. Preserve authenticated profiles, target only test-owned processes/windows, and constrain cleanup to harness-owned paths.
 
-M1-02 Phase 1 was authorized and partially executed on 2026-10-21. Before resuming
-M1-02, read the [Phase 1 report](docs/reports/M1-02-phase1.md). On 2026-10-21 the
-developer accepted the limited console/login/current-user and permission snapshot
-and deferred automated screen-lock detection. Follow the
-[revised boundary and risks](docs/implementation-plans/M1-02.md#accepted-limitation-and-risks--2026-10-21):
-record screen-lock state as unassessed without making that omission a block/error;
-unlocked, exclusive desktop use remains an operating requirement. No detector,
-heuristic, or CLI confirmation prompt was approved. Effective settings, remaining
-identity/inventory checks, and controlled cases still need qualification. The
-setup guide is a draft; the earlier 147 non-GUI tests passed. No new runtime
-evidence accompanies the scope revision. Complete the Phase 1 checkpoint before
-Phase 2; production preflight remains unavailable and Slice 1 is not validated.
+M1-02 Phase 1 was authorized and partially executed on 2026-10-21. Before resuming,
+read the [revised profile-safety plan](docs/implementation-plans/M1-02.md) and
+[historical Phase 1 report](docs/reports/M1-02-phase1.md). The developer subsequently
+limited M1-02 to profile safety: safe dedicated paths/layout, explicit dedication
+marker, deliberate adoption, and preservation of existing contents/authentication.
+All other readiness qualification is out of scope, including executable identity/
+runnability, session/permissions/lock state, effective settings, Copilot inventory/
+authentication, and new readiness dependencies. Those items do not block revised
+M1-02 acceptance and are not automatically assigned to another story. Existing
+foundation checks remain unchanged. Complete remaining profile qualification and
+the Phase 1 checkpoint before separately authorized Phase 2. The setup guide is
+a draft; production profile checks are unimplemented and Slice 1 is not validated.
+A profile-safety pass establishes no GUI readiness. An unlocked, exclusively
+reserved desktop remains an operating requirement for future GUI work. The earlier
+147 passing non-GUI tests predate this documentation-only revision.
 
 Authentication is established manually. Never automate passwords or MFA, extract credentials, or copy authenticated profiles between hosts. Classify expired authentication as blocked. Keep tokens, private conversations, and unrelated desktop content out of committed evidence and diagnostics.
 

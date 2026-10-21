@@ -131,7 +131,7 @@ The default config path is relative to the caller's current working directory. A
 
 Every admitted run contends nonblocking on `~/.ide-smoke/desktop-run.lock` before configuration is loaded. The OS-held lock serializes cooperating invocations for one macOS user across checkouts and configurations, remains held through cleanup and reporting, and is never unlinked during release. A contender writes its own blocked report and cannot act on the owner's resources. Help does not acquire the lock. OS lock release after termination does not establish cleanup of future IDE processes.
 
-The supported schema requires `macos`, `sequential`, positive finite numeric timeouts, an executable path/name, and an explicit dedicated-profile directory. Unknown or duplicate keys, malformed/empty YAML, missing fields, wrong types, and invalid timeouts are usage errors. Positive absence of an executable/profile is `BLOCKED`; indeterminate access is `HARNESS ERROR`. Availability checks do not launch anything or inspect profile contents. Existing nonexecutable files are not described as missing; runnability, permissions, session, profile identity, and authentication readiness belong to M1-02.
+The supported schema requires `macos`, `sequential`, positive finite numeric timeouts, an executable path/name, and an explicit dedicated-profile directory. Unknown or duplicate keys, malformed/empty YAML, missing fields, wrong types, and invalid timeouts are usage errors. Positive absence of an executable/profile is `BLOCKED`; indeterminate access is `HARNESS ERROR`. Availability checks do not launch anything or inspect profile contents. Existing nonexecutable files are not described as missing; profile safety belongs to the revised M1-02 scope. Executable runnability, permissions, session, settings, and Copilot/authentication readiness qualification are outside M1-02.
 
 Results use `PASS`, `FAIL`, `BLOCKED`, `HARNESS ERROR`, and dependent `SKIP`. An observed assertion mismatch is `FAIL`; an unexplained timeout is `HARNESS ERROR`, with its cause left unknown. Dependent operations stop after the first nonpass result, retain its cause, and attempt registered cleanup. Cleanup errors preserve individual results and make the run nonzero.
 
@@ -153,18 +153,19 @@ The [Phase 2 report](docs/reports/M1-01-phase2.md) records test coverage and loc
 Future runs will execute on the local host using platform-specific executable and profile paths. The proposal's illustrative configuration targets macOS; Windows setup and configuration will be established in Milestone 2.
 
 [M1-01 is developer validated](docs/implementation-plans/M1-01.md#phase-2-execution--2026-10-20).
-M1-02 Phase 1 was authorized on 2026-10-21 and partially executed; its
-[qualification report](docs/reports/M1-02-phase1.md) records the observed signals
-and remaining checks. The developer accepted a limited prerequisite snapshot and
-deferred automated screen-lock detection: future preflight may pass with that
-state explicitly unassessed. An unlocked, exclusively reserved desktop remains
-an operating requirement; locked desktops and focus interference can cause later
-GUI failures despite passing preflight. See the
-[accepted implications and risks](docs/implementation-plans/M1-02.md#accepted-limitation-and-risks--2026-10-21).
-The [dedicated-profile setup guide](docs/vscode-test-profile-setup.md) is a draft for
-review. Production preflight remains unimplemented; Phase 2 awaits remaining
-qualification and the Phase 1 checkpoint. M1-03 remains pending separate
-authorization, followed by the Slice 1 checkpoint before GUI implementation.
+M1-02 Phase 1 was authorized on 2026-10-21 and partially executed. The developer
+subsequently narrowed the story to **dedicated test-profile safety only**:
+safe paths/layout, explicit dedication, and preservation of the existing profile.
+All other readiness qualification is out of scope. See the
+[revised plan](docs/implementation-plans/M1-02.md) and
+[historical qualification report](docs/reports/M1-02-phase1.md).
+The [profile-safety setup guide](docs/vscode-test-profile-setup.md) remains a draft.
+Remaining profile qualification and the Phase 1 checkpoint precede Phase 2;
+production profile-safety checks are unimplemented. A future profile-safety pass
+will establish no executable, session, permission, settings, Copilot, or
+authentication readiness. An unlocked, exclusively reserved desktop remains a
+future GUI operating requirement. M1-03 requires separate authorization, and
+Slice 1 validation remains pending before GUI implementation.
 
 ## Repository contents
 

@@ -1,5 +1,10 @@
 # M1-02 readiness qualification
 
+> Historical broader readiness probe. M1-02 is now limited to profile safety;
+> running this script also investigates excluded areas and is not the revised
+> story's acceptance procedure. See the current implementation plan below.
+
+
 This is a partial Phase 1 investigation, not the production preflight. See the
 [report](../../../docs/reports/M1-02-phase1.md) and the
 [implementation plan](../../../docs/implementation-plans/M1-02.md).

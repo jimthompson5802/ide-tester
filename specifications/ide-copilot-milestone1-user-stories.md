@@ -164,29 +164,27 @@ authorized M1-01 or main-harness work. See the
 
 **Slice:** 1 — Foundation
 
-**As a** developer, **I want** the harness to check its environment before starting GUI tests, **so that** missing prerequisites do not appear as IDE regressions.
+**As a** developer, **I want** the harness to validate its dedicated test-profile paths and explicit dedication, **so that** later automation targets a deliberately isolated profile while preserving personal resources and existing authentication.
 
-**Developer-approved scope revision — 2026-10-21:** Accept the limited documented
-console/login/current-user and permission snapshot. Automated screen-lock
-detection is deferred; preflight may succeed with screen-lock state explicitly
-unassessed. An unlocked, exclusively reserved desktop remains an operating
-requirement; actual IDE/window interaction belongs to T01. See the
-[implementation plan's implications and risks](../docs/implementation-plans/M1-02.md#accepted-limitation-and-risks--2026-10-21).
-Other criteria and validation gates remain pending; this revision is not story
-acceptance. The GitHub issue has not been edited.
+**Developer-approved scope revision — 2026-10-21:** M1-02 is limited to profile
+safety. All other readiness qualification is out of scope: executable identity/
+runnability, session/permissions/lock state, effective settings, Copilot inventory/
+authentication, and new readiness dependencies. This supersedes the earlier
+limited-session snapshot scope. See the [revised plan](../docs/implementation-plans/M1-02.md).
+Phase 1 remains partial; Phase 2 has not started. This revision is not story
+acceptance. GitHub issue #20 retains its earlier scope and has not been edited.
 
 **Acceptance criteria**
 
-- [ ] Verify the configured VS Code executable exists and is runnable.
-- [ ] Check the intended macOS console/login/current-user session and required permissions as a limited prerequisite snapshot; identify unavailable prerequisites as `BLOCKED`. Record screen-lock state as unassessed without failing preflight for that accepted omission; do not claim actual IDE/window usability.
-- [ ] Check the required automation permissions using feasible documented checks or a minimal interaction probe; do not claim a permission was verified if it was not.
-- [ ] Validate test-profile paths and the presence of the expected Copilot extension; distinguish missing extension from authentication failure.
-- [ ] Do not automate passwords, MFA, or Keychain extraction.
-- [ ] Provide a human-readable one-time setup guide for a minimal dedicated test profile in the existing macOS login, granting permissions and signing in to Copilot; document relevant settings and required exclusive desktop use during runs.
+- [ ] Validate safe dedicated root/`user-data`/`extensions` paths and reject protected everyday locations, unsafe symlinks, and overlaps under the qualified path contract.
+- [ ] Require a nonsecret dedication marker; permit deliberate manual adoption of the existing dedicated profile while preserving contents and authentication. A marker never authorizes deletion.
+- [ ] Inspect read-only without settings/extension inventory or credential inspection; classify known unsafe/missing layouts as `BLOCKED` and indeterminate inspection as `HARNESS ERROR`.
+- [ ] Integrate profile validation into the guarded run with controlled saved findings and dependent skips; preserve existing foundation checks and explicit unimplemented IDE results.
+- [ ] Provide a human-readable profile-safety setup/adoption guide and demonstrate successful profile validation plus a controlled/simulated blocked case.
 
-**Evidence:** Successful preflight and at least one simulated/controlled blocked-preflight test.
+**Evidence:** Qualified path/marker rules, non-GUI safe/unsafe cases, actual host profile-safety observations, saved successful validation and controlled blocked-run evidence, and preservation of the persistent profile. No broader readiness claim follows.
 
-**Developer gate:** Review with M1-01 and M1-03 at the Slice 1 checkpoint; validate readiness and setup before M1-04.
+**Developer gate:** Validate Phase 1 before separately authorized Phase 2, then review with M1-01 and M1-03 at the Slice 1 checkpoint before M1-04.
 
 ---
 
@@ -367,7 +365,7 @@ The diagram includes approval gates as dependencies. Story completion alone does
 flowchart TD
     A[M1-00 Feasibility spike] --> G0{Slice 0 approved}
     G0 --> B[M1-01 CLI and package]
-    B --> C[M1-02 Preflight]
+    B --> C[M1-02 Profile safety]
     B --> D[M1-03 Workspace]
     C --> G1{Slice 1 approved}
     D --> G1
@@ -386,7 +384,7 @@ flowchart TD
 | Slice | Stories | Demonstration | Required approval |
 |---|---|---|---|
 | 0 — Feasibility | M1-00 | Current scope: one automated UI request and exact `READY` response assertion; short evidence note | Review reduced result before separately authorized foundation work |
-| 1 — Foundation | M1-01–M1-03 | CLI, validated config, safe fixture, preflight, basic saved results, overlap prevention | Validate safe environment and setup before IDE basics |
+| 1 — Foundation | M1-01–M1-03 | CLI, validated config, safe fixture, profile safety, basic saved results, overlap prevention | Validate foundation and resource isolation before IDE basics |
 | 2 — IDE basics | M1-04–M1-05 | T01–T03, including disk assertion | Validate reliable file operations before Copilot integration |
 | 3 — Copilot | M1-06–M1-07 | T04–T05 with fresh completed response satisfying `READY` assertion | Validate Chat verification before hardening |
 | 4 — Hardening | M1-08–M1-09 | Rich reports, negative tests, five unattended runs under unchanged versions/settings | Accept Milestone 1 before Windows work |
@@ -485,9 +483,9 @@ The developer confirmed shared understanding of Q1–Q16 before requesting incor
 | UI selectors | macOS Accessibility can reach Copilot Chat controls | M1-00 |
 | Automation dependencies | The selected approach installs using pure Python or compatible prebuilt wheels with source builds disabled | M1-00/M1-01 |
 | Completion detection | Find a response-associated completion signal and observable error/cancellation states that meet the agreed standard | M1-00 |
-| Profile reuse | Dedicated VS Code profile can preserve valid sign-in across runs | M1-00/M1-02 |
+| Profile reuse | Preserving a dedicated profile does not establish valid sign-in across runs; authentication qualification is outside revised M1-02 | Historical M1-00; further qualification requires separate scope |
 | Test instance isolation | CLI flags and instance handling avoid affecting regular VS Code | M1-00/M1-04 |
-| GUI session | Establish feasible readiness/permission checks for the existing login under exclusive desktop use | M1-00/M1-02 |
+| GUI session | Readiness/permission qualification is outside revised M1-02; exclusive desktop use remains an operating requirement | Further qualification requires separate scope |
 | Qualified configuration | Determine necessary mode/model/language restrictions from evidence; obtain approval of material limitations | M1-00 |
 | Response assertion | Measure behavior under the agreed whitespace-only `READY` rule; changes require developer review | M1-00/M1-07 |
 | Failure evidence | Determine which auth, service, and UI error causes are actually observable under the agreed taxonomy | M1-00/M1-01/M1-07 |

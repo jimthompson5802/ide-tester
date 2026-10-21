@@ -1,5 +1,14 @@
 # M1-02 Phase 1 — partial qualification, 2026-10-21
 
+> **Current scope — 2026-10-21:** The developer subsequently limited M1-02 to
+> profile safety only. The [revised plan](../implementation-plans/M1-02.md)
+> supersedes the broader remaining-work requirements below. Executable, session,
+> permissions, settings, Copilot, authentication, and readiness-dependency
+> qualification are out of scope. This report preserves historical observations;
+> remaining profile-safety qualification and the Phase 1 checkpoint are pending.
+> No new runtime evidence accompanies the scope revision.
+
+
 Execution was authorized by the developer's instruction to implement the
 [M1-02 plan](../implementation-plans/M1-02.md). Phase 2 has not started. The initial
 unlocked-state qualification gap caused a stop for review. The developer has

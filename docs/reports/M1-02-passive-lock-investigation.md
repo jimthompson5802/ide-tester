@@ -1,5 +1,11 @@
 # M1-02 — passive unlocked-session investigation, 2026-10-21
 
+> **Current scope — 2026-10-21:** The developer subsequently limited M1-02 to
+> profile safety. This investigation and its subsequent limited-snapshot decision
+> are historical; session/permission/lock qualification is now out of scope.
+> The [current plan](../implementation-plans/M1-02.md) governs remaining work.
+
+
 The developer authorized continued investigation of an automated passive check
 after reviewing the [partial Phase 1 report](M1-02-phase1.md). This follow-up
 examined primary Apple documentation and existing Apple SDK headers. It did not
