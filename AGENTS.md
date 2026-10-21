@@ -22,6 +22,12 @@ For creating pull requests, use the repository-local [create-pull-request skill]
 
 Use the GitHub CLI (`gh`) for this repository's GitHub operations, including issues, pull requests, reviews, and Actions runs. Run commands from this checkout so `gh` targets its GitHub remote; use `--repo jimthompson5802/ide-tester` when an explicit target is needed. Use `git` for local version-control operations.
 
+## Commit messages
+
+Use Conventional Commits for every commit: `<type>(<optional scope>): <description>`. Choose the type based on the actual change: `feat`, `fix`, `docs`, `refactor`, `test`, `build`, `ci`, or `chore`. Use a concise imperative description and include a scope when it helps identify the affected area. For example: `docs(workflow): add plan execution skill and require TDD`.
+
+Mark breaking changes with `!` before the colon and explain them in a `BREAKING CHANGE:` footer.
+
 ## Implementation boundaries
 
 The initial implementation targets VS Code and GitHub Copilot Chat on macOS. Current M1-00 scope, narrowed by the developer on 2026-10-20, is submitting `Reply with exactly the word READY.` through Copilot Chat and requiring `response.strip() == "READY"` for the associated assistant response. Completion, cancellation/error discrimination, usability testing and restart qualification are outside the current work. Follow the revised M1-00 plan before any separately authorized main-harness work. Record observed behavior separately from assumptions and unresolved decisions.
