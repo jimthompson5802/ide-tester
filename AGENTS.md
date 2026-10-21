@@ -176,12 +176,23 @@ All other readiness qualification is out of scope, including executable identity
 runnability, session/permissions/lock state, effective settings, Copilot inventory/
 authentication, and new readiness dependencies. Those items do not block revised
 M1-02 acceptance and are not automatically assigned to another story. Existing
-foundation checks remain unchanged. Complete remaining profile qualification and
-the Phase 1 checkpoint before separately authorized Phase 2. The setup guide is
+foundation checks remain unchanged. The Phase 1 developer checkpoint is complete;
+Phase 2 requires separate authorization and must not start yet. The setup guide is
 a draft; production profile checks are unimplemented and Slice 1 is not validated.
 A profile-safety pass establishes no GUI readiness. An unlocked, exclusively
 reserved desktop remains an operating requirement for future GUI work. The earlier
 147 passing non-GUI tests predate this documentation-only revision.
+
+M1-02 Phase 1 qualification is verified and developer validated on 2026-10-21.
+P1-01/P1-04/P1-05 and the Phase 1 checkpoint are complete. The developer explicitly
+instructed that Phase 2 must not start yet and requested a commit. The developer accepted dedicated roots
+strictly beneath `<checkout>/profiles/`, with every other checkout overlap
+rejected and other protections retained. The read-only spike has 68 passing
+focused tests, with 215 total non-GUI tests passing. The guarded host check admits
+the existing path/layout, reports the expected missing marker, and confirms
+unchanged root/child metadata. Actual manual dedication/adoption remains pending.
+Read the [resumption evidence](docs/reports/M1-02-phase1.md#profile-only-qualification--resumed-2026-10-21)
+before continuing. No production/profile/configuration/dependency changes occurred.
 
 Authentication is established manually. Never automate passwords or MFA, extract credentials, or copy authenticated profiles between hosts. Classify expired authentication as blocked. Keep tokens, private conversations, and unrelated desktop content out of committed evidence and diagnostics.
 

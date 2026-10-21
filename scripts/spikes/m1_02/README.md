@@ -1,4 +1,55 @@
-# M1-02 readiness qualification
+# M1-02 qualification spikes
+
+## Current profile-only qualification
+
+`profile_safety.py` provides the independent read-only
+`inspect_profile_safety(root, *, home, protected_paths, checkout=None)` boundary. It returns only
+controlled `outcome`, `reason`, and `resource` fields, reusing foundation outcome
+labels. It has no standalone command and is not installed-console admission.
+The qualified rules and developer-accepted checkout policy are in the
+[draft guide](../../../docs/vscode-test-profile-setup.md).
+
+Run synthetic behavioral checks without touching the real profile:
+
+```bash
+.venv/bin/python -m pytest tests/unit/test_m1_02_profile_safety.py -q
+.venv/bin/python -m pytest
+```
+
+Phase 1 qualification observed **68 focused / 215 total passing tests**. Initial
+resumption had 55 focused / 202 total passing tests before the accepted checkout
+rule. That initial guarded host check ran inline with `.venv/bin/python -`; its equivalent source is retained
+in ignored `reports/m1-02/profile-only-observe.py`, and its allowlisted evidence
+is `reports/m1-02/profile-only-observation.json`. On this checkout it can be
+reproduced, with host approval for the existing real per-user lock, using:
+
+```bash
+.venv/bin/python reports/m1-02/profile-only-observe.py
+```
+
+Expected current observation: real root/children, missing marker (`BLOCKED`),
+unchanged root/child inode/size/mtime, and lock release/reacquisition. The script
+reads metadata and the marker only, preserves the profile, and saves evidence
+under `reports/m1-02/`. The then-unresolved checkout policy was excluded
+from that partial observation; it establishes no complete profile-safety pass.
+Do not substitute another lock after a sandbox denial. No real marker creation,
+GUI action, configuration change, or readiness probe belongs to this invocation.
+
+The final guarded observation includes the accepted checkout rule:
+
+```bash
+.venv/bin/python reports/m1-02/profile-policy-observe.py
+```
+
+Its source and `reports/m1-02/profile-policy-observation.json` evidence are retained
+locally and ignored. It checks the same narrow resources with explicit checkout,
+everyday, and installation context. Expected actual result: root location/layout
+admitted, then `BLOCKED / profile_missing / marker`, unchanged root/child metadata,
+and lock release/reacquisition. It neither creates a marker nor establishes a
+full dedication pass. These saved host-observation scripts are not distributed in
+a fresh checkout; the tracked spike and synthetic tests remain reproducible there.
+
+## Historical readiness qualification
 
 > Historical broader readiness probe. M1-02 is now limited to profile safety;
 > running this script also investigates excluded areas and is not the revised

@@ -160,7 +160,14 @@ All other readiness qualification is out of scope. See the
 [revised plan](docs/implementation-plans/M1-02.md) and
 [historical qualification report](docs/reports/M1-02-phase1.md).
 The [profile-safety setup guide](docs/vscode-test-profile-setup.md) remains a draft.
-Remaining profile qualification and the Phase 1 checkpoint precede Phase 2;
+Phase 1 qualification is verified with 68 focused tests (215 total non-GUI tests
+passed) and was developer validated on 2026-10-21. The developer accepted dedicated roots
+strictly beneath `<checkout>/profiles/`, retaining all other protections. The
+guarded host observation accepted the existing path/layout, found an absent
+dedication marker, and confirmed unchanged root/child metadata. See the
+[resumption evidence](docs/reports/M1-02-phase1.md#profile-only-qualification--resumed-2026-10-21).
+The Phase 1 checkpoint is complete. The developer explicitly instructed that
+Phase 2 must not start yet; separate authorization is required. Currently,
 production profile-safety checks are unimplemented. A future profile-safety pass
 will establish no executable, session, permission, settings, Copilot, or
 authentication readiness. An unlocked, exclusively reserved desktop remains a

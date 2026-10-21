@@ -171,8 +171,13 @@ safety. All other readiness qualification is out of scope: executable identity/
 runnability, session/permissions/lock state, effective settings, Copilot inventory/
 authentication, and new readiness dependencies. This supersedes the earlier
 limited-session snapshot scope. See the [revised plan](../docs/implementation-plans/M1-02.md).
-Phase 1 remains partial; Phase 2 has not started. This revision is not story
-acceptance. GitHub issue #20 retains its earlier scope and has not been edited.
+Phase 1 qualification is verified and developer validated on 2026-10-21. The developer
+accepted dedicated roots strictly beneath `<checkout>/profiles/` on 2026-10-21,
+with other checkout overlap rejected and other protections retained. See the
+[Phase 1 evidence](../docs/reports/M1-02-phase1.md#profile-only-qualification--resumed-2026-10-21).
+The developer explicitly instructed that Phase 2 must not start yet; real-profile dedication/adoption remains pending. This
+is not story acceptance. GitHub issue #20 retains its earlier scope and has not
+been edited.
 
 **Acceptance criteria**
 
