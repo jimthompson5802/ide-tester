@@ -151,6 +151,13 @@ the config directory. Preserve reports' diagnostic allowlist and controlled
 reasons when adding behavior. The developer accepted Phase 2 and validated M1-01 on 2026-10-20. Slice 1 validation remains pending. Do not
 start M1-02/M1-03 or GUI work without separate authorization and applicable gates.
 
+The authorized M1-01 PATH lookup follow-up was implemented on 2026-10-20;
+developer validation is pending. Bare command names now search past directory
+candidates and retain the first wrong-kind diagnostic if no regular file exists.
+The regression failed before the fix; afterward, 73 configuration tests and all
+138 non-GUI tests passed using the existing `.venv`. No dependencies changed.
+See the [follow-up execution results](docs/implementation-plans/M1-01-path-lookup-fix.md#execution-results--2026-10-20).
+
 
 Run GUI automation sequentially against dedicated persistent test profiles and fresh disposable workspaces. Preserve authenticated profiles, target only test-owned processes/windows, and constrain cleanup to harness-owned paths.
 

@@ -135,14 +135,21 @@ def check_resources(config: Config) -> Result | None:
     if isinstance(executable, str):
         # Basic existence only. shutil.which would mislabel a nonexecutable file
         # as absent; executable runnability is a separate M1-02 responsibility.
+        first_wrong_kind = None
         for entry in os.get_exec_path():
             candidate = Path(entry) / executable
             issue = _inspect(candidate, directory=False, key="ides.vscode.executable")
             if issue is None:
                 break
+            if issue.reason == Reason.EXECUTABLE_KIND:
+                if first_wrong_kind is None:
+                    first_wrong_kind = issue
+                continue
             if issue.reason != Reason.EXECUTABLE_MISSING:
                 return issue
         else:
+            if first_wrong_kind is not None:
+                return first_wrong_kind
             return Result(Outcome.BLOCKED, Reason.EXECUTABLE_MISSING, key="ides.vscode.executable")
     else:
         issue = _inspect(executable, directory=False, key="ides.vscode.executable")

@@ -2,7 +2,7 @@
 
 **Source:** Review of `main...HEAD` at `fc4eb92`, followed by the developer request: “create a plan to fix the issue and add a test for this edge case.” Related requirements: [M1-01 configuration contract](M1-01.md#cli-and-configuration-contract) and [M1-01 story](../../specifications/ide-copilot-milestone1-user-stories.md#story-m1-01--bootstrap-the-python-project-and-cli).
 
-**Planning status:** Ready for developer review. This document plans one small M1-01 correction; implementation has not started. Plan approval and implementation authorization are separate.
+**Execution status:** Implementation authorized and completed on 2026-10-20. PATH-01 through PATH-04 passed; developer validation of this correction is pending. This follow-up does not change the accepted M1-01 foundation status or authorize later stories.
 
 ## Problem and current evidence
 
@@ -71,3 +71,21 @@ Tests use temporary synthetic files and PATH overrides scoped by pytest. No comm
 Stop and seek developer guidance if new evidence requires changing acceptance criteria or expanding scope. Follow the [repository four-unsuccessful-fix-round rule](../../AGENTS.md#validation-and-documentation), including its required report of attempted fixes, results, and diagnostics; do not attempt a fifth round or work around the failing requirement without guidance.
 
 Planning validation is limited to repository inspection, acceptance mapping, relative-link checks, and consistency with the existing README and M1-01 contract. Runtime verification of this correction belongs to the authorized implementation phase.
+
+## Execution results — 2026-10-20
+
+PATH-01 through PATH-04 are complete. Bare-name lookup now continues past directory candidates, retaining the first wrong-kind result if no regular file is found. Missing candidates still permit continued lookup, indeterminate access still returns immediately, and a successful lookup still reaches profile validation. Explicit-path handling is unchanged.
+
+The two new tests use temporary synthetic PATH entries and the fixture's existing synthetic profile. The fallback test includes two directory candidates followed by an absent candidate to verify retention of the first directory's key and path. No candidate was executed and no IDE or authenticated profile was accessed.
+
+| Check actually performed | Result |
+| --- | --- |
+| `.venv/bin/python -m pytest tests/unit/test_config.py::test_cli_name_lookup_skips_directory_candidate` before the production fix | Expected failure: `BLOCKED / EXECUTABLE_KIND` for `first/fake-ide` instead of `None`; reproduced the reported bug. |
+| `.venv/bin/python -m pytest tests/unit/test_config.py` after the fix | 73 passed, including both new tests. |
+| `.venv/bin/python -m pytest` after the fix | 138 passed, non-GUI suite; Python 3.12.15 and pytest 9.1.1. |
+| `git diff --check` and final diff inspection | Passed; production change is confined to the bare-name PATH loop. |
+| Relative-link target checks for this plan and `AGENTS.md` | Passed. |
+
+The initial regression failure was printed in the test output; no separate diagnostic artifact was saved. No scope deviations, installations, or dependency changes were needed. Executable runnability and GUI readiness remain outside this correction.
+
+**Developer checkpoint:** Implementation is ready for explicit developer validation. M1-02/M1-03 and Slice 1 retain their separate authorization and validation gates.

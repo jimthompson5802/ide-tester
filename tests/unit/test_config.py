@@ -1,5 +1,6 @@
 """Strict schema, privacy, path rules, and evidence-based availability."""
 
+import os
 from pathlib import Path
 
 import pytest
@@ -137,6 +138,38 @@ def test_cli_name_lookup_checks_existence_not_executable_permission(tmp_path, se
     assert check_resources(load_document(tmp_path, settings)) is None
     monkeypatch.setenv("PATH", str(tmp_path / "no-directory"))
     assert check_resources(load_document(tmp_path, settings)).reason == Reason.EXECUTABLE_MISSING
+
+
+def test_cli_name_lookup_skips_directory_candidate(tmp_path, settings, monkeypatch):
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    (first / "fake-ide").mkdir()
+    (second / "fake-ide").write_text("inert executable placeholder\n")
+    settings["ides"]["vscode"]["executable"] = "fake-ide"
+    monkeypatch.setenv("PATH", os.pathsep.join(map(str, (first, second))))
+
+    assert check_resources(load_document(tmp_path, settings)) is None
+
+
+def test_cli_name_lookup_preserves_directory_diagnostic(tmp_path, settings, monkeypatch):
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    third = tmp_path / "third"
+    for entry in (first, second, third):
+        entry.mkdir()
+    (first / "fake-ide").mkdir()
+    (second / "fake-ide").mkdir()
+    settings["ides"]["vscode"]["executable"] = "fake-ide"
+    monkeypatch.setenv("PATH", os.pathsep.join(map(str, (first, second, third))))
+
+    result = check_resources(load_document(tmp_path, settings))
+
+    assert result.outcome == Outcome.BLOCKED
+    assert result.reason == Reason.EXECUTABLE_KIND
+    assert result.key == "ides.vscode.executable"
+    assert result.path == str(first / "fake-ide")
 
 
 @pytest.mark.parametrize("field,reason", [("executable", Reason.EXECUTABLE_MISSING), ("profile_root", Reason.PROFILE_MISSING)])
