@@ -201,6 +201,12 @@ behavior were added. Metadata checks do not prove arbitrary-content integrity
 or authentication validity. M1-02 is developer accepted within this scope. Slice 1 remains pending;
 M1-03 requires separate authorization.
 
+The authorized M1-02 review fix on 2026-10-21 recognizes enclosing `.app`
+suffixes case-insensitively. Regression tests through `check_configured_profile`
+first reproduced unsafe passes for `.APP`, `.ApP`, and an executable case alias;
+after the fix, 75 profile-safety tests and all 298 non-GUI tests passed with
+`.venv/bin/python -m pytest -q`. The alias test ran on the host filesystem.
+
 Authentication is established manually. Never automate passwords or MFA, extract credentials, or copy authenticated profiles between hosts. Classify expired authentication as blocked. Keep tokens, private conversations, and unrelated desktop content out of committed evidence and diagnostics.
 
 ## Validation and documentation

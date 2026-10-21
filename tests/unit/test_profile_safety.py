@@ -224,6 +224,40 @@ def test_non_bundle_installation_protects_executable_parent(tmp_path):
     assert probe.installation_path(executable) == executable.parent
 
 
+@pytest.mark.parametrize("suffix", [".app", ".APP", ".ApP"])
+def test_configured_profile_inside_bundle_is_blocked_regardless_of_suffix_case(
+    layout, tmp_path, suffix
+):
+    app = tmp_path / f"Editor{suffix}"
+    executable = app / "Contents" / "MacOS" / "Electron"
+    executable.parent.mkdir(parents=True)
+    executable.write_text("inert, nonexecutable file")
+    root = app / "Contents" / "test-profile"
+    layout.rename(root)
+
+    result = probe.check_configured_profile(root, executable)
+
+    assert result.outcome == Outcome.BLOCKED
+    assert result.reason.code == "profile_protected_overlap"
+
+
+def test_configured_executable_case_alias_cannot_hide_bundle_overlap(layout, tmp_path):
+    app = tmp_path / "Editor.app"
+    executable = app / "Contents" / "MacOS" / "Electron"
+    executable.parent.mkdir(parents=True)
+    executable.write_text("inert, nonexecutable file")
+    alias = tmp_path / "Editor.APP" / "Contents" / "MacOS" / "Electron"
+    if not alias.exists():
+        pytest.skip("filesystem is case sensitive")
+    root = app / "Contents" / "test-profile"
+    layout.rename(root)
+
+    result = probe.check_configured_profile(root, alias)
+
+    assert result.outcome == Outcome.BLOCKED
+    assert result.reason.code == "profile_protected_overlap"
+
+
 def test_children_cannot_share_filesystem_identity(layout, monkeypatch):
     real_lstat = Path.lstat
     def aliased(path, *args, **kwargs):

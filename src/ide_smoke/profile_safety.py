@@ -51,7 +51,7 @@ def installation_path(executable):
     """Protect the resolved enclosing .app, or parent; establish no identity."""
     executable = Path(executable).resolve()
     for parent in executable.parents:
-        if parent.suffix == ".app":
+        if parent.suffix.casefold() == ".app":
             return parent
     return executable.parent
 
