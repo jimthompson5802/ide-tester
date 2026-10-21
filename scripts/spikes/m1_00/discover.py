@@ -206,7 +206,7 @@ def tree(window):
             queue.extend((child, f"{path}.{i}", depth + 1) for i, child in enumerate(children[:160]))
 
 
-def inspect(state):
+def inspect(state, quiet=False):
     app, selected = owned(state)
     rows = []
     for element, path, depth in tree(selected[0]):
@@ -227,7 +227,35 @@ def inspect(state):
               "regular_unchanged": regular_unchanged(state), "nodes": rows,
               "node_limit": 1400, "depth_limit": 45}
     (DATA / f"{state['run_id']}-tree.json").write_text(json.dumps(result, indent=2) + "\n")
-    print(json.dumps(result, indent=2))
+    if quiet:
+        print(json.dumps({"owned_workspace_window": True,
+                          "regular_unchanged": result["regular_unchanged"],
+                          "node_count": len(rows),
+                          "tree_saved": f"{state['run_id']}-tree.json"}))
+    else:
+        print(json.dumps(result, indent=2))
+
+
+def configuration(state):
+    """Read configuration controls only; never read account or conversation values."""
+    _, selected = owned(state)
+    controls = []
+    for element, _, _ in tree(selected[0]):
+        if attr(element, "AXRole") != "AXPopUpButton":
+            continue
+        label = str(attr(element, "AXDescription") or "")
+        if label.startswith(("Models,", "Set Agent (")) and len(label) <= 160:
+            controls.append(label)
+    models = [label for label in controls if label.startswith("Models,")]
+    modes = [label for label in controls if label.startswith("Set Agent (")]
+    result = {"owned_workspace_window": True, "model_controls": models,
+              "mode_controls": modes,
+              "sign_in_required_observed": any("sign in to use Copilot" in label for label in models),
+              "regular_unchanged": regular_unchanged(state),
+              "limitation": "Model availability alone does not establish authenticated requests or reuse"}
+    (DATA / f"{state['run_id']}-configuration-{time.time_ns()}.json").write_text(
+        json.dumps(result, indent=2) + "\n")
+    print(json.dumps(result))
 
 
 def close(state):
@@ -255,7 +283,8 @@ def close(state):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["launch", "inspect", "enable-accessibility", "open-chat", "press", "focus-input", "input-probe", "input-keys", "palette", "palette-key", "open-ask", "close"])
+    parser.add_argument("command", choices=["launch", "inspect", "configuration", "enable-accessibility", "open-chat", "press", "focus-input", "input-probe", "input-keys", "palette", "palette-key", "open-ask", "close"])
+    parser.add_argument("--quiet", action="store_true", help="Save the redacted tree but print only its summary")
     parser.add_argument("--role")
     parser.add_argument("--attribute", choices=["AXTitle", "AXDescription"])
     parser.add_argument("--sha256")
@@ -268,7 +297,9 @@ def main():
         launch()
     else:
         state = json.loads(STATE.read_text())
-        if command == "enable-accessibility":
+        if command == "configuration":
+            configuration(state)
+        elif command == "enable-accessibility":
             owned(state)
             application = AX.AXUIElementCreateApplication(state["pid"])
             error = AX.AXUIElementSetAttributeValue(application, "AXManualAccessibility", True)
@@ -289,7 +320,7 @@ def main():
         elif command == "palette-key":
             palette_input(state)
             print(json.dumps({"palette_keys_sent_with_owned_frontmost_checks": True}))
-            inspect(state)
+            inspect(state, quiet=arguments.quiet)
         elif command == "open-ask":
             field = palette_input(state)
             expected = ">Chat: Open Chat (Ask)"
@@ -304,7 +335,7 @@ def main():
                     break
                 time.sleep(0.1)
             else:
-                inspect(state)
+                inspect(state, quiet=arguments.quiet)
                 raise RuntimeError("Ask command input/result not observed; no Enter sent")
             key(state, 36)
             deadline = time.monotonic() + 3
@@ -313,11 +344,11 @@ def main():
                 if any(attr(e, "AXRole") == "AXPopUpButton" and "Ask" in str(attr(e, "AXDescription") or "")
                        for e, _, _ in tree(selected[0])):
                     print(json.dumps({"open_ask_command_observed": True, "Ask_mode_observed": True}))
-                    inspect(state)
+                    inspect(state, quiet=arguments.quiet)
                     break
                 time.sleep(0.1)
             else:
-                inspect(state)
+                inspect(state, quiet=arguments.quiet)
                 raise RuntimeError("Ask mode not observed after command")
         elif command == "palette":
             app, _ = owned(state)
@@ -442,8 +473,10 @@ def main():
                 raise RuntimeError("Owned semantic action failed")
             if command == "focus-input" and not attr(matches[0], "AXFocused"):
                 raise RuntimeError("Focus action accepted but focus outcome unverified")
+        elif command == "inspect":
+            inspect(state, quiet=arguments.quiet)
         else:
-            {"inspect": inspect, "close": close}[command](state)
+            close(state)
 
 
 if __name__ == "__main__":

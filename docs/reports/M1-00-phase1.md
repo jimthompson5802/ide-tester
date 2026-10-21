@@ -1,11 +1,27 @@
 # M1-00 Phase 1 execution — 2026-10-20
 
-Status: partial discovery; isolated lifecycle and unsent keyboard input demonstrated.
-Authentication and response-state discovery remain pending. This is neither Phase 1
-acceptance nor a feasibility recommendation. The developer authorized
-[plan execution](../implementation-plans/M1-00.md); Phase 2 still requires explicit
-Phase 1 validation. The initial non-GUI results below are followed by the attended
-continuation and input diagnosis. No sign-in or Chat prompt submission occurred.
+**Current disposition — developer scope reduction, 2026-10-20:** Only submitting
+one request (`Reply with exactly the word READY.`) through Copilot Chat and
+requiring `response.strip() == "READY"` for its assistant response is required now. The [revised plan](../implementation-plans/M1-00.md) governs.
+The retained second exchange establishes the exact response assertion on retrospective
+review; see the [current result](#reduced-scope-result--saved-evidence-review).
+Developer validated M1-00 on 2026-10-20; Slice 0 is complete. No finished harness is claimed.
+
+The developer validated Phase 1 and confirmed that the regular-window title
+change was developer activity. A subsequent live cancellation action was sent
+before the developer stopped the broader investigation and reduced scope. No
+further Copilot requests were sent during the plan revision. Original test
+settings were restored exactly, owned shutdown passed, the authenticated profile
+was preserved, and the regular-window fingerprint matched its launch baseline.
+There is no active owned test instance.
+
+**Historical record:** The sections below describe the earlier, broader work.
+References to required cancellation, stale-history, completion,
+restart/repeated-launch checks, and earlier pending Phase 1 validation are
+superseded for the current task. They remain observations and decision history,
+not instructions to resume those tests. The later clarification retains exact
+`READY` matching for the single request/response; response receipt alone does not
+establish that assertion.
 
 ## Observations
 
@@ -241,3 +257,328 @@ instead of the plan's proposed `docs/feasibility/M1-00.md`; persistent profile p
 use `profiles/m1-00/`. Both choices preserve the intended ignored-data boundaries.
 
 Continuation charged conservatively through 2026-10-21 00:09:22 UTC: 23.8 minutes; cumulative active-budget charge 27.9 minutes; at least 452.1 minutes remain. Brief approval waits are included rather than deducted. Final owned cleanup passed and temporary test settings were restored.
+
+## Resumed attended setup — 2026-10-20 local date
+
+The developer requested continuation and confirmed desktop readiness. Read-only
+host preflight again passed: checkout Python 3.12.15 arm64, user site disabled,
+all five pinned PyObjC 12.2.2 distributions with the previously recorded wheel
+tags, Accessibility trusted, graphical session visible, and one regular VS Code
+application. No packages or applications were installed or upgraded.
+
+At 2026-10-21 00:15:12 UTC, a new owned instance launched for workspace
+`m1-00-54f29fddaa` using the existing dedicated profile. Process/window/workspace
+correlation passed, enabling `AXManualAccessibility` returned zero, and the
+Command Palette route visibly selected Ask. The regular window fingerprint
+remained unchanged. No Chat prompt was submitted.
+
+The owned model picker initially exposed the exact Accessibility description
+`Models, sign in to use Copilot`. This is now observed authentication-required UI
+evidence, rather than an assumed selector. Manual sign-in was requested from the
+developer; passwords, MFA, account controls and credential storage were not read
+or automated. A later read-only snapshot exposed `Models, Auto` and
+`Set Agent (⌘.) - Ask`, with the sign-in-required message absent. This establishes
+the displayed model selection and UI transition only. Developer confirmation of
+completed sign-in, a successful authenticated request, and restart reuse remain
+pending. Auto does not identify the backend model selected for any future request.
+
+The probe now provides `configuration`, which records only the owned mode/model
+control labels, observed sign-in requirement and coexistence result. Its host
+execution passed and saved a timestamped configuration snapshot. `inspect --quiet`
+also passed on the host: 341 nodes saved in the existing bounded redacted format,
+with ownership and regular-window checks true. Python AST parsing and
+`git diff --check` passed. No harness runtime suite exists; no response-state logic
+or completion checks have been implemented or tested.
+
+Installed workbench code was inspected for candidate response-state behavior.
+It distinguishes cancellation, errors and completion internally, but these
+internal fields have not been established as Accessibility observations. Source
+inspection alone supplies no verified UI completion method. T5 response-state
+inspection and the T6 Phase 1 checkpoint remain outstanding; Phase 2 is not
+authorized by this continuation.
+
+The dedicated instance is intentionally left open for manual setup, with active
+ownership state at `.ide-smoke/m1-00/session.json`. Resume by checking that state
+and the owned instance, rather than launching a second instance. The local
+configuration snapshot and tree use the `m1-00-54f29fddaa-` prefix in that directory.
+No settings were changed during this continuation. Cleanup has not been run for
+this still-open setup session; the earlier successful cleanup evidence remains
+separate.
+
+Budget accounting conservatively charges three minutes for the preceding
+read-only resumption and seven minutes for this attended continuation through
+2026-10-21 00:22:12 UTC, including short approval/manual waits. Cumulative charge:
+at most 37.9 minutes; at least 442.1 minutes remain. Subsequent developer waiting
+is excluded until active work resumes.
+
+## Phase 1 checkpoint after manual sign-in
+
+The developer confirmed on 2026-10-20 that manual sign-in worked. Host inspection
+again observed Ask mode and Auto model selection, with the sign-in-required label
+absent. Installed manifest checks reconfirmed VS Code Stable 1.135.0, commit
+`08d4889f9ec4a1685d257b9b95de036c8e1ce1e5`, and bundled
+`GitHub.copilot-chat` 0.63.0. UI labels observed during the probes were English;
+other languages are unqualified. Auto is a selection policy; the backend model
+used for a particular request was not established.
+
+The dedicated profile now contained an empty settings object, unlike the earlier
+absence of the file. Its exact bytes were backed up locally before temporarily
+adding `editor.accessibilitySupport=on`. The existing `input-keys` host check
+passed: optimized-mode indicator, exact four-character value and selected-text
+readback, verified clear, no submission and regular-window fingerprint unchanged.
+No personal settings were changed. Original test settings bytes were restored
+after response inspection.
+
+### Observed response structure and transition
+
+The macOS-only [observation script](../../scripts/spikes/m1_00/observe_response.py)
+was executed twice against the same owned launch, for bounded T5 discovery. Each
+execution typed one fixed harmless synthetic request, verified its exact input
+readback before Enter, and sampled candidate Accessibility signals for 25 seconds.
+The sampling duration bounds inspection; it is not a completion heuristic. The
+script makes no completion/freshness decision and implements no Phase 2 test.
+
+The first request exposed a Cancel button during generation, followed by synthetic
+marker text in the transcript, feedback/retry controls and restored Send UI. The
+regular-window comparison passed for this execution. More detailed inspection
+found the following public structural attributes within the owned Chat subtree:
+
+| Observation | Established use and remaining limit |
+| --- | --- |
+| Unique Chat `AXList`; transcript rows with `AXDOMIdentifier` | Candidate conversation boundary and row identity. Identifiers are hashed in evidence; persistence across restarts is untested. |
+| `interactive-request` and `interactive-response` in `AXDOMClassList` | Distinct prompt/assistant containers within transcript rows. This is more specific than searching all window text. |
+| `chat-response-loading` on the new response | Directly observed response-associated in-progress signal. `AXElementBusy` stayed false in captured samples, so it is not an established replacement. |
+| `chat-response-completed-at` inside the response footer | Directly observed terminal timestamp element. It is not proof of successful generation. |
+| Cancel control during generation | A candidate action for the required later live cancellation challenge; no cancellation was performed here. |
+
+The second request retained the first synthetic response in history. At 0.108
+seconds the new response container had `chat-response-loading`, while the prior
+response did not. At 0.363 seconds the new response was still loading and a Cancel
+control was present. At 1.653 seconds the new response no longer had the loading
+class, a second response timestamp appeared, and marker text existed in both
+response subtrees. Subsequent observation also found a duplicate marker outside
+the transcript, reinforcing why a global text match is unsuitable. Captured
+`AXARIAPosInSet` values were all 1 for the transcript rows, so those values alone
+do not establish turn order; row identities and subtree order remain candidates.
+
+These are real GUI observations after confirmed sign-in, but they do not satisfy
+the Phase 2 exact-response test or stale-history rejection. The observer recorded
+marker comparisons without implementing an independent success classifier. Two
+requests in one launch do not establish restart authentication reuse.
+
+Installed workbench source inspection confirms `chat-response-loading` tracks
+the response's internal completion status. Crucially, its cancellation path also
+sets a completion timestamp, and its completion state includes error/cancel
+outcomes. Therefore loading disappearance, a timestamp, feedback controls or
+restored input cannot by themselves justify success. No live cancelled response
+or safely reproduced error was inspected. Cancellation/error discrimination is
+the central unresolved capability for the next phase; no go recommendation is
+made.
+
+### Regular-window drift and cleanup
+
+The second execution's final regular-window comparison returned false. A minimal
+read-only comparison established that only its title fingerprint differed:
+regular process/launch identity, window count, position, size and minimized state
+matched the launch baseline. No private title text was logged. The cause of this
+title change is unresolved; developer activity or autonomous UI changes are
+possibilities, not findings. The captured state does not prove the regular window
+was unchanged during this execution. Earlier successful coexistence evidence is
+retained separately, and this run cannot be used as fresh unchanged-window proof.
+
+No more Chat requests were made. The temporary test setting was restored to its
+exact original bytes, owned termination and kernel process-exit checks passed,
+and the authenticated profile was preserved. The regular-window comparison still
+reported false against its original title fingerprint. There is no active session
+record; the run's state was archived by scoped cleanup. The observer now refuses
+a new request if the regular-window baseline is already changed. That new guard
+was syntax-checked; its rejection path has not been exercised on the host.
+
+### Checkpoint disposition
+
+| Task | Assessable Phase 1 result |
+| --- | --- |
+| T1–T2 | Prior baseline/dependency evidence retained; refreshed interpreter/import inventory passed, and installed IDE/extension manifests reconfirmed. No new packages or source builds. |
+| T3 | Dedicated manual sign-in developer-confirmed; observed English Ask/Auto configuration. Settings restriction documented. Restart reuse remains for Phase 2. |
+| T4 | Prior scoped lifecycle/coexistence evidence retained; current owned launch/cleanup passed. Latest title drift limits this run's coexistence evidence and requires review. |
+| T5 | Chat/input selectors, request/response structure, loading transition and terminal timestamp observed. Distinguishing successful, cancelled and erroneous termination remains unverified. |
+| T6 | Findings and Phase 2 refinements presented here and in the plan. Developer validation pending. |
+
+Accessibility reads, semantic actions and CoreGraphics keyboard events worked in
+approved host execution. Automation/Apple Events and Screen Recording remain
+untested and were not requested. The developer completed manual sign-in, but
+Keychain consent behavior was not observed by the agent; no credential-store
+contents were inspected. Screenshots were unnecessary and omitted.
+
+The proposed Phase 2 investigation should first challenge the candidate terminal
+signals with actual cancellation and observable errors, then implement a bounded
+classifier only if those outcomes can be distinguished. It must reject stale
+history, echoed input and ambiguous states, and still demonstrate two separate
+launches with exact response assertions and authentication reuse. Qualifying
+conditions proposed for review are English UI, Ask/Auto, explicit screen-reader
+support in the test profile, sequential execution and exclusive desktop use.
+Review the regular-title drift before the next run. The selected Auto backend
+and different language/model configurations have no repeatability qualification.
+
+If Accessibility cannot distinguish terminal outcomes, return for a design
+decision. A possible fallback is a supported IDE command exposing a richer
+accessible response view; freshness, terminal-state discrimination and isolation
+would still need evidence. No such fallback has been validated. A driver extension
+or different architecture requires a revised plan and developer validation.
+
+Local diagnostics under `.ide-smoke/m1-00/` include
+`m1-00-54f29fddaa-response-observation-1792542242085840000.json`,
+`m1-00-54f29fddaa-response-observation-1792542366463964000.json`,
+`m1-00-54f29fddaa-response-structure.json`,
+`m1-00-54f29fddaa-regular-drift.json`, and the run's configuration, tree, archived
+session and cleanup records. Raw prompts/responses, account identifiers, tokens
+and credentials are absent from these diagnostic records. The persistent profile
+remains ignored and untracked.
+
+Actual checks: two host observation executions, the host input check, configuration
+snapshots, manifest reads, restored-settings comparison and scoped cleanup.
+Python AST parsing, relative-link validation and whitespace checks are used for
+the changed artifacts. There is no harness runtime suite or tested response
+classifier. No new four-round failure sequence occurred.
+
+Budget: active work resumed at 2026-10-21 00:22:33 UTC. Conservatively charge
+through 00:30:03 UTC (7.5 minutes, including brief approval and service waits),
+bringing the cumulative charge to at most 45.4 minutes; at least 434.6 minutes of
+the eight-hour budget remain. Developer waiting after this checkpoint is excluded.
+This checkpoint requests validation of Phase 1 findings and the bounded next-phase
+investigation, not acceptance of feasibility or authorization of the main harness.
+
+
+## Scope reduction and interruption cleanup — 2026-10-20
+
+The developer stated that only sending a Copilot request and receiving a response
+are needed and requested a plan revision. The revised plan removes broader
+qualification tasks and reuses the existing two exchanges as basic send/receive
+evidence. Nonempty assistant text is sufficient; exact wording and generation
+completion are not current acceptance requirements. No more usability, negative
+path or restart qualification work is scheduled.
+
+Before that instruction, the approved Phase 2 investigation launched owned
+workspace `m1-00-8230a517c0` with the existing profile, selected Ask/Auto and sent
+one harmless long synthetic request. The observed Cancel control was pressed
+while loading, and redacted sampling finished. This superseded probe is retained
+at `.ide-smoke/m1-00/m1-00-8230a517c0-response-observation-1792542671072604000.json`.
+No completion classifier or cancellation-discrimination conclusion was produced.
+
+After the interruption, cleanup restored the exact original settings bytes from
+`.ide-smoke/m1-00/phase2-original-settings.json` and terminated only the verified
+owned instance. Kernel process-exit, profile preservation and the regular-window
+fingerprint comparison passed. No new submission or response test was run as
+part of this documentation revision. The historical spike scripts, including
+broader operations, are retained; the revised plan defines which work is current.
+
+Documentation validation covers local file links, explicit plan/report section
+targets, whitespace and current-scope consistency. A harness runtime suite remains
+unavailable; this task did not implement one. Broader implementation is not
+started by revising the plan.
+
+Revision checks passed for 50 relative file links and their explicit section
+targets, `git diff --check`, archived ownership state and exact restoration of
+the original test settings. No additional runtime suite was run. Conservatively
+charge seven further active minutes after the prior 00:30:03 UTC cutoff through
+2026-10-21 00:37:03 UTC for the interrupted investigation, cleanup and revision.
+Cumulative budget charge: at most 52.4 minutes; at least 427.6 minutes remain.
+This retained ceiling does not schedule additional tests outside the reduced scope.
+
+
+## Exact response assertion retained — 2026-10-20
+
+The developer clarified that exact `READY` matching remains in scope for the
+single request/response. This supersedes the preceding scope-reduction paragraph's
+statement that exact wording is unnecessary. Submit `Reply with exactly the word
+READY.` and compare the associated assistant response with
+`response.strip() == "READY"`. Trim whitespace only; punctuation, different case,
+Markdown wrapping and extra words fail. Existing response observations may be
+reused only if they establish the exact assertion for that exchange; a receipt
+flag alone is insufficient. No new GUI actions or runtime checks were performed
+for this documentation correction. All other reduced-scope exclusions remain.
+
+
+## Reduced-scope result — saved evidence review
+
+**Result:** AC1–AC3 are satisfied by the retained host evidence and this result
+record. R1 and R3 are complete; R2 is unnecessary. Developer accepted
+M1-00 on 2026-10-20. This continuation performed offline checks only,
+without launching VS Code, changing settings or sending another request.
+
+The selected exchange is the second request in owned launch `m1-00-54f29fddaa`.
+The observer typed `Reply with exactly the word READY.`, checked exact input
+readback before Enter, and recorded `submitted=true`. The baseline already
+contained the first assistant container. A separate new `interactive-response`
+container appeared after submission. At 1.653 seconds its body exposed one
+five-character `AXStaticText` value whose recorded `value.strip() == "READY"`
+comparison was true. The final recorded change sample at 1.908 seconds retains
+that same exact comparison. The observer sampled for a fixed 25 seconds; it did
+not extend the wait or resubmit to obtain a preferred answer.
+
+The saved full tree confirms that this response's body group contains exactly
+one text leaf, at the path carrying the comparison. Toolbar, footer, submitted
+prompt, previous assistant text and a duplicate outside the transcript are
+excluded. This establishes the whole observed response body assertion rather
+than a global or substring match. Raw response text was intentionally not saved;
+the assertion is verified from the comparison recorded on the host and the
+corresponding tree structure. This retrospective check is specific to the saved
+exchange and does not implement a general response or completion classifier.
+
+| Criterion | Evidence/result |
+| --- | --- |
+| AC1 — Submit the specified request | Exact keyboard input readback before Enter; recorded submission true. |
+| AC2 — Exact assistant response | New assistant container; single body text leaf; recorded whitespace-only exact comparison true, within 60 seconds. |
+| AC3 — Record configuration and reproduction | This result and the offline reproduction below. |
+
+Tested configuration: macOS 15.7.9, Python 3.12.15 arm64, VS Code Stable 1.135.0,
+bundled GitHub.copilot-chat 0.63.0, English UI, Ask/Auto and temporarily enabled
+`editor.accessibilitySupport=on`. Accessibility access, a visible graphical
+session and developer-confirmed manual sign-in were prerequisites. Auto's backend
+model was not identified. The second exchange's regular-window comparison was
+false because of title drift; the developer subsequently confirmed that title
+change was their activity. It is retained as a caveat, not relabeled as a passed
+unchanged-window check.
+
+Reproduce this evidence review from the checkout root:
+
+```bash
+.venv/bin/python scripts/spikes/m1_00/verify_saved_ready.py
+```
+
+The [offline verifier](../../scripts/spikes/m1_00/verify_saved_ready.py) requires
+these existing ignored local artifacts under `.ide-smoke/m1-00/`:
+
+- `m1-00-54f29fddaa-response-observation-1792542366463964000.json`
+- `m1-00-54f29fddaa-tree.json`
+
+It checks the final recorded change sample, the new assistant container, the
+single-leaf body structure and the recorded exact comparison. A fresh checkout
+without these artifacts cannot reproduce the offline result. For the original
+host interaction path, see the [spike README](../../scripts/spikes/m1_00/README.md#minimal-host-reproduction).
+
+Cleanup evidence from the interrupted later launch remains applicable: the owned
+app exited, its authenticated profile was preserved, and the regular-window
+fingerprint comparison passed. This continuation independently verified that
+`session.json` is absent and the current test settings bytes equal the preserved
+`phase2-original-settings.json`. No new GUI cleanup was needed.
+
+Completion detection, cancellation/error discrimination, restart reuse and broader
+repeatability remain unqualified and outside this acceptance. Main-harness work
+and M1-01 require separate authorization after developer validation.
+
+Continuation validation passed: the offline verifier reported submission, assistant
+receipt and the exact comparison true (final change sample: 1.908 seconds). All
+spike Python files parsed successfully; 55 relative file links and explicit
+section targets resolved; `git diff --check` passed. Settings-byte equality and
+absence of active session state passed. No new host GUI check was performed; a
+main-harness runtime suite remains unavailable.
+
+
+## Final developer validation — 2026-10-20
+
+The developer stated “i validate m1-00”, accepting the reduced request/response
+result, the exact whitespace-trimmed `READY` assertion, the tested prerequisites
+and documented limitations. M1-00 and the Slice 0 developer gate are complete.
+M1-01 implementation and main-harness work require separate authorization. No new
+GUI interaction or runtime check was performed to record this acceptance.

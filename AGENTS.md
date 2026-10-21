@@ -24,7 +24,7 @@ Use the GitHub CLI (`gh`) for this repository's GitHub operations, including iss
 
 ## Implementation boundaries
 
-The initial implementation targets VS Code and GitHub Copilot Chat on macOS. Begin with M1-00 feasibility: demonstrate UI interaction, response-completion detection, test-instance isolation, and authentication reuse before building the main harness. Record observed behavior separately from assumptions and unresolved decisions.
+The initial implementation targets VS Code and GitHub Copilot Chat on macOS. Current M1-00 scope, narrowed by the developer on 2026-10-20, is submitting `Reply with exactly the word READY.` through Copilot Chat and requiring `response.strip() == "READY"` for the associated assistant response. Completion, cancellation/error discrimination, usability testing and restart qualification are outside the current work. Follow the revised M1-00 plan before any separately authorized main-harness work. Record observed behavior separately from assumptions and unresolved decisions.
 
 Work in the reviewable slices defined by the backlog. Complete the authorized slice and present validation evidence at its developer checkpoint. Honor approvals already given in the conversation; obtain developer validation before advancing through an unapproved slice or milestone gate.
 
@@ -100,8 +100,10 @@ untracked. No software or compiler tools were installed and no source builds
 occurred during Milestone 0. See [M0-05 results](docs/implementation-plans/M0-05.md#execution-results--2026-10-20).
 Developer accepted Milestone 0 on 2026-10-20; M1-00 requires separate authorization.
 
-M1-00 execution was authorized on 2026-10-20 and Phase 1 is partial; see the
-[execution report](docs/reports/M1-00-phase1.md) before resuming feasibility work.
+M1-00 execution was authorized on 2026-10-20. The developer later reduced it to
+a basic UI request/response proof; follow the [revised plan](docs/implementation-plans/M1-00.md).
+The [execution report](docs/reports/M1-00-phase1.md) retains historical broader probes;
+its earlier completion/cancellation/restart requirements no longer gate this task.
 The binary-only PyObjC installation/import checks passed on Python 3.12.15 arm64;
 use the [spike requirements and commands](scripts/spikes/m1_00/README.md) for exact
 tested dependencies. Host execution reports Accessibility trusted and a visible
@@ -111,9 +113,21 @@ regular-window coexistence, Chat toggle, Ask selection via the Command Palette,
 and unsent keyboard input. The diagnosed input false negative requires verified
 `editor.accessibilitySupport=on` for editor-text readback in this tested setup;
 `AXManualAccessibility` exposes the app tree but alone did not establish reliable
-editor readback. Test-profile settings were restored after diagnosis. Authentication
-and response completion remain unverified; Phase 1 validation is required before
-Phase 2. No main harness exists.
+editor readback. Manual sign-in was developer-confirmed on 2026-10-20. Two
+synthetic requests in one owned launch exposed nonempty assistant response text,
+providing basic send/receive evidence. Offline review of the saved second exchange established the exact `READY`
+assertion from its single assistant-body text leaf and recorded whitespace-only
+comparison. Reproduce with `.venv/bin/python scripts/spikes/m1_00/verify_saved_ready.py`
+using the retained ignored evidence. R1/R3 are complete and R2 is unnecessary;
+Developer validated M1-00 on 2026-10-20; Slice 0 is complete. M1-01 and
+main-harness execution require separate authorization. The developer validated Phase 1 and
+confirmed the earlier regular-window title change was developer activity.
+A later cancellation probe ran before the scope reduction; further Copilot
+probes stopped. Original test settings were restored and the owned app exited
+with its authenticated profile preserved and regular-window fingerprint unchanged.
+There is no active test instance. Completion discrimination and restart reuse are
+unqualified and outside the current scope. No main harness exists.
+
 
 Run GUI automation sequentially against dedicated persistent test profiles and fresh disposable workspaces. Preserve authenticated profiles, target only test-owned processes/windows, and constrain cleanup to harness-owned paths.
 
