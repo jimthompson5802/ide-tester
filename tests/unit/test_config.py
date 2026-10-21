@@ -134,7 +134,7 @@ def test_yaml_paths_relative_to_config_and_home(tmp_path, settings, monkeypatch)
 
 def test_cli_name_lookup_checks_existence_not_executable_permission(tmp_path, settings, monkeypatch):
     settings["ides"]["vscode"]["executable"] = "fake-ide"
-    monkeypatch.setenv("PATH", str(tmp_path))
+    monkeypatch.setenv("PATH", str(tmp_path / "bin"))
     assert check_resources(load_document(tmp_path, settings)) is None
     monkeypatch.setenv("PATH", str(tmp_path / "no-directory"))
     assert check_resources(load_document(tmp_path, settings)).reason == Reason.EXECUTABLE_MISSING
@@ -193,6 +193,22 @@ def test_indeterminate_availability_is_error(config_file, monkeypatch):
 def test_existing_wrong_resource_types_are_not_reported_missing(tmp_path, settings):
     settings["ides"]["vscode"]["executable"] = str(tmp_path)
     assert check_resources(load_document(tmp_path, settings)).reason == Reason.EXECUTABLE_KIND
-    settings["ides"]["vscode"]["executable"] = str(tmp_path / "fake-ide")
-    settings["ides"]["vscode"]["profile_root"] = str(tmp_path / "fake-ide")
+    settings["ides"]["vscode"]["executable"] = str(tmp_path / "bin" / "fake-ide")
+    settings["ides"]["vscode"]["profile_root"] = str(tmp_path / "bin" / "fake-ide")
     assert check_resources(load_document(tmp_path, settings)).reason == Reason.PROFILE_KIND
+
+
+def test_resource_context_retains_first_regular_path_selection(tmp_path, monkeypatch):
+    from ide_smoke.config import Config, resolve_resources
+    first, second = tmp_path / 'first', tmp_path / 'second'
+    first.mkdir()
+    second.mkdir()
+    (first / 'editor').mkdir()
+    chosen = second / 'editor'
+    chosen.write_text('inert nonexecutable')
+    profile = tmp_path / 'profile'
+    profile.mkdir()
+    monkeypatch.setenv('PATH', str(first) + ':' + str(second))
+    selected, issue = resolve_resources(Config('editor', profile, 1, 2))
+    assert selected == chosen
+    assert issue is None

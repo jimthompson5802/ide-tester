@@ -2,7 +2,7 @@
 
 ## Current state
 
-This repository contains design documents, the accepted M1-00 probe, and the implemented M1-01 foundation with non-GUI tests. Both phases and M1-01 are complete and developer validated on 2026-10-20. Strict configuration, results, summaries, and CLI exclusion exist; IDE operations remain explicitly unavailable. Treat remaining proposed commands, APIs, and schemas as design targets.
+This repository contains design documents, the accepted M1-00 probe, and the implemented M1-01 foundation with non-GUI tests. Both phases and M1-01 are complete and developer validated on 2026-10-20. Strict configuration, results, summaries, and CLI exclusion exist. M1-02 profile safety is complete and developer validated on 2026-10-21. IDE operations remain explicitly unavailable. Treat remaining proposed commands, APIs, and schemas as design targets.
 
 Keep documentation changes within the requested scope; a documentation task does not initiate environment setup or harness implementation.
 
@@ -167,32 +167,39 @@ See the [follow-up execution results](docs/implementation-plans/M1-01-path-looku
 
 Run GUI automation sequentially against dedicated persistent test profiles and fresh disposable workspaces. Preserve authenticated profiles, target only test-owned processes/windows, and constrain cleanup to harness-owned paths.
 
-M1-02 Phase 1 was authorized and partially executed on 2026-10-21. Before resuming,
-read the [revised profile-safety plan](docs/implementation-plans/M1-02.md) and
-[historical Phase 1 report](docs/reports/M1-02-phase1.md). The developer subsequently
-limited M1-02 to profile safety: safe dedicated paths/layout, explicit dedication
-marker, deliberate adoption, and preservation of existing contents/authentication.
-All other readiness qualification is out of scope, including executable identity/
-runnability, session/permissions/lock state, effective settings, Copilot inventory/
-authentication, and new readiness dependencies. Those items do not block revised
-M1-02 acceptance and are not automatically assigned to another story. Existing
-foundation checks remain unchanged. The Phase 1 developer checkpoint is complete;
-Phase 2 requires separate authorization and must not start yet. The setup guide is
-a draft; production profile checks are unimplemented and Slice 1 is not validated.
-A profile-safety pass establishes no GUI readiness. An unlocked, exclusively
-reserved desktop remains an operating requirement for future GUI work. The earlier
-147 passing non-GUI tests predate this documentation-only revision.
+M1-02 is limited to profile safety: safe dedicated paths/layout, explicit
+marker, deliberate adoption, and read-only preservation. Executable identity/
+runnability, session/permissions/lock state, settings, Copilot inventory/
+authentication, and new readiness dependencies are outside this story and are
+not assigned automatically elsewhere. An unlocked, exclusively reserved desktop
+remains an operating requirement for future GUI work.
 
-M1-02 Phase 1 qualification is verified and developer validated on 2026-10-21.
-P1-01/P1-04/P1-05 and the Phase 1 checkpoint are complete. The developer explicitly
-instructed that Phase 2 must not start yet and requested a commit. The developer accepted dedicated roots
-strictly beneath `<checkout>/profiles/`, with every other checkout overlap
-rejected and other protections retained. The read-only spike has 68 passing
-focused tests, with 215 total non-GUI tests passing. The guarded host check admits
-the existing path/layout, reports the expected missing marker, and confirms
-unchanged root/child metadata. Actual manual dedication/adoption remains pending.
-Read the [resumption evidence](docs/reports/M1-02-phase1.md#profile-only-qualification--resumed-2026-10-21)
-before continuing. No production/profile/configuration/dependency changes occurred.
+Phase 1 was developer validated on 2026-10-21, with 68 focused and 215 total
+non-GUI tests; its historical hold and missing-marker observations are retained
+in the [Phase 1 report](docs/reports/M1-02-phase1.md). Separately authorized
+Phase 2 is **complete and developer validated on 2026-10-21**. The developer
+stated: “I validate Phase 2 as complete”. P2-02 through P2-06 and P2-VALIDATION
+are complete. Read the [plan](docs/implementation-plans/M1-02.md),
+[Phase 2 evidence](docs/reports/M1-02-phase2.md), and
+[setup guide](docs/vscode-test-profile-setup.md) before changing profile admission.
+
+Production checks run under the existing lock after basic availability, sharing
+metadata-only executable selection and using actual editable-source checkout
+context. Dedicated roots strictly beneath `<checkout>/profiles/` are allowed;
+all other checkout overlap and other protected-path overlap remain rejected.
+The marker and real fixed children are required. Preflight is read-only, records
+`profile_safety_checked`, and never creates or repairs the profile.
+
+The developer confirmed dedication/layout and explicitly authorized exclusive
+marker creation in `profiles/m1-00` on 2026-10-21. Do not recreate or overwrite
+that marker. Real installed-console run `68d6f20bb1bb4fdb8b1918ce662e0dcc`
+recorded `profile_safe`, expected unimplemented exit 4, five correct skips,
+successful cleanup, unchanged narrow metadata, and guard reacquisition. Synthetic
+invalid markers block with exit 3; uncertain inspection is an error. All 294
+non-GUI tests passed using the existing environment. No dependencies or GUI
+behavior were added. Metadata checks do not prove arbitrary-content integrity
+or authentication validity. M1-02 is developer accepted within this scope. Slice 1 remains pending;
+M1-03 requires separate authorization.
 
 Authentication is established manually. Never automate passwords or MFA, extract credentials, or copy authenticated profiles between hosts. Classify expired authentication as blocked. Keep tokens, private conversations, and unrelated desktop content out of committed evidence and diagnostics.
 

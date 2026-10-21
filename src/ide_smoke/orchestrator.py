@@ -6,7 +6,8 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Callable
 
-from ide_smoke.config import Config, ConfigError, check_resources, load_config
+from ide_smoke.config import Config, ConfigError, resolve_resources, load_config
+from ide_smoke.profile_safety import check_configured_profile
 from ide_smoke.guard import RunLockBusy, UnsupportedPlatform, create_guard
 from ide_smoke.reporting import EvidenceError, Reporter, timestamp
 from ide_smoke.results import TEST_IDS, Outcome, Reason, Result, aggregate, exit_code, skipped
@@ -65,7 +66,12 @@ def run_attempt(ide: str, config_path: str | None = None, *,
             raise ConfigError(Reason.CONFIG_PATH) from None
         config = load_config(selected)
         emit("configuration_validated")
-        resource_issue = check_resources(config)
+        executable, resource_issue = resolve_resources(config)
+        if resource_issue is None:
+            profile_result = check_configured_profile(config.profile_root, executable)
+            emit("profile_safety_checked", result=profile_result)
+            if profile_result.outcome != Outcome.PASS:
+                resource_issue = profile_result
         if resource_issue:
             issues.append(resource_issue)
         elif _operations is None:

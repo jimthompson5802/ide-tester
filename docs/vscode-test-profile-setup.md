@@ -1,13 +1,13 @@
-# Dedicated VS Code test profile safety setup — draft
+# Dedicated VS Code test profile safety setup
 
-M1-02 is limited to profile safety by the developer's 2026-10-21 scope revision.
-The path/marker rules below have synthetic and host Phase 1 evidence, including
-the developer-accepted checkout rule. Phase 1 was developer validated on 2026-10-21;
-the developer explicitly instructed that Phase 2 must not start yet.
-Production profile-safety checks are not implemented. See the
-[plan](implementation-plans/M1-02.md) and [historical findings](reports/M1-02-phase1.md).
+M1-02 implements read-only profile safety under the existing desktop run lock.
+The path/marker policy was qualified and Phase 1 developer validated on 2026-10-21.
+Phase 2 adoption was explicitly authorized and completed on 2026-10-21; the real
+standalone safety check passed. Real installed-console verification and final evidence consolidation are complete.
+Phase 2 is complete and developer validated on 2026-10-21. See the [plan](implementation-plans/M1-02.md)
+and [Phase 2 findings](reports/M1-02-phase2.md).
 
-The proposed dedicated layout is:
+The required dedicated layout is:
 
 ```text
 profile_root/
@@ -28,9 +28,8 @@ read-only with no-follow/nonblocking flags; it never reads settings or credentia
 
 ## Independently qualified path rules
 
-The spike accepts a root, an explicit home path, explicit protected paths, and
-an optional checkout context. Complete host checks supply the checkout context;
-omitting it is suitable only for isolated rule qualification.
+The production checker accepts a root, explicit home and protected paths, and
+checkout context. Guarded runs supply the actual editable source checkout.
 It rejects a root containing `..`, symlink components (including dangling links
 and loops), missing resources, and wrong kinds. Root and both fixed children must
 be real directories with distinct filesystem identities. The marker must also
@@ -52,9 +51,9 @@ default protected set is:
 
 Installation context protects the enclosing resolved `.app` directory, or the
 resolved executable's parent for a nonbundle path. This uses path metadata only,
-without running or authenticating the executable. Phase 2 must use the same
-first regular file selected by existing foundation PATH lookup, preserving its
-wrong-kind/error behavior; the spike helper accepts an explicit file path only.
+without running or authenticating the executable. Guarded runs use the same
+first regular file selected by foundation PATH lookup, preserving its
+wrong-kind/error behavior, without a second PATH selection.
 Custom everyday locations must be supplied as protected context when known;
 these defaults cannot discover every personal resource. No workspace path exists
 in current configuration. Explicit workspace context can be protected with the
@@ -63,10 +62,10 @@ lifecycle, without adding its configuration in this story.
 
 Known unsafe/missing resources and invalid markers are `BLOCKED`. Permission or
 other indeterminate metadata/read/resolve failures are `HARNESS ERROR`. Findings
-contain controlled outcome/reason/resource labels, never marker contents or
-exception text. Interrupted inspection is allowed to propagate to the caller's
-existing interruption handling. These are spike findings; production `Result`
-reasons and guarded integration belong to Phase 2. Metadata inspection does not
+contain controlled outcome/reason and resource labels in `Result.key`, never
+marker contents or exception text. Interrupted inspection is allowed to propagate to the caller's
+existing interruption handling. Production findings are saved in `profile_safety_checked` events; failures
+also become run issues and origins for all five skipped smoke tests. Metadata inspection does not
 eliminate filesystem races or authorize deletion.
 
 ## Accepted checkout rule and manual adoption
@@ -84,10 +83,11 @@ symlink, marker, or resource-separation rules. A symlinked `profiles` container
 cannot make a source directory eligible; profile paths cannot escape through
 symlinks. Filesystem identities preserve these rules through existing case aliases.
 Thirteen additional tests qualify the checkout cases. Production integration
-will receive the actual editable-package source checkout, independently of the
+receives the actual editable-package source checkout, independently of the
 caller's working directory or config location; config directories are not inferred
-to be checkouts. Supporting a different installation layout requires a defined
-checkout-context source rather than silently dropping this comparison.
+to be checkouts. The qualified layout is `<checkout>/src/ide_smoke/` with a `pyproject.toml` at
+the checkout root. Other package layouts yield `profile_inspection_unknown`
+rather than silently omitting checkout protection.
 
 For deliberate adoption of the existing authenticated `profiles/m1-00` directory:
 
@@ -106,19 +106,22 @@ For deliberate adoption of the existing authenticated `profiles/m1-00` directory
    Rerun the read-only check and require `profile_safe`. A missing marker blocks
    full validation; an invalid existing marker requires manual review, not automatic
    replacement. Indeterminate inspection must be resolved before adoption.
-4. Configure the harness to use this dedicated root. Once implemented, profile
-   checks will inspect narrowly and read-only. Missing/unsafe layouts or invalid
-   markers will block; indeterminate access will be a harness error.
+4. Configure `ides.vscode.profile_root` in the local YAML to use this dedicated
+   root and select an existing executable path. Run `.venv/bin/ide-smoke run
+   --ide vscode --config config/harness.local.yaml` from the checkout. Profile
+   checks inspect narrowly and read-only. Missing/unsafe layouts or invalid
+   markers block (exit 3); indeterminate access is a harness error (exit 4).
 
 Profile adoption requires no copying, migration, recreation, settings changes,
 or new sign-in. Do not inspect credentials or automate passwords/MFA. Preflight
-will not create or repair the profile or marker. Disposable-workspace cleanup
+does not create or repair the profile or marker. Disposable-workspace cleanup
 must preserve this persistent profile.
 
 Phase 1 performed steps involving read-only path/layout qualification only. It
 neither confirmed dedication on the developer's behalf nor created the real
-marker. The current host has the expected missing marker; actual manual adoption
-and successful real-profile validation remain Phase 2 prerequisites.
+marker. The later Phase 2 follow-up confirmed dedication and explicitly authorized agent
+marker creation. The marker now exists and the standalone real-profile check
+passes; installed-console verification is also complete. Final consolidation is complete; developer acceptance was received on 2026-10-21.
 
 Executable identity/runnability, session and permission checks, desktop lock
 state, accessibility settings, Copilot inventory/availability, authentication,
@@ -126,7 +129,28 @@ and new readiness dependencies are out of scope for M1-02. This guide does not
 qualify them. Future GUI runs still require an unlocked, exclusively reserved
 desktop; profile validation supplies no GUI-readiness guarantee.
 
-After Phase 2 implementation, the existing `ide-smoke run --ide vscode` command
-will record profile-safety validation separately. Overall exit 4 remains expected
+The existing `ide-smoke run --ide vscode` command
+records profile-safety validation separately. Overall exit 4 remains expected
 while IDE operations are unimplemented. No passing smoke tests or separate public
 preflight command are delivered by this story.
+
+
+## Manual marker creation
+
+After the dedication confirmation and a read-only result solely identifying the
+missing marker, create the marker manually with an editor or an exclusive-create
+operation. For the existing profile, the exact target is
+`profiles/m1-00/.ide-smoke-profile.json` relative to the checkout. Do not overwrite
+an existing file. Use exactly:
+
+```json
+{"schema_version": 1, "purpose": "ide-smoke-dedicated-vscode"}
+```
+
+A new profile requires deliberate manual creation of the root and both fixed
+children at a safe dedicated path before adding its marker. An existing profile
+requires only the marker after path/layout qualification; preserve its contents.
+Review any rejected path or existing invalid marker manually. Never repair a
+personal profile to make it eligible. On this host `/usr/local/bin/code` is an
+available CLI path for basic resource checks; this guide does not qualify its
+runnability. The example executable path must be edited to match the host.

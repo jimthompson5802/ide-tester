@@ -130,29 +130,35 @@ def _inspect(path: Path, *, directory: bool, key: str) -> Result | None:
     return None
 
 
-def check_resources(config: Config) -> Result | None:
+def resolve_resources(config: Config) -> tuple[Path | None, Result | None]:
+    """Return the metadata-selected executable and any basic availability issue."""
     executable = config.executable
     if isinstance(executable, str):
         # Basic existence only. shutil.which would mislabel a nonexecutable file
-        # as absent; executable runnability is a separate M1-02 responsibility.
+        # as absent; executable runnability is outside basic availability checks.
         first_wrong_kind = None
         for entry in os.get_exec_path():
             candidate = Path(entry) / executable
             issue = _inspect(candidate, directory=False, key="ides.vscode.executable")
             if issue is None:
+                executable = candidate
                 break
             if issue.reason == Reason.EXECUTABLE_KIND:
                 if first_wrong_kind is None:
                     first_wrong_kind = issue
                 continue
             if issue.reason != Reason.EXECUTABLE_MISSING:
-                return issue
+                return None, issue
         else:
             if first_wrong_kind is not None:
-                return first_wrong_kind
-            return Result(Outcome.BLOCKED, Reason.EXECUTABLE_MISSING, key="ides.vscode.executable")
+                return None, first_wrong_kind
+            return None, Result(Outcome.BLOCKED, Reason.EXECUTABLE_MISSING, key="ides.vscode.executable")
     else:
         issue = _inspect(executable, directory=False, key="ides.vscode.executable")
         if issue:
-            return issue
-    return _inspect(config.profile_root, directory=True, key="ides.vscode.profile_root")
+            return None, issue
+    return executable, _inspect(config.profile_root, directory=True, key="ides.vscode.profile_root")
+
+
+def check_resources(config: Config) -> Result | None:
+    return resolve_resources(config)[1]

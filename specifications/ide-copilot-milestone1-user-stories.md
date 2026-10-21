@@ -1,6 +1,6 @@
 # IDE Smoke Test Harness — Milestone 1 User Stories
 
-**Status:** Draft backlog; developer-confirmed clarifications recorded on 2026-10-20; implementation and feasibility remain unverified<br>
+**Status:** Milestone 1 backlog; verified implementation and feasibility are recorded per story; overall milestone and GUI acceptance remain pending<br>
 **Source:** [Harness proposal](ide-copilot-smoke-harness-proposal.md)<br>
 **Target:** macOS; VS Code only; GitHub Copilot Chat<br>
 **Authentication:** Existing signed-in session in a dedicated, persistent test profile<br>
@@ -131,7 +131,7 @@ authorized M1-01 or main-harness work. See the
 
 ### Story M1-01 — Bootstrap the Python project and CLI
 
-**Execution status:** Phase 1 and Phase 2 developer validated on 2026-10-20; M1-01 is complete. See the [Phase 2 report](../docs/reports/M1-01-phase2.md). The developer explicitly accepted Phase 2 on 2026-10-20. Slice 1 acceptance remains pending; M1-02/M1-03 require separate authorization.
+**Execution status:** Phase 1 and Phase 2 developer validated on 2026-10-20; M1-01 is complete. See the [Phase 2 report](../docs/reports/M1-01-phase2.md). The developer explicitly accepted Phase 2 on 2026-10-20. Slice 1 acceptance remains pending; M1-02 profile safety is complete and developer validated on 2026-10-21, and M1-03 requires separate authorization.
 
 **Priority:** Must | **Dependencies:** M1-00 approved
 
@@ -175,21 +175,26 @@ Phase 1 qualification is verified and developer validated on 2026-10-21. The dev
 accepted dedicated roots strictly beneath `<checkout>/profiles/` on 2026-10-21,
 with other checkout overlap rejected and other protections retained. See the
 [Phase 1 evidence](../docs/reports/M1-02-phase1.md#profile-only-qualification--resumed-2026-10-21).
-The developer explicitly instructed that Phase 2 must not start yet; real-profile dedication/adoption remains pending. This
-is not story acceptance. GitHub issue #20 retains its earlier scope and has not
-been edited.
+The earlier Phase 2 hold was superseded by explicit authorization on 2026-10-21.
+Phase 2 is **complete and developer validated on 2026-10-21**. The developer
+stated: “I validate Phase 2 as complete”. P2-02 through P2-06 and P2-VALIDATION
+are complete. Real-profile dedication is confirmed; explicitly
+authorized marker creation, standalone safety inspection, and installed-console
+verification passed. See the [Phase 2 evidence](../docs/reports/M1-02-phase2.md).
+Checked criteria below have technical evidence and final developer acceptance.
+GitHub issue #20 retains its earlier scope and has not been edited.
 
 **Acceptance criteria**
 
-- [ ] Validate safe dedicated root/`user-data`/`extensions` paths and reject protected everyday locations, unsafe symlinks, and overlaps under the qualified path contract.
-- [ ] Require a nonsecret dedication marker; permit deliberate manual adoption of the existing dedicated profile while preserving contents and authentication. A marker never authorizes deletion.
-- [ ] Inspect read-only without settings/extension inventory or credential inspection; classify known unsafe/missing layouts as `BLOCKED` and indeterminate inspection as `HARNESS ERROR`.
-- [ ] Integrate profile validation into the guarded run with controlled saved findings and dependent skips; preserve existing foundation checks and explicit unimplemented IDE results.
-- [ ] Provide a human-readable profile-safety setup/adoption guide and demonstrate successful profile validation plus a controlled/simulated blocked case.
+- [x] Validate safe dedicated root/`user-data`/`extensions` paths and reject protected everyday locations, unsafe symlinks, and overlaps under the qualified path contract.
+- [x] Require a nonsecret dedication marker; permit deliberate manual adoption of the existing dedicated profile while preserving contents and authentication. A marker never authorizes deletion.
+- [x] Inspect read-only without settings/extension inventory or credential inspection; classify known unsafe/missing layouts as `BLOCKED` and indeterminate inspection as `HARNESS ERROR`.
+- [x] Integrate profile validation into the guarded run with controlled saved findings and dependent skips; preserve existing foundation checks and explicit unimplemented IDE results.
+- [x] Provide a human-readable profile-safety setup/adoption guide and demonstrate successful profile validation plus a controlled/simulated blocked case.
 
-**Evidence:** Qualified path/marker rules, non-GUI safe/unsafe cases, actual host profile-safety observations, saved successful validation and controlled blocked-run evidence, and preservation of the persistent profile. No broader readiness claim follows.
+**Evidence:** The [acceptance mapping](../docs/reports/M1-02-phase2.md#acceptance-mapping-and-limitations) ties all five criteria to 294 passing non-GUI tests, synthetic console rejection, controlled inspection-error tests, real installed-console `profile_safe` followed by unimplemented exit 4, and unchanged narrow profile metadata. Authentication was not inspected or requalified; no broader readiness claim follows.
 
-**Developer gate:** Validate Phase 1 before separately authorized Phase 2, then review with M1-01 and M1-03 at the Slice 1 checkpoint before M1-04.
+**Developer gate:** Phase 1 and final Phase 2 are developer validated on 2026-10-21; M1-02 is complete within the revised profile-safety scope. M1-03 requires separate authorization; review M1-01–M1-03 at the Slice 1 checkpoint before M1-04.
 
 ---
 

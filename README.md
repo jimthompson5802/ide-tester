@@ -2,7 +2,7 @@
 
 A planned smoke-test harness for Visual Studio Code or IntelliJ IDEA and selected extensions/plugins after IDE or extension updates. GitHub Copilot Chat is the initial extension target. Prove feasibility on macOS first, then add Windows support after developer approval.
 
-**Status:** Milestone 0 and M1-00 (Slice 0) were completed and developer validated on 2026-10-20. M1-01 is complete and developer validated: Phase 1 and Phase 2 were accepted on 2026-10-20. Phase 2 adds strict YAML configuration, guarded runs, structured events, saved summaries, and non-GUI acceptance tests. IDE operations remain explicitly unavailable. See the [M1-01 evidence](docs/reports/M1-01-phase2.md).
+**Status:** Milestone 0 and M1-00 (Slice 0) were completed and developer validated on 2026-10-20. M1-01 is complete and developer validated: Phase 1 and Phase 2 were accepted on 2026-10-20. Phase 2 adds strict YAML configuration, guarded runs, structured events, saved summaries, and non-GUI acceptance tests. IDE operations remain explicitly unavailable. See the [M1-01 evidence](docs/reports/M1-01-phase2.md). M1-02 profile safety is complete and developer validated on 2026-10-21. See the [M1-02 evidence](docs/reports/M1-02-phase2.md).
 
 ## Completed work
 
@@ -76,7 +76,7 @@ Milestone 1 targets **Visual Studio Code and GitHub Copilot Chat on macOS**. The
 
 The project follows YAGNI: install tools and dependencies only for demonstrated needs in the current milestone. Setup and execution use prebuilt software and pure-Python packages or compatible prebuilt wheels, with dependency source builds disabled. Local native compilation and compiler toolchain installation are out of scope; any dependency requiring them must be reconsidered.
 
-**M1-00: Validate Copilot Chat automation feasibility** is complete for the reduced request/response scope. **M1-01: Bootstrap the Python project and CLI** is complete and developer validated on 2026-10-20. It provides the foundation, with IDE operations explicitly unavailable. The remaining foundation slice also covers configuration, preflight, and disposable workspace safety.
+**M1-00: Validate Copilot Chat automation feasibility** is complete for the reduced request/response scope. **M1-01: Bootstrap the Python project and CLI** is complete and developer validated on 2026-10-20. It provides the foundation, with IDE operations explicitly unavailable. M1-02 profile safety is complete and developer validated on 2026-10-21. M1-03 disposable workspace safety and the Slice 1 checkpoint remain outstanding.
 
 Implementation proceeds in reviewable slices: feasibility, foundation, IDE file operations, Copilot Chat, and repeatability/reporting. Each slice requires developer validation. Milestone 1 acceptance includes five consecutive unattended passing runs on unchanged IDE and Copilot versions.
 
@@ -119,13 +119,18 @@ Preserve an existing `.venv`. Install locked dependency/backend wheels, then ins
 
 Keep both installation steps: the first prohibits third-party source builds and preserves spike packages; the second uses the wheel-installed backend without resolving dependencies or isolated build requirements. Avoid plain `uv sync`, which can prune the spike packages and does not enforce this recipe. Exact versions and clean-environment evidence are in the [Phase 1 report](docs/reports/M1-01-phase1.md); `uv.lock` is the version source of truth. No compiler setup is required.
 
-Use `.venv/bin/ide-smoke` explicitly, or activate `.venv` to put the bare command on PATH. Copy [config/harness.example.yaml](config/harness.example.yaml) to `config/harness.local.yaml`, then edit the executable and existing dedicated-profile paths. The larger configuration in the proposal is illustrative and is not accepted by this CLI. Configuration never creates a profile or workspace. Run:
+Use `.venv/bin/ide-smoke` explicitly, or activate `.venv` to put the bare command on PATH. Copy [config/harness.example.yaml](config/harness.example.yaml) to `config/harness.local.yaml`, then edit the executable and existing dedicated-profile paths. The larger configuration in the proposal is illustrative and is not accepted by this CLI. Configuration never creates a profile or workspace. Follow the
+[profile safety setup guide](docs/vscode-test-profile-setup.md) for the required
+real `user-data`/`extensions` directories and dedication marker. Guarded runs now
+validate profile safety after basic availability: unsafe profiles block with exit 3,
+and uncertain inspection yields exit 4. A `profile_safe` event establishes no GUI
+readiness. M1-02 Phase 2 is complete and developer validated on 2026-10-21. See the [Phase 2 evidence](docs/reports/M1-02-phase2.md). Run:
 
 ```bash
 ide-smoke run --ide vscode
 ```
 
-**With valid settings and available resources, this exits 4:** IDE operations are not implemented. It saves all T01–T05 entries as `SKIP` with that run-level `HARNESS ERROR` origin. Help exits successfully. Passing synthetic development tests does not establish IDE/Copilot behavior.
+**With valid configuration, available resources, and a profile-safety pass, this exits 4:** IDE operations are not implemented. It saves all T01–T05 entries as `SKIP` with that run-level `HARNESS ERROR` origin. Help exits successfully. Passing synthetic development tests does not establish IDE/Copilot behavior.
 
 The default config path is relative to the caller's current working directory. An explicit `--config PATH` is also relative to that directory; `~` is expanded. Paths inside YAML are relative to the configuration file, with `~` expansion; a bare executable name is searched on PATH. Selecting a config elsewhere does not relocate reports. Run evidence is saved as `reports/<run-id>/summary.json` and `events.jsonl` under the caller's working directory.
 
@@ -153,26 +158,23 @@ The [Phase 2 report](docs/reports/M1-01-phase2.md) records test coverage and loc
 Future runs will execute on the local host using platform-specific executable and profile paths. The proposal's illustrative configuration targets macOS; Windows setup and configuration will be established in Milestone 2.
 
 [M1-01 is developer validated](docs/implementation-plans/M1-01.md#phase-2-execution--2026-10-20).
-M1-02 Phase 1 was authorized on 2026-10-21 and partially executed. The developer
-subsequently narrowed the story to **dedicated test-profile safety only**:
-safe paths/layout, explicit dedication, and preservation of the existing profile.
-All other readiness qualification is out of scope. See the
-[revised plan](docs/implementation-plans/M1-02.md) and
-[historical qualification report](docs/reports/M1-02-phase1.md).
-The [profile-safety setup guide](docs/vscode-test-profile-setup.md) remains a draft.
-Phase 1 qualification is verified with 68 focused tests (215 total non-GUI tests
-passed) and was developer validated on 2026-10-21. The developer accepted dedicated roots
-strictly beneath `<checkout>/profiles/`, retaining all other protections. The
-guarded host observation accepted the existing path/layout, found an absent
-dedication marker, and confirmed unchanged root/child metadata. See the
-[resumption evidence](docs/reports/M1-02-phase1.md#profile-only-qualification--resumed-2026-10-21).
-The Phase 1 checkpoint is complete. The developer explicitly instructed that
-Phase 2 must not start yet; separate authorization is required. Currently,
-production profile-safety checks are unimplemented. A future profile-safety pass
-will establish no executable, session, permission, settings, Copilot, or
-authentication readiness. An unlocked, exclusively reserved desktop remains a
-future GUI operating requirement. M1-03 requires separate authorization, and
-Slice 1 validation remains pending before GUI implementation.
+M1-02 is limited to **dedicated test-profile safety**: safe paths/layout, explicit
+dedication, and read-only preservation. Phase 1 was developer validated on
+2026-10-21; the separately authorized Phase 2 was also completed and developer
+validated on 2026-10-21. The [plan](docs/implementation-plans/M1-02.md)
+and [Phase 2 report](docs/reports/M1-02-phase2.md) map the acceptance criteria to
+294 passing non-GUI tests, synthetic blocked/error cases, and real installed-console
+evidence. The developer confirmed dedication and explicitly authorized exclusive
+marker creation. Real-profile validation records `profile_safe` before expected
+unimplemented exit 4; narrow metadata and guard release/reacquisition checks pass.
+The [setup guide](docs/vscode-test-profile-setup.md) describes the implemented policy.
+Historical qualification and decisions remain in the
+[Phase 1 report](docs/reports/M1-02-phase1.md).
+
+Profile safety establishes no executable, session, permission, settings, Copilot,
+or authentication readiness. Future GUI runs still require an unlocked,
+exclusively reserved desktop. M1-03 requires separate authorization, and Slice 1
+validation remains pending before GUI implementation.
 
 ## Repository contents
 

@@ -337,3 +337,95 @@ def test_invalid_explicit_config_does_not_fall_back_to_default(tmp_path, monkeyp
     monkeypatch.chdir(tmp_path)
     assert run_attempt("vscode", path, _guard_factory=lambda: guard) == 2
     assert summary(tmp_path)["result"]["reason"] == "config_invalid_path"
+
+
+def test_unmarked_profile_blocks_operations_with_saved_origin(attempt, settings, tmp_path, guard):
+    root = Path(settings['ides']['vscode']['profile_root'])
+    # Foundation fixtures have no marker before Phase 2 integration.
+    marker = root / '.ide-smoke-profile.json'
+    if marker.exists():
+        marker.unlink()
+    called = []
+    assert attempt(_operations=operations(lambda *args: called.append(True))) == 3
+    data = summary(tmp_path)
+    assert data['result']['reason'] == 'profile_missing'
+    assert data['result']['key'] == 'marker'
+    assert all(t['origin'] == {'outcome': 'BLOCKED', 'reason': 'profile_missing'}
+               for t in data['tests'])
+    assert called == []
+    assert guard.released
+
+
+def test_successful_profile_event_is_separate_from_smoke_results(attempt, tmp_path, guard, monkeypatch):
+    from ide_smoke import orchestrator
+    original = orchestrator.check_configured_profile
+    def guarded(*args):
+        assert guard.owned
+        return original(*args)
+    monkeypatch.setattr(orchestrator, 'check_configured_profile', guarded)
+    assert attempt() == 4
+    events = [json.loads(line) for path in (tmp_path / 'reports').glob('*/events.jsonl')
+              for line in path.read_text().splitlines()]
+    profile_events = [e for e in events if e['event'] == 'profile_safety_checked']
+    assert len(profile_events) == 1
+    assert profile_events[0]['result']['reason'] == 'profile_safe'
+    assert profile_events[0]['result']['outcome'] == 'PASS'
+    assert all(t['outcome'] == 'SKIP' for t in summary(tmp_path)['tests'])
+
+
+@pytest.mark.parametrize('failure,code,reason', [
+    ('inspection', 4, 'profile_inspection_unknown'),
+    ('interrupt', 130, 'interrupted'),
+])
+def test_profile_inspection_failure_preserves_exclusion_and_privacy(
+        attempt, tmp_path, guard, monkeypatch, failure, code, reason):
+    from ide_smoke import profile_safety
+    def fail(path, *args, **kwargs):
+        assert guard.owned
+        if failure == 'interrupt':
+            raise KeyboardInterrupt('PRIVATE')
+        raise PermissionError('PRIVATE')
+    monkeypatch.setattr(profile_safety, '_marker_valid', fail)
+    called = []
+    assert attempt(_operations=operations(lambda *args: called.append(True))) == code
+    data = summary(tmp_path)
+    assert data['result']['reason'] == reason
+    assert all(t['origin']['reason'] == reason for t in data['tests'])
+    assert called == []
+    assert guard.released
+    assert 'PRIVATE' not in json.dumps(data)
+
+
+def test_profile_event_write_failure_prevents_operations(attempt, tmp_path, guard):
+    class FailingReporter(Reporter):
+        def event(self, name, **kwargs):
+            if name == 'profile_safety_checked':
+                raise OSError('PRIVATE')
+            super().event(name, **kwargs)
+    called = []
+    assert attempt(_operations=operations(lambda *args: called.append(True)),
+                   _reporter_factory=FailingReporter) == 4
+    assert called == []
+    assert summary(tmp_path)['result']['reason'] == 'event_write_failed'
+    assert guard.released
+
+
+def test_busy_contender_never_inspects_profile(tmp_path, config_file, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    def busy():
+        raise RunLockBusy
+    def forbidden(*args):
+        pytest.fail('A contender must not inspect any profile')
+    monkeypatch.setattr('ide_smoke.orchestrator.check_configured_profile', forbidden)
+    assert run_attempt('vscode', str(config_file), _guard_factory=busy) == 3
+    assert summary(tmp_path)['result']['reason'] == 'active_run_conflict'
+
+
+def test_profile_installation_context_uses_selected_path_candidate(
+        attempt, tmp_path, settings, config_file, monkeypatch):
+    (tmp_path / 'fake-ide').mkdir()  # Wrong-kind candidate must not supply installation context.
+    settings['ides']['vscode']['executable'] = 'fake-ide'
+    config_file.write_text(yaml.safe_dump(settings))
+    monkeypatch.setenv('PATH', str(tmp_path) + ':' + str(tmp_path / 'bin'))
+    assert attempt() == 4
+    assert summary(tmp_path)['result']['reason'] == 'operations_unimplemented'
