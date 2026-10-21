@@ -12,7 +12,7 @@ Apply YAGNI (You Aren’t Gonna Need It): add tools only for demonstrated needs 
 
 Milestone 1 owns project/package initialization, harness dependencies, dedicated IDE profiles, disposable workspaces, Copilot installation and authentication, macOS automation permissions, feasibility probes, and all harness implementation and validation. See the [Milestone 1 backlog](ide-copilot-milestone1-user-stories.md) for that work.
 
-The repository currently has no `pyproject.toml`, `uv.lock`, source package, or tests. Milestone 0 uses a standalone virtual environment; project configuration and dependency locking belong to the Milestone 1 foundation.
+At Milestone 0 execution, the repository had no project metadata, lockfile, source package, or tests; the steps below preserve that standalone setup record. M1-01 Phase 1 now establishes those files. For current project installation, use [README setup](../README.md#setup-and-usage) and the [Phase 1 evidence](../docs/reports/M1-01-phase1.md).
 
 ## 2. Host prerequisites
 
@@ -67,9 +67,9 @@ Before running these commands, follow the [M0-03 preflight and verification cont
 
 The executable should be inside this checkout's `.venv`. No system Python changes or environment activation are required. The `3.12` pin selects a minor version; record the resolved patch version from `python --version` for reproducibility.
 
-At this stage, use `.venv/bin/python` explicitly because there is no uv project yet. Avoid `uv sync` until `pyproject.toml` exists. uv documents this standalone environment workflow in [Using environments](https://docs.astral.sh/uv/pip/environments/).
+During Milestone 0, use `.venv/bin/python` explicitly because there is no uv project yet. Avoid `uv sync` until `pyproject.toml` exists. uv documents this standalone environment workflow in [Using environments](https://docs.astral.sh/uv/pip/environments/).
 
-The current `.gitignore` excludes both `.venv/` and `.python-version`. Keep the Milestone 0 pin local. When the foundation establishes a shared Python version, remove `.python-version` from `.gitignore` and commit the agreed pin alongside the package configuration.
+During Milestone 0, `.gitignore` excluded both `.venv/` and `.python-version`, keeping the pin local. M1-01 Phase 1 promotes the shared `3.12` pin alongside package configuration; `.venv/` remains ignored.
 
 ## 5. Install supporting development tools
 
@@ -122,7 +122,7 @@ Do not install harness or automation libraries during Milestone 0. Milestone 1 w
 - [x] Verify the selected Homebrew Python 3.12 and record its provenance, architecture, and resolved patch version.
 - [x] Create `.venv` and verify that its interpreter belongs to this checkout.
 - [x] Reuse or install VS Code and verify the `code` CLI is available.
-- [x] Confirm `.venv/` and the local `.python-version` remain ignored by Git.
+- [x] Confirm `.venv/` and the local `.python-version` remained ignored by Git at Milestone 0 completion (the pin is shared from M1-01 Phase 1).
 - [x] Complete setup without installing compiler tools or performing native source builds.
 
 Technical checklist passed on 2026-10-20; existing software was reused, and M0-03 created the local environment/pin. Developer accepted Milestone 0 on 2026-10-20; the milestone is complete. M1-00 configuration and feasibility require separate authorization and the existing Milestone 1 review gates. Runtime harness tests are unavailable; these setup checks do not establish GUI or Copilot feasibility.

@@ -2,7 +2,7 @@
 
 ## Current state
 
-This repository contains design documents and an M1-00 prerequisite probe for an IDE smoke-test harness. There is no implemented harness, Python project configuration, or runnable test suite yet. Treat proposed commands, source layouts, APIs, and configuration schemas as design targets until implementation establishes them.
+This repository contains design documents, the accepted M1-00 probe, and the implemented M1-01 foundation with non-GUI tests. Both phases and M1-01 are complete and developer validated on 2026-10-20. Strict configuration, results, summaries, and CLI exclusion exist; IDE operations remain explicitly unavailable. Treat remaining proposed commands, APIs, and schemas as design targets.
 
 Keep documentation changes within the requested scope; a documentation task does not initiate environment setup or harness implementation.
 
@@ -39,11 +39,11 @@ These requirements come from the Milestone 0 setup guide and the proposal's tech
 - **Environment manager:** Use `uv` to manage the repository-local `.venv`. Reuse the existing Homebrew uv installation per the developer's 2026-10-20 direction; no additional uv installation is needed and no uv version is pinned yet.
 - **Python:** Use **3.12** as the initial baseline. The developer selected existing `/opt/homebrew/bin/python3.12` on 2026-10-20; M0-02 read-only checks observed Python 3.12.15 arm64. Reuse it as the explicit base for uv environment creation; do not download another Python. M0-03 verified Python 3.12.15 arm64 and checkout-local environment isolation on 2026-10-20; developer validated M0-03 on 2026-10-20. See [M0-03 plan](docs/implementation-plans/M0-03.md).
 - **Interpreter:** Use `.venv/bin/python` explicitly during standalone setup and select it as the editor interpreter. Keep the system Python unchanged.
-- **Project lifecycle:** Until `pyproject.toml` exists, use the standalone environment workflow rather than `uv sync`. Project initialization, dependency declarations, and version locking belong to the Milestone 1 foundation.
-- **Python pin:** `.python-version` is currently ignored and remains local during Milestone 0. When the foundation establishes the shared version, remove that ignore entry and commit the agreed pin with the package configuration.
+- **Project lifecycle:** Use the qualified two-step wheel-only dependency/offline local-package installation in [README setup](README.md#setup-and-usage). Preserve the existing spike distributions with `--inexact`; plain `uv sync` can prune them. `pyproject.toml` and `uv.lock` now define foundation dependencies. Do not promote spike automation packages into them without current story justification.
+- **Python pin:** `.python-version` is now shared as `3.12`; package bounds are `>=3.12,<3.13`. Only Python 3.12.15 arm64 has been qualified.
 - **Host tooling:** Initially macOS with Git, VS Code, and the `code` CLI available. Record macOS version, architecture, and installed tool versions. Copilot installation, manual sign-in, dedicated profiles, and observed automation permissions belong to Milestone 1.
 
-Known Python package choices are not yet declared or version-locked:
+Foundation dependencies are declared and locked; historical environment observations follow:
 
 M0-01 baseline inspection on 2026-10-20 verified macOS 15.7.9 (24G830),
 `uname -m` reporting `x86_64`, and working Git 2.54.0. At that baseline, neither `.venv` nor
@@ -67,10 +67,11 @@ uv without installation or shell changes; M0-03 results follow. See [M0-02 obser
 
 | Package / capability | Status and intended use |
 | --- | --- |
-| `pytest` | Planned test runner for assertions, parametrization, and JUnit XML reporting. |
-| PyObjC | Candidate for macOS Accessibility automation; requires feasibility evidence and compatible prebuilt wheels for the target Python, macOS, and architecture. |
+| `pytest` | Foundation development runner; exact version in `uv.lock`. |
+| PyObjC | Binary-qualified spike-only packages; not foundation dependencies. Exact spike pins remain in the spike requirements. |
 | `pyautogui` | Candidate fallback for keyboard/mouse actions only when needed and validated on the target platform. |
-| YAML parsing | Required configuration capability; the references have not selected a Python parser package. |
+| YAML parsing | PyYAML is wheel-qualified and locked; strict safe loading is implemented. |
+| `flit_core` | Pure-Python packaging backend, wheel-installed from the locked development group before offline local packaging. |
 
 Install harness and automation packages only when justified by current Milestone 1 work; Milestone 0 installs none of them.
 
@@ -119,14 +120,43 @@ providing basic send/receive evidence. Offline review of the saved second exchan
 assertion from its single assistant-body text leaf and recorded whitespace-only
 comparison. Reproduce with `.venv/bin/python scripts/spikes/m1_00/verify_saved_ready.py`
 using the retained ignored evidence. R1/R3 are complete and R2 is unnecessary;
-Developer validated M1-00 on 2026-10-20; Slice 0 is complete. M1-01 and
-main-harness execution require separate authorization. The developer validated Phase 1 and
+Developer validated M1-00 on 2026-10-20; Slice 0 is complete. M1-01
+Phase 1 was subsequently authorized, implemented, and developer validated. The developer validated M1-00 Phase 1 and
 confirmed the earlier regular-window title change was developer activity.
 A later cancellation probe ran before the scope reduction; further Copilot
 probes stopped. Original test settings were restored and the owned app exited
 with its authenticated profile preserved and regular-window fingerprint unchanged.
 There is no active test instance. Completion discrimination and restart reuse are
-unqualified and outside the current scope. No main harness exists.
+unqualified and outside the current scope. No operational IDE harness exists.
+
+M1-01 Phase 1 on 2026-10-20 qualified the two-step installation in both the
+preserved `.venv` and an independent ignored clean environment, retaining all five
+spike distributions. PyYAML, pytest, backend, and transitive dependencies came
+from wheels; only the local pure-Python package was built offline. The macOS
+OS-held lock passed bounded process contention, race, normal release, and
+termination/hard-kill release tests. `.venv/bin/python -m pytest` runs the
+non-GUI foundation suite. See [Phase 1 evidence](docs/reports/M1-01-phase1.md)
+for installation versions, commands, and limitations. The developer validated
+Phase 1 on 2026-10-20. Phase 2 then implemented safe strict YAML validation,
+basic resource availability, five result labels, ordered dependency stopping,
+cleanup/interruption handling, structured JSON events/summaries, and CLI lock
+integration. Both preserved and clean environments passed 136 non-GUI tests.
+Qualified installed-console checks used the real per-user lock with synthetic
+resources; no IDE was launched. See [Phase 2 evidence](docs/reports/M1-01-phase2.md).
+Use `.venv/bin/ide-smoke run --ide vscode` with an edited local config per
+[README usage](README.md#setup-and-usage); available resources reach an explicit
+unimplemented result (exit 4), with five skipped tests and saved evidence.
+Reports/config defaults follow the caller's working directory; YAML paths follow
+the config directory. Preserve reports' diagnostic allowlist and controlled
+reasons when adding behavior. The developer accepted Phase 2 and validated M1-01 on 2026-10-20. Slice 1 validation remains pending. Do not
+start M1-02/M1-03 or GUI work without separate authorization and applicable gates.
+
+The authorized M1-01 PATH lookup follow-up was implemented on 2026-10-20;
+developer validation is pending. Bare command names now search past directory
+candidates and retain the first wrong-kind diagnostic if no regular file exists.
+The regression failed before the fix; afterward, 73 configuration tests and all
+138 non-GUI tests passed using the existing `.venv`. No dependencies changed.
+See the [follow-up execution results](docs/implementation-plans/M1-01-path-lookup-fix.md#execution-results--2026-10-20).
 
 
 Run GUI automation sequentially against dedicated persistent test profiles and fresh disposable workspaces. Preserve authenticated profiles, target only test-owned processes/windows, and constrain cleanup to harness-owned paths.

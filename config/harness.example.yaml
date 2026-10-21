@@ -1,0 +1,12 @@
+# Copy to harness.local.yaml and edit; no profile or workspace is created.
+# Only this small schema is supported; the proposal's larger example is not.
+harness:
+  platform: macos
+  execution_mode: sequential
+  timeouts:
+    ide_startup_seconds: 30
+    copilot_response_seconds: 120
+ides:
+  vscode:
+    executable: /Applications/Visual Studio Code.app/Contents/MacOS/Electron
+    profile_root: ~/.ide-smoke/profiles/vscode-test
