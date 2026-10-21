@@ -112,7 +112,7 @@ ide-smoke run --ide vscode
 
 Runs execute on the local host using configuration for its platform (`macos` or `windows`), including platform-specific executable and profile paths. The proposal's current configuration example targets macOS; Windows setup and configuration will be established in Milestone 2.
 
-For the next implementation step, review the accepted M1-00 evidence and the M1-01 story in the backlog, then obtain separate authorization for foundation execution.
+For the next implementation step, review the accepted M1-00 evidence, the M1-01 story in the backlog, and the proposed [M1-01 implementation plan](docs/implementation-plans/M1-01.md), then obtain separate authorization for foundation execution.
 
 ## Repository contents
 
@@ -123,7 +123,7 @@ For the next implementation step, review the accepted M1-00 evidence and the M1-
 ├── README.md
 ├── .agents/skills/                 # Repository workflow skills
 ├── docs/
-│   ├── implementation-plans/       # M0-01–M0-05 and revised M1-00 plans/results
+│   ├── implementation-plans/       # Milestone 0 and Milestone 1 plans/results
 │   ├── reports/M1-00-phase1.md     # Historical probes and accepted reduced-scope result
 │   └── vscode-testing-overview.md
 ├── scripts/spikes/m1_00/
