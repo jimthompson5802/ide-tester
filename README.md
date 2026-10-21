@@ -2,7 +2,7 @@
 
 A planned smoke-test harness for Visual Studio Code or IntelliJ IDEA and selected extensions/plugins after IDE or extension updates. GitHub Copilot Chat is the initial extension target. Prove feasibility on macOS first, then add Windows support after developer approval.
 
-**Status:** Milestone 0 and M1-00 (Slice 0) were completed and developer validated on 2026-10-20. M1-01 is complete and developer validated: Phase 1 and Phase 2 were accepted on 2026-10-20. Phase 2 adds strict YAML configuration, guarded runs, structured events, saved summaries, and non-GUI acceptance tests. IDE operations remain explicitly unavailable. See the [M1-01 evidence](docs/reports/M1-01-phase2.md). M1-02 profile safety is complete and developer validated on 2026-10-21. See the [M1-02 evidence](docs/reports/M1-02-phase2.md). M1-03 workspace safety is complete and developer validated on 2026-10-21; combined Slice 1 acceptance remains pending.
+**Status:** Milestone 0 and M1-00 (Slice 0) were completed and developer validated on 2026-10-20. M1-01 is complete and developer validated: Phase 1 and Phase 2 were accepted on 2026-10-20. Phase 2 adds strict YAML configuration, guarded runs, structured events, saved summaries, and non-GUI acceptance tests. IDE operations remain explicitly unavailable. See the [M1-01 evidence](docs/reports/M1-01-phase2.md). M1-02 profile safety is complete and developer validated on 2026-10-21. See the [M1-02 evidence](docs/reports/M1-02-phase2.md). M1-03 workspace safety is complete and developer validated on 2026-10-21; combined Slice 1 was developer validated on 2026-10-21.
 
 ## Completed work
 
@@ -103,7 +103,7 @@ Milestone 1 targets **Visual Studio Code and GitHub Copilot Chat on macOS**. The
 
 The project follows YAGNI: install tools and dependencies only for demonstrated needs in the current milestone. Setup and execution use prebuilt software and pure-Python packages or compatible prebuilt wheels, with dependency source builds disabled. Local native compilation and compiler toolchain installation are out of scope; any dependency requiring them must be reconsidered.
 
-**M1-00: Validate Copilot Chat automation feasibility** is complete for the reduced request/response scope. **M1-01: Bootstrap the Python project and CLI** is complete and developer validated on 2026-10-20. It provides the foundation, with IDE operations explicitly unavailable. M1-02 profile safety is complete and developer validated on 2026-10-21. M1-03 disposable workspace safety is complete and developer validated on 2026-10-21; combined Slice 1 acceptance remains pending. See the [execution report](docs/reports/M1-03-phase1.md).
+**M1-00: Validate Copilot Chat automation feasibility** is complete for the reduced request/response scope. **M1-01: Bootstrap the Python project and CLI** is complete and developer validated on 2026-10-20. It provides the foundation, with IDE operations explicitly unavailable. M1-02 profile safety is complete and developer validated on 2026-10-21. M1-03 disposable workspace safety is complete and developer validated on 2026-10-21; combined Slice 1 was developer validated on 2026-10-21. See the [execution report](docs/reports/M1-03-phase1.md).
 
 Implementation proceeds in reviewable slices: feasibility, foundation, IDE file operations, Copilot Chat, and repeatability/reporting. Each slice requires developer validation. Milestone 1 acceptance includes five consecutive unattended passing runs on unchanged IDE and Copilot versions.
 
@@ -235,7 +235,8 @@ Historical qualification and decisions remain in the
 Profile safety establishes no executable, session, permission, settings, Copilot,
 or authentication readiness. Future GUI runs still require an unlocked,
 exclusively reserved desktop. M1-03 is complete and developer validated on 2026-10-21; combined Slice 1
-validation remains pending before GUI implementation.
+was developer validated on 2026-10-21. Further implementation requires separate
+authorization; the developer has directed work to stop at this checkpoint.
 
 ## Repository contents
 

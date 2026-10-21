@@ -274,3 +274,17 @@ real console qualification. No runtime tests were rerun solely for this record;
 no resources, profiles, dependencies, or GUI behavior changed. The requested local
 commit is separately authorized. Stop after committing; no next phase, milestone,
 M1-04 execution, or publishing action is authorized.
+
+
+## Slice 1 developer acceptance — 2026-10-21
+
+After separately validating M1-03, the developer stated: “i also validate slice1”.
+This accepts the combined M1-01–M1-03 foundation and resource-isolation checkpoint
+and supersedes historical pending Slice 1 statements above. It does not expand
+the recorded evidence into IDE/Copilot readiness or qualify GUI behavior.
+
+The developer's instruction to stop before another phase or milestone remains in
+force. No new implementation, GUI work, or environment changes followed this
+acceptance. The separate M1-01 PATH follow-up validation remains as recorded.
+Only acceptance documentation changed; runtime tests were not rerun for this
+record. The 367-test passing result and installed-console evidence remain valid.

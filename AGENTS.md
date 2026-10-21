@@ -2,7 +2,7 @@
 
 ## Current state
 
-This repository contains design documents, the accepted M1-00 probe, and the implemented M1-01 foundation with non-GUI tests. Both phases and M1-01 are complete and developer validated on 2026-10-20. Strict configuration, results, summaries, and CLI exclusion exist. M1-02 profile safety is complete and developer validated on 2026-10-21. M1-03 workspace safety is complete and developer validated on 2026-10-21; combined Slice 1 acceptance remains pending. IDE operations remain explicitly unavailable. Treat remaining proposed commands, APIs, and schemas as design targets.
+This repository contains design documents, the accepted M1-00 probe, and the implemented M1-01 foundation with non-GUI tests. Both phases and M1-01 are complete and developer validated on 2026-10-20. Strict configuration, results, summaries, and CLI exclusion exist. M1-02 profile safety is complete and developer validated on 2026-10-21. M1-03 workspace safety is complete and developer validated on 2026-10-21; combined Slice 1 was developer validated on 2026-10-21. IDE operations remain explicitly unavailable. Treat remaining proposed commands, APIs, and schemas as design targets.
 
 Keep documentation changes within the requested scope; a documentation task does not initiate environment setup or harness implementation.
 
@@ -154,7 +154,7 @@ Use `.venv/bin/ide-smoke run --ide vscode` with an edited local config per
 unimplemented result (exit 4), with five skipped tests and saved evidence.
 Reports/config defaults follow the caller's working directory; YAML paths follow
 the config directory. Preserve reports' diagnostic allowlist and controlled
-reasons when adding behavior. The developer accepted Phase 2 and validated M1-01 on 2026-10-20. Slice 1 validation remains pending. Subsequent M1-02 acceptance and authorized M1-03 execution are recorded below; GUI work still requires the applicable gates.
+reasons when adding behavior. The developer accepted Phase 2 and validated M1-01 on 2026-10-20. At that checkpoint Slice 1 validation was pending; acceptance on 2026-10-21 is recorded below. Subsequent M1-02 acceptance and authorized M1-03 execution are recorded below; GUI work still requires the applicable gates.
 
 The authorized M1-01 PATH lookup follow-up was implemented on 2026-10-20;
 developer validation is pending. Bare command names now search past directory
@@ -197,7 +197,7 @@ successful cleanup, unchanged narrow metadata, and guard reacquisition. Syntheti
 invalid markers block with exit 3; uncertain inspection is an error. All 294
 non-GUI tests passed using the existing environment. No dependencies or GUI
 behavior were added. Metadata checks do not prove arbitrary-content integrity
-or authentication validity. M1-02 is developer accepted within this scope. Slice 1 remains pending;
+or authentication validity. M1-02 is developer accepted within this scope. Slice 1 acceptance is recorded below;
 M1-03 execution was subsequently authorized; see its execution entry below.
 
 The authorized M1-02 review fix on 2026-10-21 recognizes enclosing `.app`
@@ -242,6 +242,7 @@ and successor removal preserving the retained fixture; all produced expected
 unimplemented exit 4 with five skips, unchanged synthetic sentinels, and matching
 manifests. All 367 non-GUI tests passed. P1-01–P1-09 are implementation verified.
 The developer validated M1-03 on 2026-10-21 and requested a commit, explicitly
-prohibiting advancement to another phase or milestone. Combined Slice 1 validation
-remains pending. No dependencies, authenticated profile changes, or GUI behavior were added. M1-04 requires separate
+prohibiting advancement to another phase or milestone. The developer separately stated “i also validate slice1” on 2026-10-21, closing
+the combined foundation checkpoint. The instruction to stop remains in force;
+no next phase or milestone is authorized. No dependencies, authenticated profile changes, or GUI behavior were added. M1-04 requires separate
 authorization and accepted Slice 1 validation.

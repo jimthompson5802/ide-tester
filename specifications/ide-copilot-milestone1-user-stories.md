@@ -131,7 +131,7 @@ authorized M1-01 or main-harness work. See the
 
 ### Story M1-01 — Bootstrap the Python project and CLI
 
-**Execution status:** Phase 1 and Phase 2 developer validated on 2026-10-20; M1-01 is complete. See the [Phase 2 report](../docs/reports/M1-01-phase2.md). The developer explicitly accepted Phase 2 on 2026-10-20. Slice 1 acceptance remains pending; M1-02 profile safety is complete and developer validated on 2026-10-21, and M1-03 is complete and developer validated on 2026-10-21.
+**Execution status:** Phase 1 and Phase 2 developer validated on 2026-10-20; M1-01 is complete. See the [Phase 2 report](../docs/reports/M1-01-phase2.md). The developer explicitly accepted Phase 2 on 2026-10-20. Slice 1 was developer validated on 2026-10-21; M1-02 profile safety is complete and developer validated on 2026-10-21, and M1-03 is complete and developer validated on 2026-10-21.
 
 **Priority:** Must | **Dependencies:** M1-00 approved
 
@@ -154,7 +154,7 @@ authorized M1-01 or main-harness work. See the
 
 **Evidence:** CLI output, sample basic summaries including a blocked/error outcome, a controlled overlapping-invocation check, and passing unit-test report.
 
-**Developer gate:** Review with M1-02–M1-03 at the Slice 1 checkpoint; foundation approval is required before M1-04.
+**Developer gate:** The combined M1-01–M1-03 Slice 1 foundation checkpoint was developer validated on 2026-10-21. Further work requires separate authorization.
 
 ---
 
@@ -194,7 +194,7 @@ GitHub issue #20 retains its earlier scope and has not been edited.
 
 **Evidence:** The [acceptance mapping](../docs/reports/M1-02-phase2.md#acceptance-mapping-and-limitations) ties all five criteria to 294 passing non-GUI tests, synthetic console rejection, controlled inspection-error tests, real installed-console `profile_safe` followed by unimplemented exit 4, and unchanged narrow profile metadata. Authentication was not inspected or requalified; no broader readiness claim follows.
 
-**Developer gate:** Phase 1 and final Phase 2 are developer validated on 2026-10-21; M1-02 is complete within the revised profile-safety scope. M1-03 execution is authorized; review M1-01–M1-03 at the Slice 1 checkpoint before M1-04.
+**Developer gate:** Phase 1 and final Phase 2 are developer validated on 2026-10-21; M1-02 is complete within the revised profile-safety scope. M1-03 and the combined M1-01–M1-03 Slice 1 checkpoint were subsequently developer validated on 2026-10-21. Further work requires separate authorization.
 
 ---
 
@@ -204,7 +204,7 @@ GitHub issue #20 retains its earlier scope and has not been edited.
 
 **Slice:** 1 — Foundation
 
-**Execution status:** Complete and developer validated on 2026-10-21. P1-01–P1-09 passed their checks, including real-root installed-console removal/retention and 367 non-GUI tests. The developer authorized preserving the previous unmarked root by rename; no automatic adoption or repair was added. See the [plan](../docs/implementation-plans/M1-03.md) and [execution report](../docs/reports/M1-03-phase1.md). The developer explicitly validated M1-03; combined Slice 1 validation remains pending.
+**Execution status:** Complete and developer validated on 2026-10-21. P1-01–P1-09 passed their checks, including real-root installed-console removal/retention and 367 non-GUI tests. The developer authorized preserving the previous unmarked root by rename; no automatic adoption or repair was added. See the [plan](../docs/implementation-plans/M1-03.md) and [execution report](../docs/reports/M1-03-phase1.md). The developer explicitly validated M1-03; combined Slice 1 was separately developer validated on 2026-10-21.
 
 **As a** developer, **I want** a fresh fixture workspace for every run, **so that** smoke tests are reproducible and cannot damage my real projects.
 
@@ -218,7 +218,7 @@ GitHub issue #20 retains its earlier scope and has not been edited.
 
 **Evidence:** Workspace manifest, test logs, and cleanup safety tests.
 
-**Developer gate:** M1-03 workspace safety was developer validated on 2026-10-21. Combined M1-01–M1-03 Slice 1 validation remains pending. The developer explicitly prohibited advancement to another phase or milestone.
+**Developer gate:** M1-03 workspace safety was developer validated on 2026-10-21. Combined M1-01–M1-03 Slice 1 was separately developer validated on 2026-10-21. The developer explicitly prohibited advancement to another phase or milestone.
 
 ---
 
