@@ -2,7 +2,16 @@
 
 A planned smoke-test harness for Visual Studio Code or IntelliJ IDEA and selected extensions/plugins after IDE or extension updates. GitHub Copilot Chat is the initial extension target. Prove feasibility on macOS first, then add Windows support after developer approval.
 
-**Status:** M1-00 is scoped to submitting `Reply with exactly the word READY.` through Copilot Chat and requiring `response.strip() == "READY"` for its response. Saved host evidence now verifies the exact assertion; the developer validated M1-00 on 2026-10-20; additional completion, cancellation, usability and restart testing are outside the current work. See the [revised plan](docs/implementation-plans/M1-00.md) and [execution report](docs/reports/M1-00-phase1.md). There is no implemented harness or installable package; the broader behavior below is future design, not the current task.
+**Status:** Milestone 0 and M1-00 (Slice 0) were completed and developer validated on 2026-10-20. The repository contains design documents, implementation plans, an execution report, and macOS feasibility scripts. There is no main harness, installable package, project configuration (`pyproject.toml`), or runnable harness test suite yet. M1-01 and main-harness implementation require separate authorization.
+
+## Completed work
+
+- **Milestone 0 — Environment setup:** Verified the existing macOS tooling and created an isolated, repository-local uv environment using Python 3.12.15 arm64. See the [setup implementation plan](specifications/ide-milestone0-implementation-plan.md) and [final checks](docs/implementation-plans/M0-05.md#execution-results--2026-10-20).
+- **M1-00 — Copilot Chat feasibility:** Automation submitted `Reply with exactly the word READY.` through the VS Code Copilot Chat UI. Review of saved host evidence verified `response.strip() == "READY"` for the associated assistant response. See the [revised plan](docs/implementation-plans/M1-00.md) and [execution report](docs/reports/M1-00-phase1.md#reduced-scope-result--saved-evidence-review).
+
+The feasibility result used macOS 15.7.9, VS Code 1.135.0, bundled GitHub.copilot-chat 0.63.0, Python 3.12.15 arm64, and binary-installed PyObjC 12.2.2 packages. The tested path required Accessibility access, a visible graphical session, manual sign-in, and `editor.accessibilitySupport=on` in the dedicated test profile. Exact spike dependencies and commands are in the [spike README](scripts/spikes/m1_00/README.md) and [requirements](scripts/spikes/m1_00/requirements.txt).
+
+Completion detection, cancellation/error discrimination, restart authentication reuse, and broader repeatability remain unqualified. The owned test instance was closed, temporary settings were restored, and the authenticated profile was preserved. The broader behavior below remains future design.
 
 ## Start here
 
@@ -37,8 +46,8 @@ Contracts, logical tests, orchestration, and verification remain platform-neutra
 
 | Milestone | Outcome |
 | --- | --- |
-| 0 | Prepare the macOS environment. |
-| 1 | Prove VS Code and Copilot Chat on macOS with T01–T05. |
+| 0 | Prepare the macOS environment — complete and developer accepted on 2026-10-20. |
+| 1 | Prove VS Code and Copilot Chat on macOS with T01–T05 — M1-00 complete; foundation and main harness pending. |
 | 2 | Set up the Windows environment, validate feasibility, and support the same VS Code/Copilot tests on Windows. |
 | 3 | Add IntelliJ IDEA support on macOS and Windows. |
 | 4 | Strengthen reliability and diagnostics on both platforms. |
@@ -63,11 +72,11 @@ Generating a backlog, creating issues, and approving a plan do not authorize imp
 
 ## Milestone 1 scope
 
-Milestone 1 targets **Visual Studio Code and GitHub Copilot Chat on macOS**. The proposed stack is Python 3.12+, pytest, YAML configuration, and macOS Accessibility automation, subject to feasibility testing.
+Milestone 1 targets **Visual Studio Code and GitHub Copilot Chat on macOS**. The initial Python baseline is 3.12. The feasibility spike uses PyObjC for macOS Accessibility automation; pytest, YAML configuration, and the main harness package remain planned.
 
 The project follows YAGNI: install tools and dependencies only for demonstrated needs in the current milestone. Setup and execution use prebuilt software and pure-Python packages or compatible prebuilt wheels, with dependency source builds disabled. Local native compilation and compiler toolchain installation are out of scope; any dependency requiring them must be reconsidered.
 
-The first step is **M1-00: Validate Copilot Chat automation feasibility**. Its current outcome is one UI request and an assistant response matching `READY` after whitespace trimming. The broader harness remains separately scoped and authorized work.
+**M1-00: Validate Copilot Chat automation feasibility** is complete for the reduced request/response scope. The next story is **M1-01: Bootstrap the Python project and CLI**, subject to separate execution authorization. The remaining foundation slice also covers configuration, preflight, and disposable workspace safety.
 
 Implementation proceeds in reviewable slices: feasibility, foundation, IDE file operations, Copilot Chat, and repeatability/reporting. Each slice requires developer validation. Milestone 1 acceptance includes five consecutive unattended passing runs on unchanged IDE and Copilot versions.
 
@@ -85,7 +94,15 @@ The design preserves authenticated test profiles between runs and classifies exp
 
 ## Setup and usage
 
-Installation and execution instructions will be added when the harness exists. The specifications propose commands such as:
+The existing spike can verify retained local evidence without launching VS Code or sending another request:
+
+```bash
+.venv/bin/python scripts/spikes/m1_00/verify_saved_ready.py
+```
+
+This command requires the ignored observation/tree artifacts from the original host run; they are not included in a fresh checkout. See the [spike README](scripts/spikes/m1_00/README.md#current-result-and-offline-reproduction) for prerequisites and reproduction details. These scripts are experimental feasibility tools, not a general harness.
+
+Harness installation and execution instructions will be added when it exists. The specifications propose commands such as:
 
 ```bash
 ide-smoke run --ide vscode
@@ -95,17 +112,33 @@ ide-smoke run --ide vscode
 
 Runs execute on the local host using configuration for its platform (`macos` or `windows`), including platform-specific executable and profile paths. The proposal's current configuration example targets macOS; Windows setup and configuration will be established in Milestone 2.
 
-For now, read the proposal and Milestone 1 backlog, resolve the feasibility questions in M1-00, and review the resulting evidence before implementing the foundation.
+For the next implementation step, review the accepted M1-00 evidence and the M1-01 story in the backlog, then obtain separate authorization for foundation execution.
 
 ## Repository contents
 
 ```text
 .
+├── AGENTS.md                       # Repository instructions and validated environment notes
+├── LICENSE
 ├── README.md
+├── .agents/skills/                 # Repository workflow skills
 ├── docs/
+│   ├── implementation-plans/       # M0-01–M0-05 and revised M1-00 plans/results
+│   ├── reports/M1-00-phase1.md     # Historical probes and accepted reduced-scope result
 │   └── vscode-testing-overview.md
+├── scripts/spikes/m1_00/
+│   ├── README.md                  # Current result, reproduction, historical probe usage
+│   ├── requirements.txt           # Exact tested spike dependency pins
+│   ├── preflight.py               # Prerequisite checks
+│   ├── discover.py                # Owned IDE lifecycle and UI discovery
+│   ├── diagnose_proxy.py          # Historical editor-readback diagnosis
+│   ├── observe_response.py        # Fixed-prompt submission and bounded observations
+│   └── verify_saved_ready.py      # Offline verification of retained READY evidence
 └── specifications/
     ├── ide-milestone0-environment-setup.md
+    ├── ide-milestone0-implementation-plan.md
     ├── ide-copilot-smoke-harness-proposal.md
     └── ide-copilot-milestone1-user-stories.md
 ```
+
+The local `.venv/`, `.python-version`, test profiles, disposable workspaces, and raw evidence are ignored and are not distributed with the repository.
