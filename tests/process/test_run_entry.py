@@ -21,14 +21,21 @@ def runs(tmp_path):
     def launch(name, *, finish=False):
         cwd = tmp_path / name
         cwd.mkdir()
-        executable = cwd / "fake-ide"
+        executable = cwd / "bin" / "fake-ide"
+        executable.parent.mkdir()
         executable.write_text("inert\n")
-        (cwd / "profile").mkdir()
+        profile = cwd / "profile"
+        profile.mkdir()
+        (profile / "user-data").mkdir()
+        (profile / "extensions").mkdir()
+        (profile / ".ide-smoke-profile.json").write_text(
+            '{"schema_version": 1, "purpose": "ide-smoke-dedicated-vscode"}'
+        )
         config = cwd / f"{name}.yaml"
         config.write_text(yaml.safe_dump({
             "harness": {"platform": "macos", "execution_mode": "sequential",
                         "timeouts": {"ide_startup_seconds": 1, "copilot_response_seconds": 2}},
-            "ides": {"vscode": {"executable": "./fake-ide", "profile_root": "./profile"}},
+            "ides": {"vscode": {"executable": "./bin/fake-ide", "profile_root": "./profile"}},
         }))
         marker, release = cwd / "action", cwd / "release"
         if finish:
@@ -65,6 +72,8 @@ def test_cli_overlap_keeps_owner_and_evidence_independent(runs, tmp_path):
     contender, contender_cwd, rejected_action, _ = runs("contender", finish=True)
     assert contender.wait(timeout=5) == 3
     assert not rejected_action.exists()
+    assert not rejected_action.with_suffix(".profile-check").exists()
+    assert owner_action.with_suffix(".profile-check").exists()
     assert not rejected_action.with_suffix(".cleanup").exists()
     blocked = read_summary(contender_cwd)
     assert blocked["result"]["reason"] == "active_run_conflict"

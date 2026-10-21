@@ -1,6 +1,6 @@
 # IDE Smoke Test Harness — Milestone 1 User Stories
 
-**Status:** Draft backlog; developer-confirmed clarifications recorded on 2026-10-20; implementation and feasibility remain unverified<br>
+**Status:** Milestone 1 backlog; verified implementation and feasibility are recorded per story; overall milestone and GUI acceptance remain pending<br>
 **Source:** [Harness proposal](ide-copilot-smoke-harness-proposal.md)<br>
 **Target:** macOS; VS Code only; GitHub Copilot Chat<br>
 **Authentication:** Existing signed-in session in a dedicated, persistent test profile<br>
@@ -131,7 +131,7 @@ authorized M1-01 or main-harness work. See the
 
 ### Story M1-01 — Bootstrap the Python project and CLI
 
-**Execution status:** Phase 1 and Phase 2 developer validated on 2026-10-20; M1-01 is complete. See the [Phase 2 report](../docs/reports/M1-01-phase2.md). The developer explicitly accepted Phase 2 on 2026-10-20. Slice 1 acceptance remains pending; M1-02/M1-03 require separate authorization.
+**Execution status:** Phase 1 and Phase 2 developer validated on 2026-10-20; M1-01 is complete. See the [Phase 2 report](../docs/reports/M1-01-phase2.md). The developer explicitly accepted Phase 2 on 2026-10-20. Slice 1 acceptance remains pending; M1-02 profile safety is complete and developer validated on 2026-10-21, and M1-03 requires separate authorization.
 
 **Priority:** Must | **Dependencies:** M1-00 approved
 
@@ -164,20 +164,37 @@ authorized M1-01 or main-harness work. See the
 
 **Slice:** 1 — Foundation
 
-**As a** developer, **I want** the harness to check its environment before starting GUI tests, **so that** missing prerequisites do not appear as IDE regressions.
+**As a** developer, **I want** the harness to validate its dedicated test-profile paths and explicit dedication, **so that** later automation targets a deliberately isolated profile while preserving personal resources and existing authentication.
+
+**Developer-approved scope revision — 2026-10-21:** M1-02 is limited to profile
+safety. All other readiness qualification is out of scope: executable identity/
+runnability, session/permissions/lock state, effective settings, Copilot inventory/
+authentication, and new readiness dependencies. This supersedes the earlier
+limited-session snapshot scope. See the [revised plan](../docs/implementation-plans/M1-02.md).
+Phase 1 qualification is verified and developer validated on 2026-10-21. The developer
+accepted dedicated roots strictly beneath `<checkout>/profiles/` on 2026-10-21,
+with other checkout overlap rejected and other protections retained. See the
+[Phase 1 evidence](../docs/reports/M1-02-phase1.md#profile-only-qualification--resumed-2026-10-21).
+The earlier Phase 2 hold was superseded by explicit authorization on 2026-10-21.
+Phase 2 is **complete and developer validated on 2026-10-21**. The developer
+stated: “I validate Phase 2 as complete”. P2-02 through P2-06 and P2-VALIDATION
+are complete. Real-profile dedication is confirmed; explicitly
+authorized marker creation, standalone safety inspection, and installed-console
+verification passed. See the [Phase 2 evidence](../docs/reports/M1-02-phase2.md).
+Checked criteria below have technical evidence and final developer acceptance.
+GitHub issue #20 retains its earlier scope and has not been edited.
 
 **Acceptance criteria**
 
-- [ ] Verify the configured VS Code executable exists and is runnable.
-- [ ] Check that the intended macOS graphical session is usable; fail as `BLOCKED` if the UI cannot be driven.
-- [ ] Check the required automation permissions using feasible documented checks or a minimal interaction probe; do not claim a permission was verified if it was not.
-- [ ] Validate test-profile paths and the presence of the expected Copilot extension; distinguish missing extension from authentication failure.
-- [ ] Do not automate passwords, MFA, or Keychain extraction.
-- [ ] Provide a human-readable one-time setup guide for a minimal dedicated test profile in the existing macOS login, granting permissions and signing in to Copilot; document relevant settings and required exclusive desktop use during runs.
+- [x] Validate safe dedicated root/`user-data`/`extensions` paths and reject protected everyday locations, unsafe symlinks, and overlaps under the qualified path contract.
+- [x] Require a nonsecret dedication marker; permit deliberate manual adoption of the existing dedicated profile while preserving contents and authentication. A marker never authorizes deletion.
+- [x] Inspect read-only without settings/extension inventory or credential inspection; classify known unsafe/missing layouts as `BLOCKED` and indeterminate inspection as `HARNESS ERROR`.
+- [x] Integrate profile validation into the guarded run with controlled saved findings and dependent skips; preserve existing foundation checks and explicit unimplemented IDE results.
+- [x] Provide a human-readable profile-safety setup/adoption guide and demonstrate successful profile validation plus a controlled/simulated blocked case.
 
-**Evidence:** Successful preflight and at least one simulated/controlled blocked-preflight test.
+**Evidence:** The [acceptance mapping](../docs/reports/M1-02-phase2.md#acceptance-mapping-and-limitations) ties all five criteria to 294 passing non-GUI tests, synthetic console rejection, controlled inspection-error tests, real installed-console `profile_safe` followed by unimplemented exit 4, and unchanged narrow profile metadata. Authentication was not inspected or requalified; no broader readiness claim follows.
 
-**Developer gate:** Review with M1-01 and M1-03 at the Slice 1 checkpoint; validate readiness and setup before M1-04.
+**Developer gate:** Phase 1 and final Phase 2 are developer validated on 2026-10-21; M1-02 is complete within the revised profile-safety scope. M1-03 requires separate authorization; review M1-01–M1-03 at the Slice 1 checkpoint before M1-04.
 
 ---
 
@@ -358,7 +375,7 @@ The diagram includes approval gates as dependencies. Story completion alone does
 flowchart TD
     A[M1-00 Feasibility spike] --> G0{Slice 0 approved}
     G0 --> B[M1-01 CLI and package]
-    B --> C[M1-02 Preflight]
+    B --> C[M1-02 Profile safety]
     B --> D[M1-03 Workspace]
     C --> G1{Slice 1 approved}
     D --> G1
@@ -377,7 +394,7 @@ flowchart TD
 | Slice | Stories | Demonstration | Required approval |
 |---|---|---|---|
 | 0 — Feasibility | M1-00 | Current scope: one automated UI request and exact `READY` response assertion; short evidence note | Review reduced result before separately authorized foundation work |
-| 1 — Foundation | M1-01–M1-03 | CLI, validated config, safe fixture, preflight, basic saved results, overlap prevention | Validate safe environment and setup before IDE basics |
+| 1 — Foundation | M1-01–M1-03 | CLI, validated config, safe fixture, profile safety, basic saved results, overlap prevention | Validate foundation and resource isolation before IDE basics |
 | 2 — IDE basics | M1-04–M1-05 | T01–T03, including disk assertion | Validate reliable file operations before Copilot integration |
 | 3 — Copilot | M1-06–M1-07 | T04–T05 with fresh completed response satisfying `READY` assertion | Validate Chat verification before hardening |
 | 4 — Hardening | M1-08–M1-09 | Rich reports, negative tests, five unattended runs under unchanged versions/settings | Accept Milestone 1 before Windows work |
@@ -476,9 +493,9 @@ The developer confirmed shared understanding of Q1–Q16 before requesting incor
 | UI selectors | macOS Accessibility can reach Copilot Chat controls | M1-00 |
 | Automation dependencies | The selected approach installs using pure Python or compatible prebuilt wheels with source builds disabled | M1-00/M1-01 |
 | Completion detection | Find a response-associated completion signal and observable error/cancellation states that meet the agreed standard | M1-00 |
-| Profile reuse | Dedicated VS Code profile can preserve valid sign-in across runs | M1-00/M1-02 |
+| Profile reuse | Preserving a dedicated profile does not establish valid sign-in across runs; authentication qualification is outside revised M1-02 | Historical M1-00; further qualification requires separate scope |
 | Test instance isolation | CLI flags and instance handling avoid affecting regular VS Code | M1-00/M1-04 |
-| GUI session | Establish feasible readiness/permission checks for the existing login under exclusive desktop use | M1-00/M1-02 |
+| GUI session | Readiness/permission qualification is outside revised M1-02; exclusive desktop use remains an operating requirement | Further qualification requires separate scope |
 | Qualified configuration | Determine necessary mode/model/language restrictions from evidence; obtain approval of material limitations | M1-00 |
 | Response assertion | Measure behavior under the agreed whitespace-only `READY` rule; changes require developer review | M1-00/M1-07 |
 | Failure evidence | Determine which auth, service, and UI error causes are actually observable under the agreed taxonomy | M1-00/M1-01/M1-07 |

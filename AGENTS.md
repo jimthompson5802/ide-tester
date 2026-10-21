@@ -2,7 +2,7 @@
 
 ## Current state
 
-This repository contains design documents, the accepted M1-00 probe, and the implemented M1-01 foundation with non-GUI tests. Both phases and M1-01 are complete and developer validated on 2026-10-20. Strict configuration, results, summaries, and CLI exclusion exist; IDE operations remain explicitly unavailable. Treat remaining proposed commands, APIs, and schemas as design targets.
+This repository contains design documents, the accepted M1-00 probe, and the implemented M1-01 foundation with non-GUI tests. Both phases and M1-01 are complete and developer validated on 2026-10-20. Strict configuration, results, summaries, and CLI exclusion exist. M1-02 profile safety is complete and developer validated on 2026-10-21. IDE operations remain explicitly unavailable. Treat remaining proposed commands, APIs, and schemas as design targets.
 
 Keep documentation changes within the requested scope; a documentation task does not initiate environment setup or harness implementation.
 
@@ -21,6 +21,12 @@ For creating GitHub issues, use the repository-local [create-github-issue skill]
 For creating pull requests, use the repository-local [create-pull-request skill](.agents/skills/create-pull-request/SKILL.md), which uses the repository's pull request template.
 
 Use the GitHub CLI (`gh`) for this repository's GitHub operations, including issues, pull requests, reviews, and Actions runs. Run commands from this checkout so `gh` targets its GitHub remote; use `--repo jimthompson5802/ide-tester` when an explicit target is needed. Use `git` for local version-control operations.
+
+## Commit messages
+
+Use Conventional Commits for every commit: `<type>(<optional scope>): <description>`. Choose the type based on the actual change: `feat`, `fix`, `docs`, `refactor`, `test`, `build`, `ci`, or `chore`. Use a concise imperative description and include a scope when it helps identify the affected area. For example: `docs(workflow): add plan execution skill and require TDD`.
+
+Mark breaking changes with `!` before the colon and explain them in a `BREAKING CHANGE:` footer.
 
 ## Implementation boundaries
 
@@ -161,6 +167,46 @@ See the [follow-up execution results](docs/implementation-plans/M1-01-path-looku
 
 Run GUI automation sequentially against dedicated persistent test profiles and fresh disposable workspaces. Preserve authenticated profiles, target only test-owned processes/windows, and constrain cleanup to harness-owned paths.
 
+M1-02 is limited to profile safety: safe dedicated paths/layout, explicit
+marker, deliberate adoption, and read-only preservation. Executable identity/
+runnability, session/permissions/lock state, settings, Copilot inventory/
+authentication, and new readiness dependencies are outside this story and are
+not assigned automatically elsewhere. An unlocked, exclusively reserved desktop
+remains an operating requirement for future GUI work.
+
+Phase 1 was developer validated on 2026-10-21, with 68 focused and 215 total
+non-GUI tests; its historical hold and missing-marker observations are retained
+in the [Phase 1 report](docs/reports/M1-02-phase1.md). Separately authorized
+Phase 2 is **complete and developer validated on 2026-10-21**. The developer
+stated: “I validate Phase 2 as complete”. P2-02 through P2-06 and P2-VALIDATION
+are complete. Read the [plan](docs/implementation-plans/M1-02.md),
+[Phase 2 evidence](docs/reports/M1-02-phase2.md), and
+[setup guide](docs/vscode-test-profile-setup.md) before changing profile admission.
+
+Production checks run under the existing lock after basic availability, sharing
+metadata-only executable selection and using actual editable-source checkout
+context. Dedicated roots strictly beneath `<checkout>/profiles/` are allowed;
+all other checkout overlap and other protected-path overlap remain rejected.
+The marker and real fixed children are required. Preflight is read-only, records
+`profile_safety_checked`, and never creates or repairs the profile.
+
+The developer confirmed dedication/layout and explicitly authorized exclusive
+marker creation in `profiles/m1-00` on 2026-10-21. Do not recreate or overwrite
+that marker. Real installed-console run `68d6f20bb1bb4fdb8b1918ce662e0dcc`
+recorded `profile_safe`, expected unimplemented exit 4, five correct skips,
+successful cleanup, unchanged narrow metadata, and guard reacquisition. Synthetic
+invalid markers block with exit 3; uncertain inspection is an error. All 294
+non-GUI tests passed using the existing environment. No dependencies or GUI
+behavior were added. Metadata checks do not prove arbitrary-content integrity
+or authentication validity. M1-02 is developer accepted within this scope. Slice 1 remains pending;
+M1-03 requires separate authorization.
+
+The authorized M1-02 review fix on 2026-10-21 recognizes enclosing `.app`
+suffixes case-insensitively. Regression tests through `check_configured_profile`
+first reproduced unsafe passes for `.APP`, `.ApP`, and an executable case alias;
+after the fix, 75 profile-safety tests and all 298 non-GUI tests passed with
+`.venv/bin/python -m pytest -q`. The alias test ran on the host filesystem.
+
 Authentication is established manually. Never automate passwords or MFA, extract credentials, or copy authenticated profiles between hosts. Classify expired authentication as blocked. Keep tokens, private conversations, and unrelated desktop content out of committed evidence and diagnostics.
 
 ## Validation and documentation
@@ -169,7 +215,9 @@ Maintain this file as work progresses: update environment requirements, selected
 
 For documentation changes, check relative links and consistency across affected specifications and the README. Preserve the distinction between proposed behavior and verified results.
 
-Once code exists, use the applicable story's acceptance criteria to select checks. Test non-GUI logic independently; validate GUI behavior on the target host. Verify observable outcomes: an IDE edit must be checked independently on disk, and a Copilot response must be fresh and complete. Report blocked prerequisites separately from functional failures and harness errors.
+Use test-driven development for software features and bug fixes. Derive tests from the applicable story's acceptance criteria and observable behavior. Work in small red-green-refactor cycles: write or extend a focused test, run it and confirm it fails for the intended missing behavior or reproduced bug, implement the minimum change to pass, then refactor while keeping tests green. Run relevant regression checks before marking the task complete. Test behavior rather than mirroring implementation details; documentation-only changes do not require new runtime tests.
+
+Test non-GUI logic independently; validate GUI behavior on the target host. When automated verification is unsuitable, define the observable manual or host check before implementation and record why automation is unsuitable. Missing prerequisites or unavailable GUI access do not establish a passing result; report the blocker and leave required verification incomplete. Verify observable outcomes: an IDE edit must be checked independently on disk, and a Copilot response must be fresh and complete. Report blocked prerequisites separately from functional failures and harness errors. TDD does not authorize GUI work, environment setup, or advancing a developer gate outside the approved scope.
 
 **Stop after four unsuccessful fix rounds for the same error and ask the developer for guidance.** A round consists of applying a proposed fix and rerunning the check that exposed the error. Report the error, the four attempted fixes, their results, and relevant diagnostic paths. Do not begin a fifth round or work around the failing requirement until the developer provides guidance.
 

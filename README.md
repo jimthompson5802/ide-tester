@@ -2,7 +2,7 @@
 
 A planned smoke-test harness for Visual Studio Code or IntelliJ IDEA and selected extensions/plugins after IDE or extension updates. GitHub Copilot Chat is the initial extension target. Prove feasibility on macOS first, then add Windows support after developer approval.
 
-**Status:** Milestone 0 and M1-00 (Slice 0) were completed and developer validated on 2026-10-20. M1-01 is complete and developer validated: Phase 1 and Phase 2 were accepted on 2026-10-20. Phase 2 adds strict YAML configuration, guarded runs, structured events, saved summaries, and non-GUI acceptance tests. IDE operations remain explicitly unavailable. See the [M1-01 evidence](docs/reports/M1-01-phase2.md).
+**Status:** Milestone 0 and M1-00 (Slice 0) were completed and developer validated on 2026-10-20. M1-01 is complete and developer validated: Phase 1 and Phase 2 were accepted on 2026-10-20. Phase 2 adds strict YAML configuration, guarded runs, structured events, saved summaries, and non-GUI acceptance tests. IDE operations remain explicitly unavailable. See the [M1-01 evidence](docs/reports/M1-01-phase2.md). M1-02 profile safety is complete and developer validated on 2026-10-21. See the [M1-02 evidence](docs/reports/M1-02-phase2.md).
 
 ## Completed work
 
@@ -62,7 +62,7 @@ Use these skills to move from a milestone description to reviewed implementation
 1. **Generate the backlog — [generate-milestone-user-stories](.agents/skills/generate-milestone-user-stories/SKILL.md).** Invoke, for example, `$generate-milestone-user-stories milestone=2`. The skill uses the proposal for scope and the Milestone 1 backlog as its structural model, asks about consequential decisions, and writes or refines `specifications/ide-copilot-milestone<N>-user-stories.md`. Review the stories, acceptance criteria, dependencies, evidence requirements, and developer gates.
 2. **Publish the stories — [create-github-issue](.agents/skills/create-github-issue/SKILL.md).** Input: the reviewed `specifications/ide-copilot-milestone<N>-user-stories.md` file produced in step 1. For example: “Use `$create-github-issue` to create one GitHub issue per story in `specifications/ide-copilot-milestone2-user-stories.md`.” The skill uses the repository issue template and preserves story IDs, acceptance criteria, dependencies, evidence requirements, and developer gates.
 3. **Plan the next eligible story — [plan-user-story](.agents/skills/plan-user-story/SKILL.md).** Supply its issue or specification reference. The skill saves a technical plan under `docs/implementation-plans/`, with phases, tasks, verification, and developer checkpoints. Review the plan before execution.
-4. **Authorize and implement the plan.** Separately instruct the agent to execute the approved plan. There is no dedicated implementation skill in this workflow. Follow dependency order, perform the required checks, and present actual results and evidence at each developer checkpoint. Use `mattpocock-skills:diagnosing-bugs` for debugging or `mattpocock-skills:tdd` when test-first development is requested and those plugin skills are available.
+4. **Authorize and implement the plan — [execute-plan](.agents/skills/execute-plan/SKILL.md).** Separately instruct the agent to execute the approved Markdown plan, for example `$execute-plan docs/implementation-plans/M1-02.md`. The skill checks off tasks only after completion and verification, records evidence in the plan, and stops at the end of every phase for developer validation, including the final phase. Use `mattpocock-skills:diagnosing-bugs` for debugging or `mattpocock-skills:tdd` when test-first development is requested and those plugin skills are available.
 5. **Review the changes — `mattpocock-skills:code-review`.** When available, use this plugin skill to review repository standards and conformance to the originating story. Resolve findings and present validation evidence for developer review; code review does not replace the required developer validation.
 6. **Open a pull request — [create-pull-request](.agents/skills/create-pull-request/SKILL.md).** Request a PR using the repository template, describing the resulting behavior and validation evidence.
 
@@ -76,7 +76,7 @@ Milestone 1 targets **Visual Studio Code and GitHub Copilot Chat on macOS**. The
 
 The project follows YAGNI: install tools and dependencies only for demonstrated needs in the current milestone. Setup and execution use prebuilt software and pure-Python packages or compatible prebuilt wheels, with dependency source builds disabled. Local native compilation and compiler toolchain installation are out of scope; any dependency requiring them must be reconsidered.
 
-**M1-00: Validate Copilot Chat automation feasibility** is complete for the reduced request/response scope. **M1-01: Bootstrap the Python project and CLI** is complete and developer validated on 2026-10-20. It provides the foundation, with IDE operations explicitly unavailable. The remaining foundation slice also covers configuration, preflight, and disposable workspace safety.
+**M1-00: Validate Copilot Chat automation feasibility** is complete for the reduced request/response scope. **M1-01: Bootstrap the Python project and CLI** is complete and developer validated on 2026-10-20. It provides the foundation, with IDE operations explicitly unavailable. M1-02 profile safety is complete and developer validated on 2026-10-21. M1-03 disposable workspace safety and the Slice 1 checkpoint remain outstanding.
 
 Implementation proceeds in reviewable slices: feasibility, foundation, IDE file operations, Copilot Chat, and repeatability/reporting. Each slice requires developer validation. Milestone 1 acceptance includes five consecutive unattended passing runs on unchanged IDE and Copilot versions.
 
@@ -119,19 +119,24 @@ Preserve an existing `.venv`. Install locked dependency/backend wheels, then ins
 
 Keep both installation steps: the first prohibits third-party source builds and preserves spike packages; the second uses the wheel-installed backend without resolving dependencies or isolated build requirements. Avoid plain `uv sync`, which can prune the spike packages and does not enforce this recipe. Exact versions and clean-environment evidence are in the [Phase 1 report](docs/reports/M1-01-phase1.md); `uv.lock` is the version source of truth. No compiler setup is required.
 
-Use `.venv/bin/ide-smoke` explicitly, or activate `.venv` to put the bare command on PATH. Copy [config/harness.example.yaml](config/harness.example.yaml) to `config/harness.local.yaml`, then edit the executable and existing dedicated-profile paths. The larger configuration in the proposal is illustrative and is not accepted by this CLI. Configuration never creates a profile or workspace. Run:
+Use `.venv/bin/ide-smoke` explicitly, or activate `.venv` to put the bare command on PATH. Copy [config/harness.example.yaml](config/harness.example.yaml) to `config/harness.local.yaml`, then edit the executable and existing dedicated-profile paths. The larger configuration in the proposal is illustrative and is not accepted by this CLI. Configuration never creates a profile or workspace. Follow the
+[profile safety setup guide](docs/vscode-test-profile-setup.md) for the required
+real `user-data`/`extensions` directories and dedication marker. Guarded runs now
+validate profile safety after basic availability: unsafe profiles block with exit 3,
+and uncertain inspection yields exit 4. A `profile_safe` event establishes no GUI
+readiness. M1-02 Phase 2 is complete and developer validated on 2026-10-21. See the [Phase 2 evidence](docs/reports/M1-02-phase2.md). Run:
 
 ```bash
 ide-smoke run --ide vscode
 ```
 
-**With valid settings and available resources, this exits 4:** IDE operations are not implemented. It saves all T01–T05 entries as `SKIP` with that run-level `HARNESS ERROR` origin. Help exits successfully. Passing synthetic development tests does not establish IDE/Copilot behavior.
+**With valid configuration, available resources, and a profile-safety pass, this exits 4:** IDE operations are not implemented. It saves all T01–T05 entries as `SKIP` with that run-level `HARNESS ERROR` origin. Help exits successfully. Passing synthetic development tests does not establish IDE/Copilot behavior.
 
 The default config path is relative to the caller's current working directory. An explicit `--config PATH` is also relative to that directory; `~` is expanded. Paths inside YAML are relative to the configuration file, with `~` expansion; a bare executable name is searched on PATH. Selecting a config elsewhere does not relocate reports. Run evidence is saved as `reports/<run-id>/summary.json` and `events.jsonl` under the caller's working directory.
 
 Every admitted run contends nonblocking on `~/.ide-smoke/desktop-run.lock` before configuration is loaded. The OS-held lock serializes cooperating invocations for one macOS user across checkouts and configurations, remains held through cleanup and reporting, and is never unlinked during release. A contender writes its own blocked report and cannot act on the owner's resources. Help does not acquire the lock. OS lock release after termination does not establish cleanup of future IDE processes.
 
-The supported schema requires `macos`, `sequential`, positive finite numeric timeouts, an executable path/name, and an explicit dedicated-profile directory. Unknown or duplicate keys, malformed/empty YAML, missing fields, wrong types, and invalid timeouts are usage errors. Positive absence of an executable/profile is `BLOCKED`; indeterminate access is `HARNESS ERROR`. Availability checks do not launch anything or inspect profile contents. Existing nonexecutable files are not described as missing; runnability, permissions, session, profile identity, and authentication readiness belong to M1-02.
+The supported schema requires `macos`, `sequential`, positive finite numeric timeouts, an executable path/name, and an explicit dedicated-profile directory. Unknown or duplicate keys, malformed/empty YAML, missing fields, wrong types, and invalid timeouts are usage errors. Positive absence of an executable/profile is `BLOCKED`; indeterminate access is `HARNESS ERROR`. Availability checks do not launch anything or inspect profile contents. Existing nonexecutable files are not described as missing; profile safety belongs to the revised M1-02 scope. Executable runnability, permissions, session, settings, and Copilot/authentication readiness qualification are outside M1-02.
 
 Results use `PASS`, `FAIL`, `BLOCKED`, `HARNESS ERROR`, and dependent `SKIP`. An observed assertion mismatch is `FAIL`; an unexplained timeout is `HARNESS ERROR`, with its cause left unknown. Dependent operations stop after the first nonpass result, retain its cause, and attempt registered cleanup. Cleanup errors preserve individual results and make the run nonzero.
 
@@ -152,7 +157,24 @@ The [Phase 2 report](docs/reports/M1-01-phase2.md) records test coverage and loc
 
 Future runs will execute on the local host using platform-specific executable and profile paths. The proposal's illustrative configuration targets macOS; Windows setup and configuration will be established in Milestone 2.
 
-[M1-01 is developer validated](docs/implementation-plans/M1-01.md#phase-2-execution--2026-10-20). M1-02/M1-03 remain pending separate authorization, followed by the Slice 1 checkpoint before GUI implementation.
+[M1-01 is developer validated](docs/implementation-plans/M1-01.md#phase-2-execution--2026-10-20).
+M1-02 is limited to **dedicated test-profile safety**: safe paths/layout, explicit
+dedication, and read-only preservation. Phase 1 was developer validated on
+2026-10-21; the separately authorized Phase 2 was also completed and developer
+validated on 2026-10-21. The [plan](docs/implementation-plans/M1-02.md)
+and [Phase 2 report](docs/reports/M1-02-phase2.md) map the acceptance criteria to
+294 passing non-GUI tests, synthetic blocked/error cases, and real installed-console
+evidence. The developer confirmed dedication and explicitly authorized exclusive
+marker creation. Real-profile validation records `profile_safe` before expected
+unimplemented exit 4; narrow metadata and guard release/reacquisition checks pass.
+The [setup guide](docs/vscode-test-profile-setup.md) describes the implemented policy.
+Historical qualification and decisions remain in the
+[Phase 1 report](docs/reports/M1-02-phase1.md).
+
+Profile safety establishes no executable, session, permission, settings, Copilot,
+or authentication readiness. Future GUI runs still require an unlocked,
+exclusively reserved desktop. M1-03 requires separate authorization, and Slice 1
+validation remains pending before GUI implementation.
 
 ## Repository contents
 

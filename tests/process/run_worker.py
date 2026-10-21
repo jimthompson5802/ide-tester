@@ -4,12 +4,23 @@ import sys
 import time
 from pathlib import Path
 
-from ide_smoke import cli
+from ide_smoke import cli, orchestrator
 from ide_smoke.orchestrator import run_attempt
 from ide_smoke.platforms.macos.run_lock import DesktopRunLock
 from ide_smoke.results import TEST_IDS, Outcome, Reason, Result
 
 lock_path, marker, release, config_path = map(Path, sys.argv[1:])
+
+
+original_profile_check = orchestrator.check_configured_profile
+
+
+def observed_profile_check(*args):
+    marker.with_suffix(".profile-check").write_text("inspected under exclusion\n")
+    return original_profile_check(*args)
+
+
+orchestrator.check_configured_profile = observed_profile_check
 
 
 def first(context, timeout):
