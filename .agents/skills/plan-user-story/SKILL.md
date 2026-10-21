@@ -25,9 +25,12 @@ When an approach is unproven, begin with a bounded investigation or feasibility 
 For each phase, provide:
 
 - An outcome and prerequisites, including dependencies on earlier phases or external prerequisites.
-- Ordered tasks with stable identifiers. Each task states a concrete outcome, likely affected files or components, task dependencies, and how completion will be verified. Identify proposed paths as proposed. Leave routine implementation choices to the implementing agent; avoid speculative code or exact edits unsupported by evidence.
+- Ordered tasks with stable identifiers and Markdown checkboxes, such as `- [ ] P1-T01: ...`. Start new tasks unchecked. Instruct the implementing agent to change a task to `- [x]` only after its work is complete and its required verification passes, recording the result and evidence in the plan. Keep partial, blocked, failed, or unverified tasks unchecked. When revising an existing plan, preserve completion states supported by recorded evidence.
+- Specific file operations for each task: identify repository-relative paths to create, modify, or delete and describe the intended change in each file. For read-only tasks, identify the files or resources to inspect and the evidence to record. Mark new paths as proposed; if investigation must determine a path, make that investigation an explicit prerequisite and refine the dependent task before implementation. Do not substitute vague component names for identifiable files.
+- For each software-writing task, describe what the software must do: relevant inputs, resulting behavior or outputs, and applicable failure handling. Identify the class, method, or function to add or change where appropriate. Distinguish existing symbols from proposed names, and describe responsibilities clearly when names are not yet settled. Give enough detail to implement and verify the behavior while leaving routine internal choices to the implementing agent; do not invent unsupported APIs or prescribe line-by-line edits.
+- Task dependencies and verification tied to the stated outcome and file changes. Each task must have an assessable completion condition.
 - Meaningful automated tests where appropriate, and manual checks or diagnostic evidence where automation is unsuitable. Specify observable expected results, not merely commands to run. Distinguish existing commands from checks to create. Avoid tests that simply mirror implementation details or unnecessary tests for low-impact, reversible edits.
-- Explicit phase completion criteria and a developer validation checkpoint.
+- Explicit phase completion criteria and a separate unchecked developer validation item. Only check off developer validation after the developer explicitly provides it; completed implementation tasks do not establish phase acceptance.
 
 Map every source acceptance criterion to task identifiers and verification evidence. Preserve its meaning; technical tasks supplement acceptance criteria rather than replace them. Flag criteria that cannot yet be verified, the reason, and what would unblock verification.
 
@@ -52,6 +55,6 @@ Use a structure that includes:
 5. Acceptance-criterion mapping to tasks and evidence.
 6. Implementation controls: scope-change handling, the repository failure-limit reference, and the distinction between plan approval and implementation authorization.
 
-Before completion, check every acceptance criterion is accounted for, phase ordering is feasible, each task has an assessable outcome, conditional work is identified, and every phase has its stop-and-validate instruction. Verify local links and consistency with affected specifications and README. Report only validation actually performed; runtime tests remain unavailable until project tooling exists.
+Before completion, check every acceptance criterion is accounted for, phase ordering is feasible, every task has a checkbox, specific file operations, and an assessable outcome, and software-writing tasks describe expected behavior and relevant symbols. Confirm conditional work is identified and every phase has its stop-and-validate instruction and separate developer validation checkbox. Verify local links and consistency with affected specifications and README. Report only validation actually performed; runtime tests remain unavailable until project tooling exists.
 
 Return a link to the saved plan, briefly describe its phases and any blockers, and request developer review. Revise within planning scope as requested. Finish without starting implementation.
