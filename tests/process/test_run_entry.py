@@ -18,7 +18,7 @@ WORKER = Path(__file__).with_name("run_worker.py")
 @pytest.fixture
 def runs(tmp_path):
     children = []
-    def launch(name, *, finish=False, retain=False):
+    def launch(name, *, finish=False, retain=False, session=""):
         cwd = tmp_path / name
         cwd.mkdir()
         executable = cwd / "bin" / "fake-ide"
@@ -41,7 +41,7 @@ def runs(tmp_path):
         if finish:
             release.touch()
         child = subprocess.Popen(
-            [sys.executable, str(WORKER), str(tmp_path / "shared.lock"), str(marker), str(release), str(config)],
+            [sys.executable, str(WORKER), str(tmp_path / "shared.lock"), str(marker), str(release), str(config), session],
             cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
         )
         children.append(child)
@@ -110,9 +110,48 @@ def test_sigint_finalizes_and_releases_for_next_cli_run(runs, retain):
     data = read_summary(cwd)
     assert data["workspace"]["disposition"] == ("retained" if retain else "removed")
     assert Path(data["workspace"]["target_path"]).exists() is retain
-    assert data["issues"][0]["reason"] == "interrupted"
-    assert all(t["outcome"] == "SKIP" for t in data["tests"])
+    assert data["tests"][0]["reason"] == "interrupted"
+    assert data["tests"][0]["outcome"] == "HARNESS ERROR"
+    assert data["tests"][0]["duration_seconds"] >= 0
+    assert all(t["outcome"] == "SKIP" for t in data["tests"][1:])
     assert action.with_suffix(".cleanup").exists()
     successor, _, next_action, _ = runs("after-interrupt", finish=True)
     assert successor.wait(timeout=5) == 0
     assert next_action.exists()
+
+
+@pytest.mark.parametrize('scenario,code,outcome,reason', [
+    ('ready', 4, 'PASS', 'assertion_passed'),
+    ('startup_failure', 4, 'HARNESS ERROR', 'ide_launch_failed'),
+    ('readiness_timeout', 4, 'HARNESS ERROR', 'ide_readiness_timeout'),
+    ('cleanup_failure', 4, 'PASS', 'assertion_passed'),
+])
+def test_production_t01_inert_session_records_bounded_result_and_retains_workspace(runs, scenario, code, outcome, reason):
+    child, cwd, marker, _ = runs('production-' + scenario, finish=True, session=scenario)
+    assert child.wait(timeout=5) == code
+    data = read_summary(cwd)
+    assert data['tests'][0]['outcome'] == outcome
+    assert data['tests'][0]['reason'] == reason
+    assert 0 <= data['tests'][0]['duration_seconds'] < 2
+    assert all(test['outcome'] == 'SKIP' for test in data['tests'][1:])
+    assert data['workspace']['disposition'] == 'retained'
+    assert Path(data['workspace']['target_path']).is_file()
+    assert marker.with_suffix('.cleanup').exists()
+    assert data['cleanup']['outcome'] == ('HARNESS ERROR' if scenario == 'cleanup_failure' else 'PASS')
+
+
+def test_production_t01_sigint_keeps_interrupted_result_and_releases_guard(runs):
+    owner, cwd, marker, _ = runs('production-interrupted', session='interrupt')
+    wait_until(marker.exists)
+    owner.send_signal(signal.SIGINT)
+    assert owner.wait(timeout=5) == 130
+    data = read_summary(cwd)
+    assert data['tests'][0]['outcome'] == 'HARNESS ERROR'
+    assert data['tests'][0]['reason'] == 'interrupted'
+    assert 0 <= data['tests'][0]['duration_seconds'] < 2
+    assert all(test['outcome'] == 'SKIP' for test in data['tests'][1:])
+    assert data['workspace']['disposition'] == 'retained'
+    assert marker.with_suffix('.cleanup').exists()
+    successor, _, action, _ = runs('after-production-interrupt', finish=True)
+    assert successor.wait(timeout=5) == 0
+    assert action.exists()

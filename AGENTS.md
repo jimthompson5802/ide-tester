@@ -2,7 +2,7 @@
 
 ## Current state
 
-This repository contains design documents, the accepted M1-00 probe, and the implemented M1-01 foundation with non-GUI tests. Both phases and M1-01 are complete and developer validated on 2026-10-20. Strict configuration, results, summaries, and CLI exclusion exist. M1-02 profile safety is complete and developer validated on 2026-10-21. M1-03 workspace safety is complete and developer validated on 2026-10-21; combined Slice 1 was developer validated on 2026-10-21. IDE operations remain explicitly unavailable. Treat remaining proposed commands, APIs, and schemas as design targets.
+This repository contains design documents, the accepted M1-00 probe, and the implemented M1-01 foundation with non-GUI tests. Both phases and M1-01 are complete and developer validated on 2026-10-20. Strict configuration, results, summaries, and CLI exclusion exist. M1-02 profile safety is complete and developer validated on 2026-10-21. M1-03 workspace safety is complete and developer validated on 2026-10-21; combined Slice 1 was developer validated on 2026-10-21. M1-04 Phase 2 implements production T01 and is complete and developer validated on 2026-10-21. T02–T05 remain unavailable. Treat remaining proposed commands, APIs, and schemas as design targets.
 
 Keep documentation changes within the requested scope; a documentation task does not initiate environment setup or harness implementation.
 
@@ -74,7 +74,7 @@ uv without installation or shell changes; M0-03 results follow. See [M0-02 obser
 | Package / capability | Status and intended use |
 | --- | --- |
 | `pytest` | Foundation development runner; exact version in `uv.lock`. |
-| PyObjC | Binary-qualified spike-only packages; not foundation dependencies. Exact spike pins remain in the spike requirements. |
+| PyObjC | Production T01 macOS worker dependencies: two direct framework pins and three transitive constraints, all 12.2.2; exact artifacts in uv.lock. Preserve the qualified existing environment. |
 | `pyautogui` | Candidate fallback for keyboard/mouse actions only when needed and validated on the target platform. |
 | YAML parsing | PyYAML is wheel-qualified and locked; strict safe loading is implemented. |
 | `flit_core` | Pure-Python packaging backend, wheel-installed from the locked development group before offline local packaging. |
@@ -246,3 +246,29 @@ prohibiting advancement to another phase or milestone. The developer separately 
 the combined foundation checkpoint. The instruction to stop remains in force;
 no next phase or milestone is authorized. No dependencies, authenticated profile changes, or GUI behavior were added. M1-04 requires separate
 authorization and accepted Slice 1 validation.
+
+
+## M1-04 Phase 2 execution — 2026-10-21
+
+Read the [plan](docs/implementation-plans/M1-04.md) and
+[Phase 2 evidence](docs/reports/M1-04-phase2.md) before changing IDE lifecycle,
+worker boundaries, T01 results or GUI retention. Phase 1 was developer accepted;
+Phase 2 execution was separately authorized with TDD/subagents. Production T01
+passed through the installed console on VS Code 1.135.0 in 2.67s; eight controlled
+host cases produced expected outcomes. Observed owned cleanup, regular-window/
+narrow profile preservation and guard reacquisition passed. GUI checks are
+stopped and the desktop reservation released.
+
+Native Code launch uses isolated bounded workers and one shared startup deadline;
+imports remain inert. Two macOS PyObjC framework pins and three transitive
+constraints now lock the five qualified 12.2.2 distributions. Reuse the existing
+.venv and README two-step wheel-only/offline local-package recipe with --inexact.
+Both the preserved and independent clean environments passed 511 non-GUI tests;
+clean wheel-only/offline local-package qualification passed using the existing base.
+Every GUI launch-attempt workspace is retained, normally gui_exit_scope_limited,
+even with configured retain_on_failure:false. Automatic recovery and unseen
+detached-child completeness remain deferred. T01 is passive workbench readiness;
+T02–T05 and authentication are unassessed. Overall public exit 4 remains expected.
+The developer stated “i validate Phase 2” on 2026-10-21; Phase 2 and M1-04
+are complete and accepted within the recorded scope. Slice 2 acceptance remains
+pending; M1-05 and later work require separate authorization.

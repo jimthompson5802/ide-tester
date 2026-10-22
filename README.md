@@ -2,7 +2,7 @@
 
 A planned smoke-test harness for Visual Studio Code or IntelliJ IDEA and selected extensions/plugins after IDE or extension updates. GitHub Copilot Chat is the initial extension target. Prove feasibility on macOS first, then add Windows support after developer approval.
 
-**Status:** Milestone 0 and M1-00 (Slice 0) were completed and developer validated on 2026-10-20. M1-01 is complete and developer validated: Phase 1 and Phase 2 were accepted on 2026-10-20. Phase 2 adds strict YAML configuration, guarded runs, structured events, saved summaries, and non-GUI acceptance tests. IDE operations remain explicitly unavailable. See the [M1-01 evidence](docs/reports/M1-01-phase2.md). M1-02 profile safety is complete and developer validated on 2026-10-21. See the [M1-02 evidence](docs/reports/M1-02-phase2.md). M1-03 workspace safety is complete and developer validated on 2026-10-21; combined Slice 1 was developer validated on 2026-10-21.
+**Status:** Milestone 0 and M1-00 (Slice 0) were completed and developer validated on 2026-10-20. M1-01 is complete and developer validated: Phase 1 and Phase 2 were accepted on 2026-10-20. Phase 2 adds strict YAML configuration, guarded runs, structured events, saved summaries, and non-GUI acceptance tests. M1-04 now implements production T01 launch/readiness with observed owned shutdown and conservative GUI workspace retention; Phase 2 was developer validated on 2026-10-21. T02–T05 remain unimplemented. See the [T01 evidence](docs/reports/M1-04-phase2.md). See the [M1-01 evidence](docs/reports/M1-01-phase2.md). M1-02 profile safety is complete and developer validated on 2026-10-21. See the [M1-02 evidence](docs/reports/M1-02-phase2.md). M1-03 workspace safety is complete and developer validated on 2026-10-21; combined Slice 1 was developer validated on 2026-10-21.
 
 ## Completed work
 
@@ -99,11 +99,11 @@ Generating a backlog, creating issues, and approving a plan do not authorize imp
 
 ## Milestone 1 scope
 
-Milestone 1 targets **Visual Studio Code and GitHub Copilot Chat on macOS**. The package supports Python 3.12 only; 3.12.15 arm64 is the qualified interpreter. The feasibility spike uses PyObjC for macOS Accessibility automation. Foundation now locks PyYAML, pytest, and the pure-Python Flit Core backend; configuration handling is implemented for the small schema in [the example](config/harness.example.yaml).
+Milestone 1 targets **Visual Studio Code and GitHub Copilot Chat on macOS**. The package supports Python 3.12 only; 3.12.15 arm64 is the qualified interpreter. Production T01 uses PyObjC 12.2.2 through isolated macOS workers. The lock includes its five-distribution graph, PyYAML, pytest, and the pure-Python Flit Core backend; configuration handling is implemented for the small schema in [the example](config/harness.example.yaml).
 
 The project follows YAGNI: install tools and dependencies only for demonstrated needs in the current milestone. Setup and execution use prebuilt software and pure-Python packages or compatible prebuilt wheels, with dependency source builds disabled. Local native compilation and compiler toolchain installation are out of scope; any dependency requiring them must be reconsidered.
 
-**M1-00: Validate Copilot Chat automation feasibility** is complete for the reduced request/response scope. **M1-01: Bootstrap the Python project and CLI** is complete and developer validated on 2026-10-20. It provides the foundation, with IDE operations explicitly unavailable. M1-02 profile safety is complete and developer validated on 2026-10-21. M1-03 disposable workspace safety is complete and developer validated on 2026-10-21; combined Slice 1 was developer validated on 2026-10-21. See the [execution report](docs/reports/M1-03-phase1.md).
+**M1-00: Validate Copilot Chat automation feasibility** is complete for the reduced request/response scope. **M1-01: Bootstrap the Python project and CLI** is complete and developer validated on 2026-10-20. It provides the foundation; M1-04 adds production T01 and is complete and developer validated on 2026-10-21. M1-02 profile safety is complete and developer validated on 2026-10-21. M1-03 disposable workspace safety is complete and developer validated on 2026-10-21; combined Slice 1 was developer validated on 2026-10-21. See the [execution report](docs/reports/M1-03-phase1.md).
 
 Implementation proceeds in reviewable slices: feasibility, foundation, IDE file operations, Copilot Chat, and repeatability/reporting. Each slice requires developer validation. Milestone 1 acceptance includes five consecutive unattended passing runs on unchanged IDE and Copilot versions.
 
@@ -157,7 +157,7 @@ readiness. M1-02 Phase 2 is complete and developer validated on 2026-10-21. See 
 ide-smoke run --ide vscode
 ```
 
-**With valid configuration, available resources, and a profile-safety pass, this exits 4:** IDE operations are not implemented. It saves all T01–T05 entries as `SKIP` with that run-level `HARNESS ERROR` origin. Help exits successfully. Passing synthetic development tests does not establish IDE/Copilot behavior.
+**With admitted resources and a reserved usable desktop, this runs T01.** T01 PASS records installed IDE version and startup duration; T02–T05 remain unimplemented SKIP, so overall exit 4 is expected. Admission failures still skip all five. See [T01 setup and limits](docs/vscode-test-profile-setup.md#production-t01-launch-requirements). Help exits successfully.
 
 The default config path is relative to the caller's current working directory. An explicit `--config PATH` is also relative to that directory; `~` is expanded. Paths inside YAML are relative to the configuration file, with `~` expansion; a bare executable name is searched on PATH. Selecting a config elsewhere does not relocate reports. Run evidence is saved as `reports/<run-id>/summary.json`, `workspace.json`, and `events.jsonl` under the caller's working directory.
 
@@ -170,9 +170,11 @@ exclusively creates a generated child with `example.py` containing
 without adoption or repair. Profiles remain separate and persistent.
 
 Optional `harness.workspace.retain_on_failure` accepts only a boolean and defaults
-to `false`. By default, owned workspaces are removed on pass and nonpass. With
-`true`, known nonpassing runs retain them locally, including today's public
-unimplemented exit 4. Operation/process cleanup failure or inability to save
+to `false`. Every workspace whose GUI session entered launch is retained, even
+on PASS with observed cleanup PASS and configured `false`, using reason
+`gui_exit_scope_limited`. This reflects deferred unseen-child exit qualification.
+The manifest preserves the configured value. Non-GUI operations keep the M1-03
+policy: remove on pass/nonpass by default; `true` retains known nonpassing runs. Operation/process cleanup failure or inability to save
 initial ownership metadata also preserves the workspace. Uncertain ownership
 is preserved for inspection. Required removal refusal/failure is a cleanup error.
 A final report or guard-release failure discovered after deletion cannot restore
@@ -203,18 +205,18 @@ Results use `PASS`, `FAIL`, `BLOCKED`, `HARNESS ERROR`, and dependent `SKIP`. An
 
 | Exit code | Meaning |
 | --- | --- |
-| `0` | All five assertions passed with successful cleanup; also ordinary help. Public foundation runs cannot pass yet. |
+| `0` | All five assertions passed with successful cleanup; also ordinary help. Public runs cannot pass the complete suite yet. |
 | `1` | Functional `FAIL` without a harness error. |
 | `2` | Argument/configuration usage error; parsed runs save configuration errors where possible. |
 | `3` | Identified prerequisite `BLOCKED`, including an active competing run. |
 | `4` | Runtime `HARNESS ERROR`, unimplemented execution, cleanup failure, or evidence-writing failure. |
 | `130` | Handled Ctrl-C; cleanup/evidence failures override this with `4`. |
 
-Runtime severity is `HARNESS ERROR` before `FAIL` before `BLOCKED`; skipped or incomplete suites cannot erase their origin or yield success. A handled interruption preserves completed tests, skips remaining tests with the interruption origin, attempts cleanup, and finalizes evidence. Hard kills and machine failures cannot guarantee evidence or future IDE cleanup.
+Runtime severity is `HARNESS ERROR` before `FAIL` before `BLOCKED`; skipped or incomplete suites cannot erase their origin or yield success. A handled in-operation interruption preserves completed tests and records the interrupted test as HARNESS ERROR with elapsed duration; dependent tests SKIP with that origin. Cleanup and evidence finalization still run. Hard kills and machine failures cannot guarantee evidence or future IDE cleanup.
 
 Terminal output is brief: outcome, controlled explanation, and the saved summary path. Report failures explicitly state that no summary was saved, with nonzero status; partial event/temporary files may remain. Structured diagnostics contain run/test metadata, controlled reason codes/messages, and relevant configuration keys/resource paths. They omit configuration contents, credentials, environment dumps, prompts/responses, and arbitrary exception text/tracebacks. Unknown-key diagnostics identify the supported parent section without echoing arbitrary key names.
 
-The [Phase 2 report](docs/reports/M1-01-phase2.md) records test coverage and local evidence paths. Actual graphical-session readiness, IDE operations, and richer reporting remain later work.
+The [Phase 2 report](docs/reports/M1-01-phase2.md) records test coverage and local evidence paths. Production T01 evidence is in the [M1-04 report](docs/reports/M1-04-phase2.md); editor/Copilot operations and richer reporting remain later work.
 
 Future runs will execute on the local host using platform-specific executable and profile paths. The proposal's illustrative configuration targets macOS; Windows setup and configuration will be established in Milestone 2.
 
@@ -235,8 +237,7 @@ Historical qualification and decisions remain in the
 Profile safety establishes no executable, session, permission, settings, Copilot,
 or authentication readiness. Future GUI runs still require an unlocked,
 exclusively reserved desktop. M1-03 is complete and developer validated on 2026-10-21; combined Slice 1
-was developer validated on 2026-10-21. Further implementation requires separate
-authorization; the developer has directed work to stop at this checkpoint.
+was developer validated on 2026-10-21. M1-04 Phase 2 is complete and developer validated on 2026-10-21. M1-05 and later work require separate authorization.
 
 ## Repository contents
 
