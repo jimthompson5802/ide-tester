@@ -1,3 +1,4 @@
+# Possibility of reusing VSCode smoke-test approach
 
 In VS Code, **smoke tests** are lightweight end-to-end checks that validate critical user journeys after a build (for example: app launch, window/workbench readiness, basic commands, and key UI interactions), to quickly catch “is the product basically working?” regressions.
 
