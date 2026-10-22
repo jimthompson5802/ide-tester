@@ -1,5 +1,6 @@
 # macOS
 .DS_Store
+node_modules/
 ._*
 
 # Python bytecode and caches

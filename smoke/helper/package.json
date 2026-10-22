@@ -1,0 +1,12 @@
+{
+  "name": "smoke-helper",
+  "publisher": "ide-tester",
+  "version": "0.1.0",
+  "private": true,
+  "engines": { "vscode": "^1.135.0" },
+  "main": "./dist/extension.js",
+  "activationEvents": ["onCommand:ideTester.openLocalChat"],
+  "contributes": {
+    "commands": [{ "command": "ideTester.openLocalChat", "title": "Smoke Tester: Open Local Chat" }]
+  }
+}

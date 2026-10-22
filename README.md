@@ -1,9 +1,12 @@
-# VS Code Smoke Tester — Planning Baseline
+# VS Code Smoke Tester
 
-This branch is a fresh starting point for a VS Code smoke tester. It retains specifications, implementation plans, research, development workflows, and the existing uv/Python environment. The previous harness, tests, experiments, and execution reports have been removed.
+This branch contains the standalone TypeScript VS Code smoke tester under [`smoke/`](smoke/README.md). Compilation, 17 non-GUI tests, editing-only, two-turn mocked Chat-only and combined GUI commands pass against VS Code 1.135.0 / Copilot Chat 0.63.0 on macOS arm64. The developer accepted the foundation, selected suites and final handoff. The [completed plan and execution record](docs/vscode-smoke-tester-plan.md) preserve verification and compatibility limits.
+
+The previous Python harness, tests, experiments, and execution reports were removed. Specifications, historical plans, research, development workflows, and the existing uv/Python environment remain.
 
 ## Start here
 
+- [Current setup, commands, artifacts and compatibility](smoke/README.md) — the delivered standalone tester.
 - [Harness proposal](specifications/ide-copilot-smoke-harness-proposal.md) — historical architecture and milestone design, pending review for the replacement.
 - [Milestone 1 user stories](specifications/ide-copilot-milestone1-user-stories.md) — historical acceptance criteria and delivery slices.
 - [Milestone 0 environment setup](specifications/ide-milestone0-environment-setup.md) and [implementation plan](specifications/ide-milestone0-implementation-plan.md) — retained environment planning.
@@ -15,9 +18,18 @@ Historical documents retain their original decisions and completion records. Tho
 
 ## Setup and usage
 
+```sh
+npm --prefix smoke ci
+npm --prefix smoke run compile
+npm --prefix smoke run test:unit
+npm --prefix smoke run smoke -- --build "/Applications/Visual Studio Code.app" --suite all
+```
+
+GUI execution needs authorization and an unlocked reserved desktop. Select `editing`, `chat`, or `all` (default). See [usage and recovery](smoke/README.md) for results, isolation and version requirements.
+
 The existing `.venv/`, `pyproject.toml`, `uv.lock`, and `.python-version` are preserved unchanged. Reuse the existing Homebrew uv and `/opt/homebrew/bin/python3.12`; Python 3.12.15 arm64 was historically qualified. Recheck the execution context before separately authorized environment work.
 
-There is currently no runnable harness or runtime test suite. Package metadata, the editable installation, and `.venv/bin/ide-smoke` may still reference the removed `src/ide_smoke/` package. Installation, build, synchronization, and old CLI examples are not working usage instructions for this baseline. Preserve the environment without reinstalling or regenerating the lock as part of this reset.
+Root Python package metadata, the editable installation, and `.venv/bin/ide-smoke` may still reference the removed `src/ide_smoke/` package. Historical Python installation, build, synchronization, and CLI examples remain unavailable. Preserve that environment without reinstalling or regenerating its lock.
 
 Future authorized dependency work must retain the wheel-only dependency/offline local-package approach: preserve extra installed distributions with `--inexact`, disable third-party source builds and Python downloads, and install a local package only after its source and build backend are available. Exact dependency declarations and pins remain in `pyproject.toml` and `uv.lock`.
 
@@ -25,11 +37,12 @@ Future authorized dependency work must retain the wheel-only dependency/offline 
 
 Repository-local skills remain available for [backlog generation](.agents/skills/generate-milestone-user-stories/SKILL.md), [story planning](.agents/skills/plan-user-story/SKILL.md), [plan execution](.agents/skills/execute-plan/SKILL.md), [issue creation](.agents/skills/create-github-issue/SKILL.md), and [pull request creation](.agents/skills/create-pull-request/SKILL.md).
 
-Review the replacement approach and authorize implementation separately. Follow [repository instructions](AGENTS.md), use TDD for future software changes, and obtain developer validation at agreed phase and milestone gates. Retained historical stories are reference material until explicitly selected or revised.
+The replacement plan is complete and developer accepted. Follow [repository instructions](AGENTS.md) and use TDD for future software changes. New scope requires developer direction. GUI execution requires authorization and an unlocked reserved desktop; these were authorized for the recorded qualifications. Retained historical stories are reference material until explicitly selected or revised.
 
 ## Repository contents
 
 - `specifications/` — retained planning and specification artifacts.
+- `smoke/` — standalone TypeScript tester, helper extension, and non-GUI tests.
 - `docs/implementation-plans/` — historical implementation plans and decisions.
 - `docs/research/` and `docs/vscode-testing-overview.md` — retained research and background.
 - `.agents/skills/` and `.github/` — workflow skills and issue/PR templates.
