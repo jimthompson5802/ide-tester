@@ -1,6 +1,6 @@
 # Standalone VS Code smoke tester
 
-Status: implementation complete; foundation, selected suites and final handoff developer accepted. Compilation, 17 non-GUI tests, editing-only, two-turn mocked Chat-only and combined commands pass against VS Code 1.135.0 / Copilot Chat 0.63.0 on macOS arm64. The [completed plan and qualification evidence](../docs/vscode-smoke-tester-plan.md) preserve decisions and checks.
+Status: implementation complete; foundation, selected suites and final handoff developer accepted. Compilation and 27 non-GUI tests pass. Editing-only, two-turn mocked Chat-only and combined commands were verified against VS Code 1.135.0 / Copilot Chat 0.63.0 on macOS arm64. The [completed plan and qualification evidence](../docs/vscode-smoke-tester-plan.md) preserve decisions and checks.
 
 ## Non-GUI commands
 
@@ -72,6 +72,32 @@ The mock advertises one Chat Completions model under `data` and an empty proxy i
 The installed build has no DOM session-binding attribute. Session tracking instead reads the local conversation URI from `ChatModelSelection` workbench-view events in the owned renderer log. The latest event must identify a local session; missing/unbound/non-local events fail closed. Before submission, the tester requires a new URI and an empty response transcript. After submission, it requires the same URI, the current unique prompt marker visible in the UI, exactly one new completed assistant bubble, exact reply text, and a newer completed matching mock request. The driver targets Monaco's native edit-context element for text entry. These log, UI and driver contracts remain version-dependent.
 
 ## Results and recovery
+
+Both `smoke` and `qualify` print a plain-text summary by default and save the same text as `result.txt` beside the unchanged `result.json`. For example (durations and run ID are illustrative):
+
+```text
+Smoke test: PASSED
+Run ID: <run-id>
+Scope: Selected suites
+
+Suite       Result        Duration
+Editing     PASSED        1.200 seconds
+Chat        PASSED        1.500 seconds
+
+Harness disposition: PASSED
+Resources: Removed
+Reservation: Released
+Duration: 4.924 seconds
+JSON report: /path/to/reports/smoke/<run-id>/result.json
+```
+
+Use `--output json` for the previous single-line terminal JSON format, or `--output text` explicitly. Both modes save both report files when a result report path is available. For example:
+
+```sh
+npm --prefix smoke run smoke -- --build "/Applications/Visual Studio Code.app" --suite all --output json
+```
+
+The summary distinguishes PASSED, FAILED, BLOCKED, HARNESS ERROR and NOT RUN. Suite outcomes come from individual checks; a cleanup failure can leave suites PASSED while the final harness disposition is HARNESS ERROR. Available suite and total durations, failure reasons and cleanup errors are included, along with the resource path when resources are retained. Missing suite or cleanup information is shown as Unavailable. Early errors such as an existing reservation may have no report directory or saved artifacts. A text-report write failure returns nonzero and identifies the reporting error while preserving the saved JSON (JSON terminal mode adds a `reportingError` field for this error only).
 
 Each run reserves `reports/smoke/.reservation` exclusively and writes `reports/smoke/<run-id>/result.json`. Disposable resources use a short owned `/private/tmp/ide-smoke-*` directory to fit macOS's Unix-socket path limit; `resources.json` and the result record its exact location. Results record scope, selected suites, versions, timings, request counts, outcome and cleanup disposition. Failures retain disposable resources and, when a page is available, an app-only screenshot and trace. Missing prerequisites and failures return nonzero. A missing or timed-out application handle leaves shutdown uncertain and retains the reservation.
 

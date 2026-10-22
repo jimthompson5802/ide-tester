@@ -1,7 +1,7 @@
 import { isAbsolute } from 'node:path';
 
 export type Suite = 'editing' | 'chat' | 'all';
-export interface Options { build: string; suite: Suite }
+export interface Options { build: string; suite: Suite; output?: 'text' | 'json' }
 
 export function parseArguments(args: string[], platform: string = process.platform): Options {
   if (platform !== 'darwin') throw new Error('Only macOS is supported');
@@ -9,7 +9,7 @@ export function parseArguments(args: string[], platform: string = process.platfo
   for (let i = 0; i < args.length; i += 2) {
     const key = args[i];
     const value = args[i + 1];
-    if (!['--build', '--suite'].includes(key) || values.has(key) || !value || value.startsWith('--')) {
+    if (!['--build', '--suite', '--output'].includes(key) || values.has(key) || !value || value.startsWith('--')) {
       throw new Error(`Invalid or duplicate argument: ${key}`);
     }
     values.set(key, value);
@@ -22,5 +22,9 @@ export function parseArguments(args: string[], platform: string = process.platfo
   if (suite !== 'editing' && suite !== 'chat' && suite !== 'all') {
     throw new Error('--suite must be editing, chat, or all');
   }
-  return { build, suite };
+  const output = values.get('--output');
+  if (output !== undefined && output !== 'text' && output !== 'json') {
+    throw new Error('--output must be text or json');
+  }
+  return { build, suite, ...(output ? { output } : {}) };
 }
