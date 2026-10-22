@@ -1,5 +1,8 @@
 # Possibility of reusing VSCode smoke-test approach
 
+> **Historical reference — fresh-start reset (2026-10-22):** This document preserves prior planning, research, decisions, and recorded results. Implementation, test, and execution claims refer to the previous harness; that source and its execution reports were removed from this branch. Commands and approvals here do not establish current functionality or authorize resumption. See [the current README](../../README.md) for the retained environment and current scope.
+
+
 In VS Code, **smoke tests** are lightweight end-to-end checks that validate critical user journeys after a build (for example: app launch, window/workbench readiness, basic commands, and key UI interactions), to quickly catch “is the product basically working?” regressions.
 
 For the exact commands in that `package.json` URL, I should read the file directly and enumerate the smoke-specific scripts (names + what each runs). If you want, I can do that next and give you a precise list from `main/package.json`.

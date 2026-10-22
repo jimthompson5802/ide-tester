@@ -1,7 +1,0 @@
-# Exact direct and transitive dependencies observed on Python 3.12.15 arm64.
-# Install with --only-binary :all: (see README.md).
-pyobjc-core==12.2.2
-pyobjc-framework-ApplicationServices==12.2.2
-pyobjc-framework-Cocoa==12.2.2
-pyobjc-framework-CoreText==12.2.2
-pyobjc-framework-Quartz==12.2.2

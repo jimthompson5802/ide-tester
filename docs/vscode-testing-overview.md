@@ -1,3 +1,5 @@
+> **Historical reference — fresh-start reset (2026-10-22):** This document preserves prior planning, research, decisions, and recorded results. Implementation, test, and execution claims refer to the previous harness; that source and its execution reports were removed from this branch. Commands and approvals here do not establish current functionality or authorize resumption. See [the current README](../README.md) for the retained environment and current scope.
+
 https://github.com/microsoft/vscode
 
 VS Code is tested at **multiple layers**, not just with one test suite:

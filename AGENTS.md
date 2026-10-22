@@ -2,322 +2,60 @@
 
 ## Current state
 
-This repository contains design documents, the accepted M1-00 probe, and the implemented M1-01 foundation with non-GUI tests. Both phases and M1-01 are complete and developer validated on 2026-10-20. Strict configuration, results, summaries, and CLI exclusion exist. M1-02 profile safety is complete and developer validated on 2026-10-21. M1-03 workspace safety is complete and developer validated on 2026-10-21; combined Slice 1 was developer validated on 2026-10-21. M1-04 Phase 2 implements production T01 and is complete and developer validated on 2026-10-21. T02–T05 remain unavailable. Treat remaining proposed commands, APIs, and schemas as design targets.
+The `vscode-smoke-tester` branch is a fresh planning baseline. The previous harness, tests, experiments, configuration, and execution reports have been removed. Specifications, plans, research, workflow skills, templates, licensing, and uv project files remain. There is no runnable harness or runtime test suite.
 
-Keep documentation changes within the requested scope; a documentation task does not initiate environment setup or harness implementation.
+Retained historical documents preserve old decisions, completion records, commands, and approvals. Treat them as reference material pending review, not current functionality or authorization. M1-05 remains on hold; M1-06 and replacement design/implementation require explicit developer direction. This reset does not accept any outstanding milestone or slice gate.
 
 ## Read before working
 
-- For project scope and delivery status, read [README.md](README.md).
-- For environment setup or dependency installation, read [Milestone 0 setup](specifications/ide-milestone0-environment-setup.md). It describes a standalone uv environment; project initialization belongs to Milestone 1.
-- For architecture, adapter contracts, isolation, or milestone planning, read the [harness proposal](specifications/ide-copilot-smoke-harness-proposal.md). It is a draft design, with feasibility assumptions still to validate.
-- For Milestone 1 implementation or acceptance review, read the [user stories](specifications/ide-copilot-milestone1-user-stories.md), including the applicable story's dependencies, acceptance criteria, evidence, and developer gate.
-- For VS Code testing approaches, consult the [testing overview](docs/vscode-testing-overview.md). Distinguish extension-host/API testing from evidence that actual IDE and Copilot UI interactions work.
+- For current scope, retained artifacts, and environment limitations, read [README.md](README.md).
+- For environment work, read the historical [Milestone 0 setup guide](specifications/ide-milestone0-environment-setup.md) and inspect current `pyproject.toml`, `uv.lock`, and `.python-version`.
+- For architecture or milestone planning, read the historical [harness proposal](specifications/ide-copilot-smoke-harness-proposal.md). Review its assumptions before adopting them.
+- For a selected Milestone 1 story, read the [historical backlog](specifications/ide-copilot-milestone1-user-stories.md) and applicable [implementation plan](docs/implementation-plans/). Historical acceptance does not establish current implementation.
+- For VS Code testing approaches, read the [testing overview](docs/vscode-testing-overview.md) and [smoke testing research](docs/research/vscode-tester-approach.md). Distinguish extension-host/API tests from evidence that real IDE and Copilot UI interactions work.
+
+Documentation work stays within its requested scope; it does not initiate setup or implementation.
 
 ## GitHub operations
 
-For creating GitHub issues, use the repository-local [create-github-issue skill](.agents/skills/create-github-issue/SKILL.md).
+Use `gh` for this repository's GitHub operations, from this checkout or with `--repo jimthompson5802/ide-tester`. Use `git` for local version control.
 
-For creating pull requests, use the repository-local [create-pull-request skill](.agents/skills/create-pull-request/SKILL.md), which uses the repository's pull request template.
-
-Use the GitHub CLI (`gh`) for this repository's GitHub operations, including issues, pull requests, reviews, and Actions runs. Run commands from this checkout so `gh` targets its GitHub remote; use `--repo jimthompson5802/ide-tester` when an explicit target is needed. Use `git` for local version-control operations.
+For issue creation, use the repository-local [create-github-issue skill](.agents/skills/create-github-issue/SKILL.md). For pull requests, use [create-pull-request](.agents/skills/create-pull-request/SKILL.md) and the repository PR template. Publish only when requested.
 
 ## Commit messages
 
-Use Conventional Commits for every commit: `<type>(<optional scope>): <description>`. Choose the type based on the actual change: `feat`, `fix`, `docs`, `refactor`, `test`, `build`, `ci`, or `chore`. Use a concise imperative description and include a scope when it helps identify the affected area. For example: `docs(workflow): add plan execution skill and require TDD`.
-
-Mark breaking changes with `!` before the colon and explain them in a `BREAKING CHANGE:` footer.
+Use Conventional Commits: `<type>(<optional scope>): <description>`. Select `feat`, `fix`, `docs`, `refactor`, `test`, `build`, `ci`, or `chore` based on the change. Use a concise imperative description. Mark breaking changes with `!` and explain them in a `BREAKING CHANGE:` footer.
 
 ## Implementation boundaries
 
-The initial implementation targets VS Code and GitHub Copilot Chat on macOS. Current M1-00 scope, narrowed by the developer on 2026-10-20, is submitting `Reply with exactly the word READY.` through Copilot Chat and requiring `response.strip() == "READY"` for the associated assistant response. Completion, cancellation/error discrimination, usability testing and restart qualification are outside the current work. Follow the revised M1-00 plan before any separately authorized main-harness work. Record observed behavior separately from assumptions and unresolved decisions.
+Authorize replacement implementation separately from planning. Work in approved reviewable slices and obtain explicit developer validation before advancing through an unapproved phase, slice, or milestone gate. Honor approvals already given for the applicable work.
 
-Work in the reviewable slices defined by the backlog. Complete the authorized slice and present validation evidence at its developer checkpoint. Honor approvals already given in the conversation; obtain developer validation before advancing through an unapproved slice or milestone gate.
-
-Apply YAGNI: add dependencies, tools, and abstractions only for current acceptance criteria. Windows setup and implementation begin in Milestone 2; IntelliJ support begins in Milestone 3; release monitoring and scheduling belong to Milestone 5.
-
-Keep contracts, logical tests, orchestration, and verification platform-neutral. Isolate platform-specific automation and imports. File and extension adapters target the same IDE session; the IDE adapter owns launch and process cleanup. Consult the proposal's contract rules when changing these boundaries.
+Apply YAGNI. Add dependencies, tooling, abstractions, or platform support only for approved current acceptance criteria. The historical macOS-first, Windows, IntelliJ, scheduling, and adapter designs remain proposals until selected for replacement work.
 
 ## Technical environment
 
-These requirements come from the Milestone 0 setup guide and the proposal's technology choices. Python environment observations are recorded below; remaining tooling and harness requirements are design targets.
+Preserve the existing `.venv/`, `.vscode/`, `pyproject.toml`, `uv.lock`, and `.python-version`. These were retained unchanged during the reset. Metadata and installed entry points may reference deleted source; installation and CLI commands are unavailable until a replacement package is approved and implemented.
 
-- **Environment manager:** Use `uv` to manage the repository-local `.venv`. Reuse the existing Homebrew uv installation per the developer's 2026-10-20 direction; no additional uv installation is needed and no uv version is pinned yet.
-- **Python:** Use **3.12** as the initial baseline. The developer selected existing `/opt/homebrew/bin/python3.12` on 2026-10-20; M0-02 read-only checks observed Python 3.12.15 arm64. Reuse it as the explicit base for uv environment creation; do not download another Python. M0-03 verified Python 3.12.15 arm64 and checkout-local environment isolation on 2026-10-20; developer validated M0-03 on 2026-10-20. See [M0-03 plan](docs/implementation-plans/M0-03.md).
-- **Interpreter:** Use `.venv/bin/python` explicitly during standalone setup and select it as the editor interpreter. Keep the system Python unchanged.
-- **Project lifecycle:** Use the qualified two-step wheel-only dependency/offline local-package installation in [README setup](README.md#setup-and-usage). Preserve the existing spike distributions with `--inexact`; plain `uv sync` can prune them. `pyproject.toml` and `uv.lock` now define foundation dependencies. Do not promote spike automation packages into them without current story justification.
-- **Python pin:** `.python-version` is now shared as `3.12`; package bounds are `>=3.12,<3.13`. Only Python 3.12.15 arm64 has been qualified.
-- **Host tooling:** Initially macOS with Git, VS Code, and the `code` CLI available. Record macOS version, architecture, and installed tool versions. Copilot installation, manual sign-in, dedicated profiles, and observed automation permissions belong to Milestone 1.
+Use uv for the repository-local environment. Reuse existing Homebrew uv and `/opt/homebrew/bin/python3.12`; do not install another uv or download Python. Python 3.12.15 arm64 was historically qualified. Recheck architecture in the actual execution context before authorized environment work, and use `.venv/bin/python` explicitly. Keep system Python unchanged.
 
-Foundation dependencies are declared and locked; historical environment observations follow:
-
-M0-01 baseline inspection on 2026-10-20 verified macOS 15.7.9 (24G830),
-`uname -m` reporting `x86_64`, and working Git 2.54.0. At that baseline, neither `.venv` nor
-`.python-version` existed. Existing uv 0.13.1 runs, but its symlink and version
-output identify a Homebrew installation reporting `aarch64-apple-darwin`.
-The developer selected reuse of this installation on 2026-10-20; developer-provided
-native arm64 terminal output verified its resolution and version under M0-02. Python
-environment compatibility was unverified at that baseline. No software was installed.
-See [M0-01 results](docs/implementation-plans/M0-01.md#execution-results).
-Developer validated M0-01 on 2026-10-20; later setup remains outside this execution.
-
-Architecture follow-up on 2026-10-20 established an Apple Silicon host and
-Rosetta translation for this agent session. The developer reports a separate
-native arm64 terminal. M0-02 verification on 2026-10-20 reconfirmed Homebrew
-uv 0.13.1 and its arm64 executable. An attempted arm64 login shell still
-reported `uname -m=x86_64`. Subsequent developer-provided output confirms
-`arm64` in the intended native terminal and an existing alias to the same
-Homebrew uv executable, with successful uv 0.13.1 version output. M0-02
-verification is complete and developer validated on 2026-10-20. Preserve/reuse
-uv without installation or shell changes; M0-03 results follow. See [M0-02 observations](docs/implementation-plans/M0-02.md#scope-dependencies-and-current-state).
-
-| Package / capability | Status and intended use |
-| --- | --- |
-| `pytest` | Foundation development runner; exact version in `uv.lock`. |
-| PyObjC | Production T01 macOS worker dependencies: two direct framework pins and three transitive constraints, all 12.2.2; exact artifacts in uv.lock. Preserve the qualified existing environment. |
-| `pyautogui` | Candidate fallback for keyboard/mouse actions only when needed and validated on the target platform. |
-| YAML parsing | PyYAML is wheel-qualified and locked; strict safe loading is implemented. |
-| `flit_core` | Pure-Python packaging backend, wheel-installed from the locked development group before offline local packaging. |
-
-Install harness and automation packages only when justified by current Milestone 1 work; Milestone 0 installs none of them.
-
-Use prebuilt applications and Python, plus pure-Python packages or compatible prebuilt wheels, with dependency source builds disabled. Reconsider dependencies that require native compilation; compiler toolchain installation is outside this project's workflow.
-
-M0-03 review on 2026-10-20 observed the current agent context and selected Python reporting arm64. Recheck architecture in the execution context; a verified native agent may execute separately authorized setup. Follow the [M0-03 plan](docs/implementation-plans/M0-03.md) for approved patch tolerance, offline uv commands, inherited-setting checks, isolation checks, and partial-failure preservation. M0-03 execution on 2026-10-20 created the ignored local `3.12` pin and unseeded `.venv` using those offline commands. Independent checks passed for Python 3.12.15 arm64, selected Homebrew base identity, checkout prefix, disabled system/user site packages, and zero installed distributions. The sandbox initially denied uv cache locks; identical commands succeeded after approved escalation. Developer validated M0-03 on 2026-10-20. Subsequent M0-04 validation and M0-05 final checks are recorded below.
+Use `pyproject.toml` and `uv.lock` as the sources of truth for declared dependencies and exact versions. For separately authorized dependency work, preserve extra distributions with `--inexact`, install compatible wheels with source builds and Python downloads disabled, and install local pure-Python source offline only after its backend is available. Plain `uv sync` can prune preserved packages. Report-local uv caches and qualification environments were intentionally removed; do not assume offline artifacts are still available. Compiler/toolchain installation is outside this workflow.
 
 ## Isolation
 
-M0-04 execution on 2026-10-20 verified the existing VS Code 1.135.0
-application executable as arm64 and its bundled CLI version output as arm64.
-Bare `code` did not resolve in the agent shell. Subsequent developer-terminal
-output resolves `code` to `/usr/local/bin/code` and reports the matching version,
-commit and arm64 architecture. The CLI symlink targets the inspected application.
-The developer confirmed fresh-terminal provenance, visible checkout/README opening,
-and satisfaction of editor interpreter selection or the permitted unavailable-UI
-deferral; the combined confirmation does not distinguish the interpreter outcomes. Independent checkout Python
-3.12.15 isolation checks passed again. No editor settings or installations were
-changed. See [M0-04 results](docs/implementation-plans/M0-04.md#execution-results--2026-10-20).
-M0-04 is complete and developer validated on 2026-10-20.
-M0-05 final checks on 2026-10-20 passed in a fresh native arm64 agent login
-PTY: Git 2.54.0, Homebrew uv 0.13.1, Python 3.12.15 with checkout isolation,
-and VS Code CLI 1.135.0 arm64. Bare `code` now resolves in that context;
-its version command exits 0 with the previously observed `task_name_for_pid`
-diagnostic. Local environment, pin, settings and evidence remain ignored and
-untracked. No software or compiler tools were installed and no source builds
-occurred during Milestone 0. See [M0-05 results](docs/implementation-plans/M0-05.md#execution-results--2026-10-20).
-Developer accepted Milestone 0 on 2026-10-20; M1-00 requires separate authorization.
+Preserve all existing dedicated profiles and their markers, plus `reports/m1-03/preserved-workspaces/`. Keep `.vscode/` settings unchanged unless separately requested. Inspect any retained environment references before proposing changes.
 
-M1-00 execution was authorized on 2026-10-20. The developer later reduced it to
-a basic UI request/response proof; follow the [revised plan](docs/implementation-plans/M1-00.md).
-The [execution report](docs/reports/M1-00-phase1.md) retains historical broader probes;
-its earlier completion/cancellation/restart requirements no longer gate this task.
-The binary-only PyObjC installation/import checks passed on Python 3.12.15 arm64;
-use the [spike requirements and commands](scripts/spikes/m1_00/README.md) for exact
-tested dependencies. Host execution reports Accessibility trusted and a visible
-graphical session; sandbox checks report different visibility. VS Code 1.135.0
-bundles GitHub.copilot-chat 0.63.0. Attended probes established scoped lifecycle,
-regular-window coexistence, Chat toggle, Ask selection via the Command Palette,
-and unsent keyboard input. The diagnosed input false negative requires verified
-`editor.accessibilitySupport=on` for editor-text readback in this tested setup;
-`AXManualAccessibility` exposes the app tree but alone did not establish reliable
-editor readback. Manual sign-in was developer-confirmed on 2026-10-20. Two
-synthetic requests in one owned launch exposed nonempty assistant response text,
-providing basic send/receive evidence. Offline review of the saved second exchange established the exact `READY`
-assertion from its single assistant-body text leaf and recorded whitespace-only
-comparison. Reproduce with `.venv/bin/python scripts/spikes/m1_00/verify_saved_ready.py`
-using the retained ignored evidence. R1/R3 are complete and R2 is unnecessary;
-Developer validated M1-00 on 2026-10-20; Slice 0 is complete. M1-01
-Phase 1 was subsequently authorized, implemented, and developer validated. The developer validated M1-00 Phase 1 and
-confirmed the earlier regular-window title change was developer activity.
-A later cancellation probe ran before the scope reduction; further Copilot
-probes stopped. Original test settings were restored and the owned app exited
-with its authenticated profile preserved and regular-window fingerprint unchanged.
-There is no active test instance. Completion discrimination and restart reuse are
-unqualified and outside the current scope. No operational IDE harness exists.
+GUI automation requires separate authorization, an unlocked exclusively reserved desktop, sequential runs, dedicated persistent test profiles, and disposable workspaces. Target only test-owned processes/windows and constrain cleanup to explicitly owned paths. Preserved profiles and saved workspace data do not automatically become replacement-harness resources.
 
-M1-01 Phase 1 on 2026-10-20 qualified the two-step installation in both the
-preserved `.venv` and an independent ignored clean environment, retaining all five
-spike distributions. PyYAML, pytest, backend, and transitive dependencies came
-from wheels; only the local pure-Python package was built offline. The macOS
-OS-held lock passed bounded process contention, race, normal release, and
-termination/hard-kill release tests. `.venv/bin/python -m pytest` runs the
-non-GUI foundation suite. See [Phase 1 evidence](docs/reports/M1-01-phase1.md)
-for installation versions, commands, and limitations. The developer validated
-Phase 1 on 2026-10-20. Phase 2 then implemented safe strict YAML validation,
-basic resource availability, five result labels, ordered dependency stopping,
-cleanup/interruption handling, structured JSON events/summaries, and CLI lock
-integration. Both preserved and clean environments passed 136 non-GUI tests.
-Qualified installed-console checks used the real per-user lock with synthetic
-resources; no IDE was launched. See [Phase 2 evidence](docs/reports/M1-01-phase2.md).
-Use `.venv/bin/ide-smoke run --ide vscode` with an edited local config per
-[README usage](README.md#setup-and-usage); available resources reach an explicit
-unimplemented result (exit 4), with five skipped tests and saved evidence.
-Reports/config defaults follow the caller's working directory; YAML paths follow
-the config directory. Preserve reports' diagnostic allowlist and controlled
-reasons when adding behavior. The developer accepted Phase 2 and validated M1-01 on 2026-10-20. At that checkpoint Slice 1 validation was pending; acceptance on 2026-10-21 is recorded below. Subsequent M1-02 acceptance and authorized M1-03 execution are recorded below; GUI work still requires the applicable gates.
-
-The authorized M1-01 PATH lookup follow-up was implemented on 2026-10-20;
-developer validation is pending. Bare command names now search past directory
-candidates and retain the first wrong-kind diagnostic if no regular file exists.
-The regression failed before the fix; afterward, 73 configuration tests and all
-138 non-GUI tests passed using the existing `.venv`. No dependencies changed.
-See the [follow-up execution results](docs/implementation-plans/M1-01-path-lookup-fix.md#execution-results--2026-10-20).
-
-
-Run GUI automation sequentially against dedicated persistent test profiles and fresh disposable workspaces. Preserve authenticated profiles, target only test-owned processes/windows, and constrain cleanup to harness-owned paths.
-
-M1-02 is limited to profile safety: safe dedicated paths/layout, explicit
-marker, deliberate adoption, and read-only preservation. Executable identity/
-runnability, session/permissions/lock state, settings, Copilot inventory/
-authentication, and new readiness dependencies are outside this story and are
-not assigned automatically elsewhere. An unlocked, exclusively reserved desktop
-remains an operating requirement for future GUI work.
-
-Phase 1 was developer validated on 2026-10-21, with 68 focused and 215 total
-non-GUI tests; its historical hold and missing-marker observations are retained
-in the [Phase 1 report](docs/reports/M1-02-phase1.md). Separately authorized
-Phase 2 is **complete and developer validated on 2026-10-21**. The developer
-stated: “I validate Phase 2 as complete”. P2-02 through P2-06 and P2-VALIDATION
-are complete. Read the [plan](docs/implementation-plans/M1-02.md),
-[Phase 2 evidence](docs/reports/M1-02-phase2.md), and
-[setup guide](docs/vscode-test-profile-setup.md) before changing profile admission.
-
-Production checks run under the existing lock after basic availability, sharing
-metadata-only executable selection and using actual editable-source checkout
-context. Dedicated roots strictly beneath `<checkout>/profiles/` are allowed;
-all other checkout overlap and other protected-path overlap remain rejected.
-The marker and real fixed children are required. Preflight is read-only, records
-`profile_safety_checked`, and never creates or repairs the profile.
-
-The developer confirmed dedication/layout and explicitly authorized exclusive
-marker creation in `profiles/m1-00` on 2026-10-21. Do not recreate or overwrite
-that marker. Real installed-console run `68d6f20bb1bb4fdb8b1918ce662e0dcc`
-recorded `profile_safe`, expected unimplemented exit 4, five correct skips,
-successful cleanup, unchanged narrow metadata, and guard reacquisition. Synthetic
-invalid markers block with exit 3; uncertain inspection is an error. All 294
-non-GUI tests passed using the existing environment. No dependencies or GUI
-behavior were added. Metadata checks do not prove arbitrary-content integrity
-or authentication validity. M1-02 is developer accepted within this scope. Slice 1 acceptance is recorded below;
-M1-03 execution was subsequently authorized; see its execution entry below.
-
-The authorized M1-02 review fix on 2026-10-21 recognizes enclosing `.app`
-suffixes case-insensitively. Regression tests through `check_configured_profile`
-first reproduced unsafe passes for `.APP`, `.ApP`, and an executable case alias;
-after the fix, 75 profile-safety tests and all 298 non-GUI tests passed with
-`.venv/bin/python -m pytest -q`. The alias test ran on the host filesystem.
-
-Authentication is established manually. Never automate passwords or MFA, extract credentials, or copy authenticated profiles between hosts. Classify expired authentication as blocked. Keep tokens, private conversations, and unrelated desktop content out of committed evidence and diagnostics.
+Authentication is manual. Never automate passwords or MFA, extract credentials, or copy authenticated profiles between hosts. Classify expired authentication as blocked. Keep tokens, private conversations, and unrelated desktop content out of committed evidence and diagnostics.
 
 ## Validation and documentation
 
-Maintain this file as work progresses: update environment requirements, selected packages, validated versions, and working commands when implementation or feasibility evidence establishes them. Keep these entries consistent with the reference documents; once package metadata and a lockfile exist, use them as the source of truth for exact dependency versions.
+Keep these instructions and the README consistent with verified implementation and environment changes. Preserve the distinction between design targets, historical observations, and current verified behavior. Check relative links after documentation changes.
 
-For documentation changes, check relative links and consistency across affected specifications and the README. Preserve the distinction between proposed behavior and verified results.
+Use TDD for future software features and bug fixes: derive observable tests from acceptance criteria, confirm the intended failure, implement the minimum passing change, and run relevant regression checks. Documentation-only changes do not require runtime tests. The reset baseline has no runtime suite; do not present historical test results as current checks.
 
-Use test-driven development for software features and bug fixes. Derive tests from the applicable story's acceptance criteria and observable behavior. Work in small red-green-refactor cycles: write or extend a focused test, run it and confirm it fails for the intended missing behavior or reproduced bug, implement the minimum change to pass, then refactor while keeping tests green. Run relevant regression checks before marking the task complete. Test behavior rather than mirroring implementation details; documentation-only changes do not require new runtime tests.
+Test non-GUI logic independently. Validate GUI outcomes on the authorized target host; define observable manual checks before implementation when automation is unsuitable. Missing prerequisites do not establish a pass. Independently verify IDE edits on disk and require fresh complete Copilot responses. Report blocked prerequisites separately from functional failures and harness errors.
 
-Test non-GUI logic independently; validate GUI behavior on the target host. When automated verification is unsuitable, define the observable manual or host check before implementation and record why automation is unsuitable. Missing prerequisites or unavailable GUI access do not establish a passing result; report the blocker and leave required verification incomplete. Verify observable outcomes: an IDE edit must be checked independently on disk, and a Copilot response must be fresh and complete. Report blocked prerequisites separately from functional failures and harness errors. TDD does not authorize GUI work, environment setup, or advancing a developer gate outside the approved scope.
+**Stop after four unsuccessful fix rounds for the same error and ask the developer for guidance.** A round is a proposed fix followed by rerunning the exposing check. Report the error, all four attempts and results, and diagnostic paths. Do not begin a fifth round or work around the requirement without guidance.
 
-**Stop after four unsuccessful fix rounds for the same error and ask the developer for guidance.** A round consists of applying a proposed fix and rerunning the check that exposed the error. Report the error, the four attempted fixes, their results, and relevant diagnostic paths. Do not begin a fifth round or work around the failing requirement until the developer provides guidance.
-
-Report checks actually performed, their results, and remaining limitations. Until project tooling exists, state that runtime tests are unavailable rather than presenting proposed CLI examples as working commands.
-
-## M1-03 workspace execution — 2026-10-21
-
-M1-03 execution is authorized. Read the [plan](docs/implementation-plans/M1-03.md)
-and [execution report](docs/reports/M1-03-phase1.md) before changing workspace
-admission, cleanup, retention, or manifest behavior. Fixed root: actual editable
-source checkout/workspaces, independent of cwd/config. Existing roots require the
-exact purpose marker; automatic adoption/repair and stale-resource sweeps are
-outside scope. Cleanup authority is a manager-issued in-memory handle with
-qualified descriptors. Initial metadata precedes deletion; late evidence errors
-cannot restore removed data. Config loading remains read-only; admitted runs now
-create fixtures while public IDE operations remain unimplemented.
-
-The developer explicitly authorized moving the pre-existing unmarked workspace
-root on 2026-10-21; it is preserved intact by rename under ignored
-`reports/m1-03/preserved-workspaces/`. The harness exclusively created a fresh
-marked root. Three installed-console runs verified removal, configured retention,
-and successor removal preserving the retained fixture; all produced expected
-unimplemented exit 4 with five skips, unchanged synthetic sentinels, and matching
-manifests. All 367 non-GUI tests passed. P1-01–P1-09 are implementation verified.
-The developer validated M1-03 on 2026-10-21 and requested a commit, explicitly
-prohibiting advancement to another phase or milestone. The developer separately stated “i also validate slice1” on 2026-10-21, closing
-the combined foundation checkpoint. The instruction to stop remains in force;
-no next phase or milestone is authorized. No dependencies, authenticated profile changes, or GUI behavior were added. M1-04 requires separate
-authorization and accepted Slice 1 validation.
-
-
-## M1-04 Phase 2 execution — 2026-10-21
-
-Read the [plan](docs/implementation-plans/M1-04.md) and
-[Phase 2 evidence](docs/reports/M1-04-phase2.md) before changing IDE lifecycle,
-worker boundaries, T01 results or GUI retention. Phase 1 was developer accepted;
-Phase 2 execution was separately authorized with TDD/subagents. Production T01
-passed through the installed console on VS Code 1.135.0 in 2.67s; eight controlled
-host cases produced expected outcomes. Observed owned cleanup, regular-window/
-narrow profile preservation and guard reacquisition passed. GUI checks are
-stopped and the desktop reservation released.
-
-Native Code launch uses isolated bounded workers and one shared startup deadline;
-imports remain inert. Two macOS PyObjC framework pins and three transitive
-constraints now lock the five qualified 12.2.2 distributions. Reuse the existing
-.venv and README two-step wheel-only/offline local-package recipe with --inexact.
-Both the preserved and independent clean environments passed 511 non-GUI tests;
-clean wheel-only/offline local-package qualification passed using the existing base.
-Every GUI launch-attempt workspace is retained, normally gui_exit_scope_limited,
-even with configured retain_on_failure:false. Automatic recovery and unseen
-detached-child completeness remain deferred. T01 is passive workbench readiness;
-T02–T05 and authentication are unassessed. Overall public exit 4 remains expected.
-The developer stated “i validate Phase 2” on 2026-10-21; Phase 2 and M1-04
-are complete and accepted within the recorded scope. Slice 2 acceptance remains
-pending; M1-05 and later work require separate authorization.
-
-## M1-05 Phase 1 execution — 2026-10-21
-
-**Current override: M1-05 is ON HOLD by developer direction.** Preserve partial
-code/tests and [hold evidence](docs/reports/M1-05-phase1.md#hold-checkpoint--2026-10-21)
-while T02/T03 are reconsidered. Do not resume M1-05 automatically. M1-06 is the
-developer's intended next story, overriding the original story-order prerequisite
-without accepting M1-05 or Slice 2. **Do not start any M1-06 planning,
-investigation, implementation or GUI work without explicit developer approval.**
-No M1-06 work has started. Desktop/profile reservation is released and settings
-are restored. All 17 host attempts retained original fixtures with matching
-manifests and recorded cleanup PASS; no output file was created. The latest
-sender run-loop hypothesis is inert-tested only, not host-qualified. The last
-full suite (541 tests) predates the revised workflow; see the report for current
-focused checks. Historical execution entries below do not authorize resumption.
-
-Phase 1 was authorized with TDD/subagents; see the
-[plan](docs/implementation-plans/M1-05.md) and
-[partial evidence](docs/reports/M1-05-phase1.md). P1-01 is complete; other tasks
-remain incomplete. Four unsuccessful Quick Open input-focus fixes reached the
-guidance stop. Scoped AX focus, an
-explicitly authorized temporary accessibility setting, bounded focus confirmation,
-and supported AXPress all failed to establish focus. No path text or file edits
-followed; replacement/Save remain unavailable. Production T02–T05 are unchanged.
-All 541 non-GUI tests passed. All 13 host workspaces are retained with original
-fixture bytes and matching manifests; observed cleanup, narrow preservation and
-guard checks passed. Exact original settings were restored, GUI work stopped and
-desktop/profile reservation released. No dependencies changed. Phase 1 is not
-accepted and Phase 2 remains unauthorized.
-
-The developer subsequently directed a revised sequence: new empty untitled
-editor, enter fixed text, Save As `created.py` in the current workspace root,
-independent exact disk comparison. Desktop/profile reservation was renewed for
-this revised Phase 1 investigation, then released at the hold checkpoint. This supplied guidance for the new approach;
-the old Quick Open focus path remains unqualified. Preserve the old evidence,
-leave `example.py` untouched, require the new destination initially absent, and
-qualify full destination identity after Save As. Read the revised plan/report
-before resuming. Settings remain at their restored original values; this revision
-does not authorize further settings changes or Phase 2.
-
-After the hold, the developer separately requested regression verification and
-renewed desktop/profile reservation. The current full non-GUI suite passed
-**544 tests in 12.75s**; normal installed-console T01 passed in **2.73s** and all
-eight existing controlled lifecycle checks produced expected outcomes. Cleanup,
-narrow preservation, manifests and guard checks passed; final preflight found
-no conflicts across 26 dedicated profiles. See the
-[regression report](docs/reports/post-hold-regression-checks.md). GUI checks are
-stopped and reservation released. M1-05 remains on hold, T02–T05 remain
-unavailable, and M1-06 remains unstarted pending explicit approval.
+Report checks actually performed and their limitations. Preserve local environments and private data during branch changes; ignored files are shared across branches in this checkout.

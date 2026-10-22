@@ -11,7 +11,7 @@ __pycache__/
 .pytype/
 .hypothesis/
 
-# Virtual environments and local Python configuration
+# Preserved uv/Python environments and other local virtual environments
 .venv/
 venv/
 env/
@@ -31,12 +31,12 @@ junit*.xml
 .tox/
 .nox/
 
-# Harness reports, screenshots, logs, and other diagnostic artifacts
+# Local evidence and preserved reports/m1-03/preserved-workspaces data
 /reports/*
 !/reports/.gitkeep
 *.log
 
-# Local harness configuration, persistent authenticated profiles, and workspaces
+# Local experiment state, preserved authenticated profiles, and future disposable workspaces
 /.ide-smoke/
 /profiles/
 /workspaces/
@@ -51,7 +51,7 @@ junit*.xml
 *.pem
 *.key
 
-# Local editor settings
+# Preserved local editor settings (including .vscode/)
 .idea/
 .vscode/
 *.swp

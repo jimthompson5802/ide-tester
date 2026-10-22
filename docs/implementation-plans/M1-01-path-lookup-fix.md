@@ -1,16 +1,19 @@
 # M1-01 follow-up — Search PATH past directory candidates
 
+> **Historical reference — fresh-start reset (2026-10-22):** This document preserves prior planning, research, decisions, and recorded results. Implementation, test, and execution claims refer to the previous harness; that source and its execution reports were removed from this branch. Commands and approvals here do not establish current functionality or authorize resumption. See [the current README](../../README.md) for the retained environment and current scope.
+
+
 **Source:** Review of `main...HEAD` at `fc4eb92`, followed by the developer request: “create a plan to fix the issue and add a test for this edge case.” Related requirements: [M1-01 configuration contract](M1-01.md#cli-and-configuration-contract) and [M1-01 story](../../specifications/ide-copilot-milestone1-user-stories.md#story-m1-01--bootstrap-the-python-project-and-cli).
 
 **Execution status:** Implementation authorized and completed on 2026-10-20. PATH-01 through PATH-04 passed; developer validation of this correction is pending. This follow-up does not change the accepted M1-01 foundation status or authorize later stories.
 
 ## Problem and current evidence
 
-When `ides.vscode.executable` is a bare command name, [check_resources](../../src/ide_smoke/config.py) searches PATH entries in order. It immediately returns any inspection issue other than `EXECUTABLE_MISSING`.
+When `ides.vscode.executable` is a bare command name, check_resources (historical path: `../../src/ide_smoke/config.py`; removed from this branch) searches PATH entries in order. It immediately returns any inspection issue other than `EXECUTABLE_MISSING`.
 
 For `PATH=/first:/second`, with `/first/code` a directory and `/second/code` a regular file, the function returns `BLOCKED / executable_not_file` for `/first/code`. It never examines the available later file. The preceding review reproduced this with temporary synthetic resources and an existing synthetic profile, without launching an IDE.
 
-[Existing tests](../../tests/unit/test_config.py) cover command-name availability, absent resources, explicit paths of the wrong type, and indeterminate availability. They do not cover an earlier PATH directory sharing the command name. The preceding review ran the existing suite: 136 tests passed. That result predates the proposed regression test and fix.
+Existing tests (historical path: `../../tests/unit/test_config.py`; removed from this branch) cover command-name availability, absent resources, explicit paths of the wrong type, and indeterminate availability. They do not cover an earlier PATH directory sharing the command name. The preceding review ran the existing suite: 136 tests passed. That result predates the proposed regression test and fix.
 
 ## Scope and acceptance criteria
 

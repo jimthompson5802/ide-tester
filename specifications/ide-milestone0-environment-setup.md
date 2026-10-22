@@ -1,5 +1,8 @@
 # Milestone 0 — Environment Setup with uv
 
+> **Historical reference — fresh-start reset (2026-10-22):** This document preserves prior planning, research, decisions, and recorded results. Implementation, test, and execution claims refer to the previous harness; that source and its execution reports were removed from this branch. Commands and approvals here do not establish current functionality or authorize resumption. See [the current README](../README.md) for the retained environment and current scope.
+
+
 **Status:** M0-01–M0-04 developer validated on 2026-10-20; M0-05 final availability/isolation checks passed on 2026-10-20. Developer accepted Milestone 0 on 2026-10-20. See [consolidated evidence](../docs/implementation-plans/M0-05.md#execution-results--2026-10-20); harness behavior remains proposed.
 **Target:** macOS, uv, Python 3.12, and supporting development tools.  
 **Related:** [Harness proposal](ide-copilot-smoke-harness-proposal.md) and [Milestone 1 user stories](ide-copilot-milestone1-user-stories.md).
@@ -12,7 +15,7 @@ Apply YAGNI (You Aren’t Gonna Need It): add tools only for demonstrated needs 
 
 Milestone 1 owns project/package initialization, harness dependencies, dedicated IDE profiles, disposable workspaces, Copilot installation and authentication, macOS automation permissions, feasibility probes, and all harness implementation and validation. See the [Milestone 1 backlog](ide-copilot-milestone1-user-stories.md) for that work.
 
-At Milestone 0 execution, the repository had no project metadata, lockfile, source package, or tests; the steps below preserve that standalone setup record. M1-01 Phase 1 now establishes those files. For current project installation, use [README setup](../README.md#setup-and-usage) and the [Phase 1 evidence](../docs/reports/M1-01-phase1.md).
+At Milestone 0 execution, the repository had no project metadata, lockfile, source package, or tests; the steps below preserve that standalone setup record. M1-01 Phase 1 now establishes those files. For current project installation, use [README setup](../README.md#setup-and-usage) and the Phase 1 evidence (historical path: `../docs/reports/M1-01-phase1.md`; removed from this branch).
 
 ## 2. Host prerequisites
 

@@ -1,5 +1,8 @@
 # Milestone 0 — Technical Implementation Plan
 
+> **Historical reference — fresh-start reset (2026-10-22):** This document preserves prior planning, research, decisions, and recorded results. Implementation, test, and execution claims refer to the previous harness; that source and its execution reports were removed from this branch. Commands and approvals here do not establish current functionality or authorize resumption. See [the current README](../README.md) for the retained environment and current scope.
+
+
 **Status:** M0-01–M0-04 completed and developer validated on 2026-10-20; M0-05 final technical checks passed on 2026-10-20. Developer accepted Milestone 0 on 2026-10-20. See [M0-05 consolidated evidence](../docs/implementation-plans/M0-05.md#execution-results--2026-10-20). Unchecked lists below preserve the original execution checklist; current results and decisions are recorded in the story plans.
 **Scope:** Prepare one macOS checkout for Milestone 1 using prebuilt software, the existing Homebrew uv installation, Python 3.12, and a repository-local `.venv`.
 **Source of requirements:** [Milestone 0 environment setup](ide-milestone0-environment-setup.md). See also the [README](../README.md), [harness proposal](ide-copilot-smoke-harness-proposal.md), and [Milestone 1 backlog](ide-copilot-milestone1-user-stories.md).

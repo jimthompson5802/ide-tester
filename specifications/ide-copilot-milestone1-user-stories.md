@@ -1,5 +1,8 @@
 # IDE Smoke Test Harness — Milestone 1 User Stories
 
+> **Historical reference — fresh-start reset (2026-10-22):** This document preserves prior planning, research, decisions, and recorded results. Implementation, test, and execution claims refer to the previous harness; that source and its execution reports were removed from this branch. Commands and approvals here do not establish current functionality or authorize resumption. See [the current README](../README.md) for the retained environment and current scope.
+
+
 **Status:** Milestone 1 backlog; verified implementation and feasibility are recorded per story; overall milestone and GUI acceptance remain pending<br>
 **Source:** [Harness proposal](ide-copilot-smoke-harness-proposal.md)<br>
 **Target:** macOS; VS Code only; GitHub Copilot Chat<br>
@@ -97,7 +100,7 @@ flowchart LR
 **Slice:** 0 — Feasibility
 
 **Execution status:** Developer validated M1-00 on 2026-10-20; Slice 0 is complete. M1-01 execution requires separate authorization.
-The [saved-evidence review](../docs/reports/M1-00-phase1.md#reduced-scope-result--saved-evidence-review)
+The saved-evidence review (historical path: `../docs/reports/M1-00-phase1.md#reduced-scope-result--saved-evidence-review`; removed from this branch)
 establishes submission and exact `READY` matching; no additional exchange was needed.
 
 **Scope revision:** The developer narrowed this task on 2026-10-20 to sending one
@@ -131,7 +134,7 @@ authorized M1-01 or main-harness work. See the
 
 ### Story M1-01 — Bootstrap the Python project and CLI
 
-**Execution status:** Phase 1 and Phase 2 developer validated on 2026-10-20; M1-01 is complete. See the [Phase 2 report](../docs/reports/M1-01-phase2.md). The developer explicitly accepted Phase 2 on 2026-10-20. Slice 1 was developer validated on 2026-10-21; M1-02 profile safety is complete and developer validated on 2026-10-21, and M1-03 is complete and developer validated on 2026-10-21.
+**Execution status:** Phase 1 and Phase 2 developer validated on 2026-10-20; M1-01 is complete. See the Phase 2 report (historical path: `../docs/reports/M1-01-phase2.md`; removed from this branch). The developer explicitly accepted Phase 2 on 2026-10-20. Slice 1 was developer validated on 2026-10-21; M1-02 profile safety is complete and developer validated on 2026-10-21, and M1-03 is complete and developer validated on 2026-10-21.
 
 **Priority:** Must | **Dependencies:** M1-00 approved
 
@@ -174,13 +177,13 @@ limited-session snapshot scope. See the [revised plan](../docs/implementation-pl
 Phase 1 qualification is verified and developer validated on 2026-10-21. The developer
 accepted dedicated roots strictly beneath `<checkout>/profiles/` on 2026-10-21,
 with other checkout overlap rejected and other protections retained. See the
-[Phase 1 evidence](../docs/reports/M1-02-phase1.md#profile-only-qualification--resumed-2026-10-21).
+Phase 1 evidence (historical path: `../docs/reports/M1-02-phase1.md#profile-only-qualification--resumed-2026-10-21`; removed from this branch).
 The earlier Phase 2 hold was superseded by explicit authorization on 2026-10-21.
 Phase 2 is **complete and developer validated on 2026-10-21**. The developer
 stated: “I validate Phase 2 as complete”. P2-02 through P2-06 and P2-VALIDATION
 are complete. Real-profile dedication is confirmed; explicitly
 authorized marker creation, standalone safety inspection, and installed-console
-verification passed. See the [Phase 2 evidence](../docs/reports/M1-02-phase2.md).
+verification passed. See the Phase 2 evidence (historical path: `../docs/reports/M1-02-phase2.md`; removed from this branch).
 Checked criteria below have technical evidence and final developer acceptance.
 GitHub issue #20 retains its earlier scope and has not been edited.
 
@@ -192,7 +195,7 @@ GitHub issue #20 retains its earlier scope and has not been edited.
 - [x] Integrate profile validation into the guarded run with controlled saved findings and dependent skips; preserve existing foundation checks and explicit unimplemented IDE results.
 - [x] Provide a human-readable profile-safety setup/adoption guide and demonstrate successful profile validation plus a controlled/simulated blocked case.
 
-**Evidence:** The [acceptance mapping](../docs/reports/M1-02-phase2.md#acceptance-mapping-and-limitations) ties all five criteria to 294 passing non-GUI tests, synthetic console rejection, controlled inspection-error tests, real installed-console `profile_safe` followed by unimplemented exit 4, and unchanged narrow profile metadata. Authentication was not inspected or requalified; no broader readiness claim follows.
+**Evidence:** The acceptance mapping (historical path: `../docs/reports/M1-02-phase2.md#acceptance-mapping-and-limitations`; removed from this branch) ties all five criteria to 294 passing non-GUI tests, synthetic console rejection, controlled inspection-error tests, real installed-console `profile_safe` followed by unimplemented exit 4, and unchanged narrow profile metadata. Authentication was not inspected or requalified; no broader readiness claim follows.
 
 **Developer gate:** Phase 1 and final Phase 2 are developer validated on 2026-10-21; M1-02 is complete within the revised profile-safety scope. M1-03 and the combined M1-01–M1-03 Slice 1 checkpoint were subsequently developer validated on 2026-10-21. Further work requires separate authorization.
 
@@ -204,7 +207,7 @@ GitHub issue #20 retains its earlier scope and has not been edited.
 
 **Slice:** 1 — Foundation
 
-**Execution status:** Complete and developer validated on 2026-10-21. P1-01–P1-09 passed their checks, including real-root installed-console removal/retention and 367 non-GUI tests. The developer authorized preserving the previous unmarked root by rename; no automatic adoption or repair was added. See the [plan](../docs/implementation-plans/M1-03.md) and [execution report](../docs/reports/M1-03-phase1.md). The developer explicitly validated M1-03; combined Slice 1 was separately developer validated on 2026-10-21.
+**Execution status:** Complete and developer validated on 2026-10-21. P1-01–P1-09 passed their checks, including real-root installed-console removal/retention and 367 non-GUI tests. The developer authorized preserving the previous unmarked root by rename; no automatic adoption or repair was added. See the [plan](../docs/implementation-plans/M1-03.md) and execution report (historical path: `../docs/reports/M1-03-phase1.md`; removed from this branch). The developer explicitly validated M1-03; combined Slice 1 was separately developer validated on 2026-10-21.
 
 **As a** developer, **I want** a fresh fixture workspace for every run, **so that** smoke tests are reproducible and cannot damage my real projects.
 
@@ -240,7 +243,7 @@ GitHub issue #20 retains its earlier scope and has not been edited.
 - [x] Close only the test-owned instance during cleanup, even after test failure.
 - [x] Preserve the authenticated profile during cleanup. If the test-owned instance cannot be closed, preserve individual test results, record a separate cleanup `HARNESS ERROR`, and return nonzero even if T01–T05 passed.
 
-**Evidence/status — 2026-10-21:** Both phases and M1-04 are complete and developer validated on 2026-10-21 within the recorded scope. Installed-console T01 PASS in 2.67s, VS Code 1.135.0, expected overall exit 4 with T02–T05 SKIP. Eight controlled host cases and inert cleanup-failure/all-pass precedence checks passed. See the [Phase 2 report](../docs/reports/M1-04-phase2.md) and [plan](../docs/implementation-plans/M1-04.md). GUI workspaces are always retained after launch entry, independently of configured failure retention. Automatic recovery and unseen detached-child completeness remain deferred; developer acceptance does not establish full descendant-exit proof or combined Slice 2 acceptance.
+**Evidence/status — 2026-10-21:** Both phases and M1-04 are complete and developer validated on 2026-10-21 within the recorded scope. Installed-console T01 PASS in 2.67s, VS Code 1.135.0, expected overall exit 4 with T02–T05 SKIP. Eight controlled host cases and inert cleanup-failure/all-pass precedence checks passed. See the Phase 2 report (historical path: `../docs/reports/M1-04-phase2.md`; removed from this branch) and [plan](../docs/implementation-plans/M1-04.md). GUI workspaces are always retained after launch entry, independently of configured failure retention. Automatic recovery and unseen detached-child completeness remain deferred; developer acceptance does not establish full descendant-exit proof or combined Slice 2 acceptance.
 
 **Developer gate:** Review with M1-05 at the Slice 2 checkpoint; T01–T03 validation is required before M1-06.
 
@@ -251,7 +254,7 @@ GitHub issue #20 retains its earlier scope and has not been edited.
 **Status — 2026-10-21: ON HOLD by developer direction.** Phase 1 is incomplete
 and unaccepted while T02/T03 are reconsidered. Preserve the partial probe and
 evidence; see the [plan](../docs/implementation-plans/M1-05.md) and
-[hold checkpoint](../docs/reports/M1-05-phase1.md#hold-checkpoint--2026-10-21).
+hold checkpoint (historical path: `../docs/reports/M1-05-phase1.md#hold-checkpoint--2026-10-21`; removed from this branch).
 No acceptance criteria or Slice 2 gate are marked complete by this hold.
 
 **Priority:** Must | **Dependencies:** M1-04

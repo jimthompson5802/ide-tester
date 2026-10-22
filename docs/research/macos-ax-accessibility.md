@@ -1,5 +1,8 @@
 # AX: macOS Accessibility
 
+> **Historical reference — fresh-start reset (2026-10-22):** This document preserves prior planning, research, decisions, and recorded results. Implementation, test, and execution claims refer to the previous harness; that source and its execution reports were removed from this branch. Commands and approvals here do not establish current functionality or authorize resumption. See [the current README](../../README.md) for the retained environment and current scope.
+
+
 This document summarizes some of the difficulties encountered while using
 PyObjC to interact with the VS Code IDE through macOS Accessibility APIs.
 It introduces the relationship between PyObjC and AX, then uses recorded project
@@ -108,8 +111,8 @@ not been executed as part of this documentation change.
 
 Examples in this checkout:
 
-- [Native VS Code worker](../../src/ide_smoke/platforms/macos/vscode_worker.py).
-- [Historical UI discovery probe](../../scripts/spikes/m1_00/discover.py).
+- Native VS Code worker (historical path: `../../src/ide_smoke/platforms/macos/vscode_worker.py`; removed from this branch).
+- Historical UI discovery probe (historical path: `../../scripts/spikes/m1_00/discover.py`; removed from this branch).
 
 ## Why AX appears in testing problems
 
@@ -121,7 +124,7 @@ Accessibility permission, a usable graphical session, and application accessibil
 settings can affect inspection. In the qualified M1-00 setup,
 `editor.accessibilitySupport=on` was needed for reliable editor-text readback;
 `AXManualAccessibility` alone did not establish that behavior. See the
-[M1-00 evidence](../reports/M1-00-phase1.md).
+M1-00 evidence (historical path: `../reports/M1-00-phase1.md`; removed from this branch).
 
 An AX action returning successfully does not by itself prove the intended test
 outcome. Focus needs observable confirmation, an IDE edit needs independent disk
@@ -172,7 +175,7 @@ PyObjC, macOS, or VS Code. Enabling the accessibility setting had resolved a
 different text-readback problem in M1-00; that earlier result did not establish
 that the same setting would resolve Quick Open focus.
 
-See the [M1-05 focus-attempt evidence](../reports/M1-05-phase1.md#four-unsuccessful-input-focus-fixes--guidance-checkpoint).
+See the M1-05 focus-attempt evidence (historical path: `../reports/M1-05-phase1.md#four-unsuccessful-input-focus-fixes--guidance-checkpoint`; removed from this branch).
 These are historical observations, not instructions to resume the held work.
 
 ### Related example: a reference became invalid during inspection
@@ -186,7 +189,7 @@ it did not authorize replaying a mutation whose completion was uncertain.
 Fresh observation eventually reached Quick Open without that stale-element
 error, but the separate focus check still failed. Resolving one AX problem
 therefore did not establish that the entire editor workflow worked. See the
-[M1-05 investigation history](../reports/M1-05-phase1.md#probe-tdd-and-initial-host-investigation).
+M1-05 investigation history (historical path: `../reports/M1-05-phase1.md#probe-tdd-and-initial-host-investigation`; removed from this branch).
 
 Synthetic tests can check how the harness handles these reported states,
 deadlines and refusals. Actual host checks are needed to establish what the
