@@ -8,7 +8,7 @@ export function chatTurns(backend: ChatBackend, foundation = false): SubmittedTu
   const marker = randomUUID();
   const token = `SMOKE_${randomUUID()}`;
   if (backend === 'real') return [
-    { marker, reply: token, prompt: `Reply with exactly this token and nothing else: \`${token}\`. Do not use tools. [smoke:${marker}]` },
+    { marker, reply: token, prompt: `Reply with exactly this token and nothing else: ${token}. Do not use tools. [smoke:${marker}]` },
     { marker: randomUUID(), reply: token, prompt: 'Repeat the token from your previous answer exactly, and nothing else. Do not use tools.' },
   ].map((turn, index) => index === 0 ? turn : { ...turn, prompt: `${turn.prompt} [smoke:${turn.marker}]` });
   const first = { marker, reply: `${foundation ? 'MOCK_FOUNDATION' : 'MOCK_CHAT_FIRST'}_${marker}`,
@@ -56,7 +56,15 @@ export function verifyExport(data: unknown, turns: readonly SubmittedTurn[]): st
       throw new ChatFailure('failed', 'Exported Chat transcript does not match the current turn markers');
     }
     if (!Array.isArray(request?.response)) throw new ChatFailure('harness_error', 'Unsupported Chat response schema');
-    const markdown = request.response.map(part => object(part)?.value);
+    // Reasoning is separate from the final answer and must not enter evidence.
+    // Copilot also emits empty MCP startup bookkeeping when Ask uses no tools.
+    // Unknown response parts still fail closed.
+    const markdown = request.response.filter(part => {
+      const status = object(part);
+      if (status?.kind === 'thinking') return false;
+      return !(status?.kind === 'mcpServersStarting' && Array.isArray(status.didStartServerIds) &&
+        status.didStartServerIds.length === 0 && Object.keys(status).every(key => ['kind', 'didStartServerIds'].includes(key)));
+    }).map(part => object(part)?.value);
     const text = markdown.filter((part): part is string => typeof part === 'string').join('');
     observed.push(text);
     const fail = (outcome: ChatOutcome, reason: string): never => {

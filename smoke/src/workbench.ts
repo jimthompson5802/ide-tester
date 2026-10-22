@@ -110,7 +110,7 @@ export class Workbench {
     const visibleText = async (selector: string) => this.page.locator(selector).evaluateAll(elements =>
       elements.filter(element => element.getClientRects().length > 0).map(element => element.textContent ?? ''));
     if (await this.chat().locator('.chat-quota-error-widget').first().isVisible()) return uiIssue(['quota exceeded']);
-    const messages = await visibleText('div[id="workbench.panel.chat"] .chat-notification-widget, div[id="workbench.panel.chat"] .chat-error-confirmation, div[id="workbench.panel.chat"] .chat-quota-error-widget, .notifications-toasts .notification-list-item, .monaco-dialog-box');
+    const messages = await visibleText('div[id="workbench.panel.chat"] .chat-notification-widget, div[id="workbench.panel.chat"] .chat-error-confirmation, div[id="workbench.panel.chat"] .chat-quota-error-widget, .notifications-toasts .notification-list-item:has(.notification-list-item-icon.codicon-error), .notifications-toasts .notification-list-item:has(.notification-list-item-icon.codicon-warning), .monaco-dialog-box');
     const welcome = await visibleText('div[id="workbench.panel.chat"] .chat-welcome-view, div[id="workbench.panel.chat"] .chat-view-welcome');
     const signIn = await this.page.getByRole('button', { name: /^Sign In$/i }).first().isVisible();
     const prerequisite = uiIssue([...welcome, ...(signIn ? ['Sign in to use GitHub Copilot'] : [])]);
@@ -140,6 +140,7 @@ export class Workbench {
 
   async qualifyChat(turns: SubmittedTurn[], backend: ChatBackend, requests: () => MockRequest[], session: () => Promise<string>, timeout: number, exportRoot: string, evidence: ChatEvidence = { session: '', turns: [] }) {
     const chat = this.chat();
+    let diagnosticStage = 'open-session';
     try {
       if (backend === 'real') { const issue = await this.chatIssue(); if (issue) throw issue; }
       const previousSession = await session();
@@ -155,26 +156,38 @@ export class Workbench {
           await this.page.waitForTimeout(100);
         }
       }
+      diagnosticStage = 'new-session-identity';
       await expect.poll(async () => {
         const current = await session();
         return !!current && current !== previousSession;
       }, { timeout: 15_000, message: 'Expected a new local sidebar session identity' }).toBe(true);
-      await chat.locator('.chat-mode-picker-item [role="button"]').click();
-      const ask = this.page.locator('.action-widget').getByRole('menuitemcheckbox', { name: /^Ask,/ });
-      await expect(ask).toBeVisible();
-      const position = Number(await ask.getAttribute('data-index'));
-      if (!Number.isSafeInteger(position) || position < 0 || position > 10) throw new Error('Invalid Ask picker position');
-      await this.page.keyboard.press('Home');
-      for (let i = 0; i < position; i++) await this.page.keyboard.press('ArrowDown');
-      await this.page.keyboard.press('Enter');
+      diagnosticStage = 'select-ask';
+      if (backend === 'real') {
+        // The authenticated build can hide legacy Ask from the mode menu.
+        // Its built-in command still selects Ask through the visible command palette.
+        await this.command('Chat: Open Chat (Ask)');
+      } else {
+        await chat.locator('.chat-mode-picker-item [role="button"]').click();
+        diagnosticStage = 'ask-menu-item';
+        const ask = this.page.locator('.action-widget').getByRole('menuitemcheckbox', { name: /^Ask,/ });
+        await expect(ask).toBeVisible();
+        const position = Number(await ask.getAttribute('data-index'));
+        if (!Number.isSafeInteger(position) || position < 0 || position > 10) throw new Error('Invalid Ask picker position');
+        await this.page.keyboard.press('Home');
+        for (let i = 0; i < position; i++) await this.page.keyboard.press('ArrowDown');
+        await this.page.keyboard.press('Enter');
+      }
+      diagnosticStage = 'ask-selected-label';
       await expect(chat.locator('.chat-mode-picker-item .chat-input-picker-label')).toHaveText('Ask');
       const responses = chat.locator('.interactive-item-container.interactive-response');
+      diagnosticStage = 'empty-session';
       await expect(responses).toHaveCount(0);
       const sessionId = await session();
       expect(sessionId).toMatch(/^vscode-chat-session:\/\/local\//);
       evidence.session = sessionId;
       const selector = 'div[id="workbench.panel.chat"] .interactive-input-part .monaco-editor[role="code"]';
       for (const [index, turn] of turns.entries()) {
+        diagnosticStage = `turn-${index + 1}`;
         const started = Date.now();
         const item: ChatEvidence['turns'][number] = { ...turn, completed: false, responseCount: index, durationMs: 0 };
         evidence.turns.push(item);
@@ -234,7 +247,7 @@ export class Workbench {
         const issue = await this.chatIssue().catch(() => undefined);
         const failure = issue ?? (cause instanceof ChatFailure ? cause :
           new ChatFailure(String(cause).includes('Chat turn timed out') ? 'failed' : 'harness_error',
-            String(cause).includes('Chat turn timed out') ? 'Chat turn timed out' : 'Chat UI/session contract failed'));
+            String(cause).includes('Chat turn timed out') ? 'Chat turn timed out' : `Chat UI/session contract failed (${diagnosticStage})`));
         if (failure.observedReplies) for (const [index, reply] of failure.observedReplies.entries()) {
           if (evidence.turns[index]) evidence.turns[index].observedReply = reply;
         }

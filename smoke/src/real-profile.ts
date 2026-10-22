@@ -55,6 +55,8 @@ export function backendLaunch(backend: ChatBackend, profile: ProfilePaths, inher
   }
   Object.assign(env, { XDG_STATE_HOME: profile.state, COPILOT_HOME: join(profile.state, '.copilot'), CODEX_HOME: join(profile.state, '.codex') });
   return { env, args: ['--user-data-dir', profile.userData, '--extensions-dir', profile.extensions,
+    // Session identity is emitted by ChatModelSelection's debug-level binding events.
+    ...(backend === 'real' ? ['--log=debug'] : []),
     ...(backend === 'mock' ? ['--use-inmemory-secretstorage', '--password-store=basic'] : [])] };
 }
 

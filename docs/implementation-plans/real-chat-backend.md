@@ -44,7 +44,7 @@ Tests use the approved plan’s public boundaries: turn/transcript validation (e
 ## Separately authorized GUI qualification
 
 - [ ] Default mocked Chat on VS Code 1.135.0 / Copilot Chat 0.63.0, macOS arm64.
-- [ ] Real two-turn Chat.
+- [x] Real two-turn Chat — authorized reproduction and fixes, 2026-10-22; evidence below.
 - [ ] Combined editing and real Chat.
 - [ ] Signed-out real Chat blocks with setup instructions.
 
@@ -72,4 +72,16 @@ Reserve an unlocked, exclusive macOS arm64 desktop with Node 26.3.1, VS Code 1.1
 4. Combined real: run the same command with `--suite all`; confirm independent on-disk edit evidence and the real Chat assertions both pass in the owned instance.
 5. Signed-out blocking: use setup to sign out manually in the dedicated profile, close it, then run real Chat. Confirm `blocked`, setup instructions, no pass or fabricated reply, preserved profile, and no authentication screenshots/traces. Restore sign-in manually through setup if desired.
 
-Model-added prose or Markdown is a functional failure even if the service is reachable. Service errors/timeouts fail; auth/entitlement/quota block; missing export/schema/UI contracts and cleanup errors are harness errors. Record actual versions, results, durations and evidence paths without credentials or unrelated desktop content. None of these GUI checks have been executed during implementation.
+Model-added prose or Markdown is a functional failure even if the service is reachable. Service errors/timeouts fail; auth/entitlement/quota block; missing export/schema/UI contracts and cleanup errors are harness errors. Record actual versions, results, durations and evidence paths without credentials or unrelated desktop content. The original implementation performed no GUI checks; the subsequent authorized real Chat check is recorded below.
+
+## Real Chat failure diagnosis and verification — 2026-10-22
+
+The developer reported a 15-second `Chat UI/session contract failed` error and authorized GUI reproduction. The same failure reproduced before prompt submission. Info-level logs omitted the debug-level session-binding events; the real launch now requests debug logging. The authenticated mode menu also omitted legacy Ask, so real mode selects Ask through its visible built-in command and verifies the displayed label. Sanitized fixed stage labels now identify UI/session failures.
+
+Further checks exposed export/transcript assumptions: empty MCP startup status and model thinking parts are separate from final-answer Markdown, and Markdown backticks in the first prompt disappear from rendered text. The verifier now excludes those known non-answer parts (and excludes thinking from report evidence), while unknown parts, nonexact Markdown, cancellation, errors and incomplete states still fail. The first prompt uses plain text so follow-up preservation compares the same text. Toast checks now consider warning/error severity rather than treating informational notifications as errors.
+
+Red/green tests cover launch logging, plain-text prompt construction, empty startup status, and thinking exclusion. Compilation and all 43 non-GUI tests passed; the full suite required loopback access outside the sandbox. Temporary schema-only debug probes were removed. No screenshots or traces were captured.
+
+The original real Chat command passed both turns, raw completion checks and cleanup in 6.508 seconds on VS Code 1.135.0 / Copilot Chat 0.63.0, macOS arm64, Node 26.3.1. [Passing result](../../reports/smoke/2026-10-22T17-10-12-175Z-563268cf-ea30-4927-9d7e-c4cc44a9881f/result.json). Disposable resources were removed, the reservation released, and the dedicated profile preserved. The first sandbox launch failed before reproduction and left a reservation; after confirming its PID and owned processes were absent, that reservation was archived under its run report before recovery.
+
+This evidence verifies real two-turn Chat only. Setup, combined real mode, signed-out blocking and a new mock GUI regression were not verified in this diagnosis. Slice 2 developer validation remains pending.

@@ -34,6 +34,7 @@ test('real profile requires setup ownership and survives disposable run cleanup'
   assert.equal(launch.env.VSCODE_COPILOT_CHAT_TOKEN, undefined);
   assert.equal(launch.env.HTTPS_PROXY, undefined);
   assert.ok(!launch.args.some(arg => /inmemory|password-store/.test(arg)));
+  assert.ok(launch.args.includes('--log=debug'), 'Session binding diagnostics require debug logging');
   for (const passed of [true, false]) {
     const run = await createRun(root);
     const cleanup = await finishRun({ ...run, ...profile }, passed, []);
