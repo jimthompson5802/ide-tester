@@ -29,5 +29,6 @@ export async function checkEditing(workbench: Workbench, workspace: string) {
     await verifySavedFile(workspace, file.name, text);
     files.push({ ...file, reopened: true, displayedLines });
   }
+  await workbench.closeEditors();
   return { createdInitiallyAbsent: true, files };
 }
