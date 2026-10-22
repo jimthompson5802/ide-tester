@@ -16,3 +16,12 @@ test('CLI requires an explicit macOS app and accepts only supported suites', () 
   }
   assert.throws(() => parseArguments(['--build', '/a.app'], 'linux'), /macOS/);
 });
+
+test('output accepts text or json and rejects invalid or duplicate options', () => {
+  for (const output of ['text', 'json']) {
+    assert.equal(parseArguments(['--build', '/a.app', '--output', output], 'darwin').output, output);
+  }
+  for (const tail of [['--output', 'xml'], ['--output'], ['--output', 'text', '--output', 'json']]) {
+    assert.throws(() => parseArguments(['--build', '/a.app', ...tail], 'darwin'));
+  }
+});

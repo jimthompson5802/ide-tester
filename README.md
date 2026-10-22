@@ -1,6 +1,6 @@
 # VS Code Smoke Tester
 
-This branch contains the standalone TypeScript VS Code smoke tester under [`smoke/`](smoke/README.md). Compilation, 17 non-GUI tests, editing-only, two-turn mocked Chat-only and combined GUI commands pass against VS Code 1.135.0 / Copilot Chat 0.63.0 on macOS arm64. The developer accepted the foundation, selected suites and final handoff. The [completed plan and execution record](docs/vscode-smoke-tester-plan.md) preserve verification and compatibility limits.
+This branch contains the standalone TypeScript VS Code smoke tester under [`smoke/`](smoke/README.md). Compilation and 27 non-GUI tests pass. Editing-only, two-turn mocked Chat-only and combined GUI commands were verified against VS Code 1.135.0 / Copilot Chat 0.63.0 on macOS arm64. The developer accepted the foundation, selected suites and final handoff. The [completed plan and execution record](docs/vscode-smoke-tester-plan.md) preserve verification and compatibility limits.
 
 The previous Python harness, tests, experiments, and execution reports were removed. Specifications, historical plans, research, development workflows, and the existing uv/Python environment remain.
 

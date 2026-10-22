@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { reportResult } from './report.js';
 import { parseArguments } from './arguments.js';
 import { createRun, finishRun } from './resources.js';
 import { runFoundation, runSmoke } from './runner.js';
@@ -9,6 +10,9 @@ export const checkoutRoot = fileURLToPath(new URL('../../../', import.meta.url))
 
 export async function executeCLI(args: string[], checkout = checkoutRoot, qualify = false, output: (message: string) => void = console.log): Promise<number> {
   const started = Date.now();
+  // Recover the requested presentation even when other arguments are invalid.
+  const outputIndex = args.indexOf('--output');
+  const mode = outputIndex >= 0 && args[outputIndex + 1] === 'json' ? 'json' : 'text';
   try {
     let options;
     let prerequisite: string | undefined;
@@ -25,16 +29,13 @@ export async function executeCLI(args: string[], checkout = checkoutRoot, qualif
         versions: { node: process.version, platform: process.platform, architecture: process.arch },
         mockRequestCount: 0, cleanup, resourcesPath: run.resources, resultPath };
       await writeFile(resultPath, JSON.stringify(result, null, 2));
-      output(JSON.stringify(result));
-      return 1;
+      return await reportResult(result, mode, output);
     }
     const result = await (qualify ? runFoundation : runSmoke)(options, checkout);
-    output(JSON.stringify(result));
-    return result.outcome === 'passed' ? 0 : 1;
+    return await reportResult(result, mode, output);
   } catch (error) {
     // An existing or uncertain reservation must never be removed on this path.
-    output(JSON.stringify({ outcome: 'harness_error', error: String(error) }));
-    return 1;
+    return await reportResult({ outcome: 'harness_error', error: String(error) }, mode, output);
   }
 }
 
