@@ -2,7 +2,7 @@
 
 ## Current state
 
-The `vscode-smoke-tester` branch is a fresh planning baseline. The previous harness, tests, experiments, configuration, and execution reports have been removed. Specifications, plans, research, workflow skills, templates, licensing, and uv project files remain. There is no runnable harness or runtime test suite.
+The `vscode-smoke-tester` branch contains a standalone TypeScript tester under `smoke/`, with verified compilation, 17 non-GUI tests, editing-only, two-turn mocked Chat-only and combined GUI commands against VS Code 1.135.0 / Copilot Chat 0.63.0 on macOS arm64. The foundation, selected suites and final handoff are developer accepted; [the replacement plan](docs/vscode-smoke-tester-plan.md) is complete. For execution or maintenance, read [current usage and compatibility limits](smoke/README.md). Further scope requires developer direction. The previous Python harness, tests, experiments, configuration, and execution reports were removed. Historical specifications and the root uv environment remain.
 
 Retained historical documents preserve old decisions, completion records, commands, and approvals. Treat them as reference material pending review, not current functionality or authorization. M1-05 remains on hold; M1-06 and replacement design/implementation require explicit developer direction. This reset does not accept any outstanding milestone or slice gate.
 
@@ -52,7 +52,7 @@ Authentication is manual. Never automate passwords or MFA, extract credentials, 
 
 Keep these instructions and the README consistent with verified implementation and environment changes. Preserve the distinction between design targets, historical observations, and current verified behavior. Check relative links after documentation changes.
 
-Use TDD for future software features and bug fixes: derive observable tests from acceptance criteria, confirm the intended failure, implement the minimum passing change, and run relevant regression checks. Documentation-only changes do not require runtime tests. The reset baseline has no runtime suite; do not present historical test results as current checks.
+Use TDD for software features and bug fixes: derive observable tests from acceptance criteria, confirm the intended failure, implement the minimum passing change, and run relevant regression checks. Documentation-only changes do not require runtime tests. Current non-GUI tests live under `smoke/tests/`; do not present historical Python test results or passing non-GUI tests as current GUI checks.
 
 Test non-GUI logic independently. Validate GUI outcomes on the authorized target host; define observable manual checks before implementation when automation is unsuitable. Missing prerequisites do not establish a pass. Independently verify IDE edits on disk and require fresh complete Copilot responses. Report blocked prerequisites separately from functional failures and harness errors.
 
