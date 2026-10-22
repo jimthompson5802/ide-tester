@@ -13,6 +13,15 @@ def load_probe():
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
+    original_run = module.run_probe
+    def inert_probe(*args, backend_factory, **kwargs):
+        def factory(spec):
+            backend = backend_factory(spec)
+            if not hasattr(backend, 'get_version'):
+                backend.get_version = lambda executable, *, deadline: '1.135.0'
+            return backend
+        return original_run(*args, backend_factory=factory, **kwargs)
+    module.run_probe = inert_probe
     return module
 
 
@@ -26,7 +35,7 @@ def test_owned_launch_uses_exact_vector_and_shared_deadline():
             calls.append(('start', deadline))
             assert selected.argv == (str(spec.executable), '--user-data-dir', '/safe profile/user-data',
                                       '--extensions-dir', '/safe profile/extensions', '--new-window', '/fresh workspace')
-            claim(probe.ProcessIdentity(42, 'birth-1', selected.executable, selected.argv))
+            claim(probe.ProcessIdentity(42, '1:2', selected.executable, selected.argv))
         def observe(self, identity, deadline):
             calls.append(('observe', deadline))
             return probe.Observation()
@@ -49,9 +58,9 @@ def test_failed_launch_keeps_cleanup_authority_without_foreign_termination(fault
     class Backend:
         def start(self, selected, deadline, claim):
             if fault == 'identity':
-                claim(probe.ProcessIdentity(9, 'birth', Path('/foreign'), selected.argv))
+                claim(probe.ProcessIdentity(9, '1:2', Path('/foreign'), selected.argv))
             if fault == 'partial':
-                claim(probe.ProcessIdentity(8, 'birth', selected.executable, selected.argv))
+                claim(probe.ProcessIdentity(8, '1:2', selected.executable, selected.argv))
             raise OSError('PRIVATE_PROCESS_DATA')
         def close(self, identity, deadline):
             closed.append(identity.pid if identity else None)
@@ -85,7 +94,7 @@ def test_passive_readiness_requires_one_owned_unobstructed_workbench(observation
     closed = []
     class Backend:
         def start(self, spec, deadline, claim):
-            claim(probe.ProcessIdentity(42, 'birth', spec.executable, spec.argv))
+            claim(probe.ProcessIdentity(42, '1:2', spec.executable, spec.argv))
         def observe(self, identity, deadline):
             return probe.Observation(**observation)
         def close(self, identity, deadline):
@@ -111,7 +120,7 @@ def test_probe_reuses_admission_guard_workspace_and_preserves_interrupt_limit(tm
         def start(self, spec, deadline, claim):
             assert guard.owned
             assert (spec.workspace / 'example.py').is_file()
-            claim(probe.ProcessIdentity(42, 'birth', spec.executable, spec.argv))
+            claim(probe.ProcessIdentity(42, '1:2', spec.executable, spec.argv))
             seen.append(spec.workspace)
             if fault == 'interrupt':
                 raise KeyboardInterrupt
@@ -130,13 +139,13 @@ def test_probe_reuses_admission_guard_workspace_and_preserves_interrupt_limit(tm
     assert qualification['cleanup'] == summary['cleanup']['outcome']
     assert qualification['workspace_disposition'] == summary['workspace']['disposition']
     assert 'PRIVATE' not in json.dumps(qualification)
-    assert seen[0].exists() is (fault == 'shutdown')
+    assert seen[0].exists()
     assert guard.released
     if fault == 'interrupt':
         assert result.facts[-1]['reason'] == 'interrupted'
         assert result.facts[-1]['duration_seconds'] >= 0
-        assert summary['tests'][0]['outcome'] == 'SKIP'  # Existing production limitation.
-        assert summary['tests'][0]['duration_seconds'] is None
+        assert summary['tests'][0]['outcome'] == 'HARNESS ERROR'
+        assert summary['tests'][0]['duration_seconds'] >= 0
     else:
         assert summary['tests'][0]['outcome'] == 'PASS'
         assert all(t['outcome'] == 'SKIP' for t in summary['tests'][1:])
@@ -149,7 +158,7 @@ def test_launch_consumes_startup_budget_and_failed_close_can_be_recovered():
     calls = []
     class Backend:
         def start(self, spec, deadline, claim):
-            claim(probe.ProcessIdentity(42, 'birth', spec.executable, spec.argv))
+            claim(probe.ProcessIdentity(42, '1:2', spec.executable, spec.argv))
             now[0] = 2.0
         def observe(self, identity, deadline):
             pytest.fail('launch consumed the full shared budget')
@@ -160,7 +169,7 @@ def test_launch_consumes_startup_budget_and_failed_close_can_be_recovered():
     owner = probe.Lifecycle(Backend(), clock=lambda: now[0])
     with pytest.raises(probe.QualificationError, match='readiness_timeout'):
         owner.launch(probe.LaunchSpec(Path('/app'), Path('/profile'), Path('/workspace')), 1.0)
-    with pytest.raises(probe.CleanupRefused, match='shutdown_unconfirmed'):
+    with pytest.raises(probe.CleanupRefused, match='cleanup_failed'):
         owner.close()
     owner.close()
     assert calls == [12.0, 12.0]
@@ -255,7 +264,7 @@ def test_native_controller_owns_spawn_through_confirmed_shutdown(tmp_path, monke
     executable.chmod(0o700)
     (contents / 'Info.plist').write_bytes(plistlib.dumps({
         'CFBundleIdentifier': 'com.microsoft.VSCode', 'CFBundleExecutable': 'Code'}))
-    spec = probe.LaunchSpec(executable, tmp_path / 'profile with spaces', tmp_path / 'workspace')
+    spec = probe.LaunchSpec(executable, Path('/tmp/m104-profile with spaces'), tmp_path / 'workspace')
     commands = []
     class Process:
         pid = 4242
@@ -272,6 +281,7 @@ def test_native_controller_owns_spawn_through_confirmed_shutdown(tmp_path, monke
             os.kill(os.getpid(), signal.SIGINT)
         return Process()
     responses = {
+        'metadata': {'executable': str(executable), 'bundle_identifier': 'com.microsoft.VSCode', 'version': '1.135.0'},
         'preflight': {'prerequisites_observed': True},
         'regular_snapshot': {'applications': [{'pid': 11, 'birth': '1:2', 'windows': [{'title_sha256': '0' * 64,
                              'position': [0, 0], 'size': [100, 100], 'minimized': False}]}]},
@@ -535,31 +545,6 @@ def test_probe_records_only_allowlisted_native_failure_stage(tmp_path, config_fi
     assert 'PRIVATE' not in str(result.facts)
 
 
-def test_scoped_recovery_reuses_owner_under_guard_and_keeps_retained_workspace(tmp_path, config_file, guard, monkeypatch):
-    probe = load_probe()
-    monkeypatch.chdir(tmp_path)
-    calls = []
-    workspace = []
-    class Backend:
-        def start(self, spec, deadline, claim):
-            workspace.append(spec.workspace)
-            claim(probe.ProcessIdentity(42, 'birth', spec.executable, spec.argv))
-        def observe(self, identity, deadline):
-            return probe.Observation()
-        def close(self, identity, deadline):
-            assert guard.owned
-            calls.append(identity.pid)
-            if len(calls) == 1:
-                raise probe.CleanupRefused
-    run = probe.run_probe(str(config_file), backend_factory=lambda spec: Backend(), _guard_factory=lambda: guard)
-    assert run.exit_code == 4
-    assert probe.recover_probe(run, _guard_factory=lambda: guard) == 'recovered'
-    assert calls == [42, 42]
-    assert workspace[0].is_dir()
-    assert run.owner.closed
-    assert guard.released
-
-
 @pytest.mark.skipif(sys.platform != 'darwin', reason='native arguments with synthetic app inventory; no GUI')
 @pytest.mark.parametrize('relative', [False, True])
 def test_native_preflight_refuses_occupied_or_uncertain_profile(tmp_path, relative):
@@ -628,7 +613,7 @@ def test_controlled_observations_keep_original_owner_for_cleanup(scenario, reaso
         process = 'original-owner'
         def start(self, spec, deadline, claim):
             calls.append('spawn')
-            claim(probe.ProcessIdentity(42, 'birth', spec.executable, spec.argv))
+            claim(probe.ProcessIdentity(42, '1:2', spec.executable, spec.argv))
         def observe(self, identity, deadline):
             if scenario == 'early_exit':
                 calls.append('observed_before_controlled_exit')
@@ -651,14 +636,14 @@ def test_controlled_observations_keep_original_owner_for_cleanup(scenario, reaso
     assert backend.scenario == scenario
 
 
-def test_controlled_shutdown_refusal_retains_workspace_until_same_owner_recovers(tmp_path, config_file, guard, monkeypatch):
+def test_controlled_shutdown_refusal_retains_workspace_without_recovery(tmp_path, config_file, guard, monkeypatch):
     import json
     probe = load_probe()
     monkeypatch.chdir(tmp_path)
     calls = []
     class Backend:
         def start(self, spec, deadline, claim):
-            claim(probe.ProcessIdentity(42, 'birth', spec.executable, spec.argv))
+            claim(probe.ProcessIdentity(42, '1:2', spec.executable, spec.argv))
         def observe(self, identity, deadline):
             pytest.fail('shutdown scenario uses explicitly synthetic readiness')
         def close(self, identity, deadline):
@@ -673,8 +658,8 @@ def test_controlled_shutdown_refusal_retains_workspace_until_same_owner_recovers
     workspace = Path(summary['workspace']['workspace_path'])
     assert workspace.is_dir()
     assert calls == []
-    assert probe.recover_probe(result, _guard_factory=lambda: guard) == 'recovered'
-    assert calls == [42]
+    assert not hasattr(probe, 'recover_probe')
+    assert calls == []
     assert workspace.is_dir()
 
 
@@ -684,9 +669,9 @@ def test_controlled_stalled_observer_is_bounded_and_restores_worker_before_clean
     closed = []
     class Backend(probe.NativeBackend):
         def start(self, spec, deadline, claim):
-            claim(probe.ProcessIdentity(42, 'birth', spec.executable, spec.argv))
+            claim(probe.ProcessIdentity(42, '1:2', spec.executable, spec.argv))
         def close(self, identity, deadline):
-            assert self._worker_command[-1] == '--_native-worker'
+            assert self._worker_command[-1] == 'ide_smoke.platforms.macos.vscode_worker'
             assert self.CALL_SECONDS == 3.0
             closed.append(identity.pid)
     backend = probe.make_controlled_backend('stalled_observer', backend_factory=Backend)(None)
@@ -714,7 +699,7 @@ def test_host_entry_reports_normal_cleanup_without_automatic_recovery(monkeypatc
         calls.append(config)
         return result
     monkeypatch.setattr(probe, 'run_probe', run)
-    monkeypatch.setattr(probe, 'recover_probe', lambda *args, **kwargs: pytest.fail('automatic recovery is deferred'))
+    assert not hasattr(probe, 'recover_probe')
     monkeypatch.setattr(sys, 'argv', ['qualify_lifecycle.py', '--host', '--config', '/synthetic/config.yaml'])
     assert probe.main() == 4
     document = json.loads(capsys.readouterr().out)
@@ -789,3 +774,12 @@ def test_controlled_early_exit_waits_for_native_launch_without_accessibility():
         owner.wait_ready(deadline)
     assert calls == [('state', deadline), ('state', deadline), ('close', deadline)]
     owner.close()
+
+
+def test_probe_uses_production_native_implementation_and_has_no_recovery_path():
+    from ide_smoke.platforms.macos.vscode_session import NativeBackend
+    from ide_smoke.platforms.macos.vscode_worker import _native_worker
+    probe = load_probe()
+    assert probe.NativeBackend is NativeBackend
+    assert probe._native_worker is _native_worker
+    assert not hasattr(probe, 'recover_probe')

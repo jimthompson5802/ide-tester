@@ -19,6 +19,8 @@ def test_help(arguments, capsys):
     output = capsys.readouterr().out
     assert "usage: ide-smoke" in output
     assert "run" in output
+    if arguments == ["--help"]:
+        assert "T01" in output and "T02" in output
 
 
 @pytest.mark.parametrize("arguments", [[], ["run"], ["run", "--ide", "idea"], ["unknown"]])
@@ -28,13 +30,15 @@ def test_invalid_arguments(arguments):
     assert caught.value.code == 2
 
 
-def test_run_is_explicitly_unavailable(capsys, config_file, tmp_path, monkeypatch, guard):
+def test_cli_runs_default_t01_with_inert_session(capsys, config_file, tmp_path, monkeypatch, guard):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("ide_smoke.orchestrator.create_guard", lambda: guard)
+    from test_t01_integration import Session
+    monkeypatch.setattr("ide_smoke.adapters.vscode.VSCodeIDE", lambda *args: Session())
     assert main(["run", "--ide", "vscode", "--config", str(config_file)]) == 4
     output = capsys.readouterr().err
     assert "HARNESS ERROR" in output
-    assert "IDE operations are not implemented" in output
+    assert "T02" in output and "not implemented" in output
     assert "Summary saved:" in output
 
 

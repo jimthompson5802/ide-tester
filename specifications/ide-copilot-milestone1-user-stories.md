@@ -232,15 +232,15 @@ GitHub issue #20 retains its earlier scope and has not been edited.
 
 **Acceptance criteria**
 
-- [ ] Launch the configured VS Code executable with the dedicated user-data and extensions directories, subject to feasibility-spike findings.
-- [ ] Open the run's disposable workspace.
-- [ ] Detect the expected VS Code process/window and readiness within a configurable timeout.
-- [ ] Avoid attaching to or closing unrelated user VS Code windows.
-- [ ] Record startup duration and distinguish startup failure from timeout.
-- [ ] Close only the test-owned instance during cleanup, even after test failure.
-- [ ] Preserve the authenticated profile during cleanup. If the test-owned instance cannot be closed, preserve individual test results, record a separate cleanup `HARNESS ERROR`, and return nonzero even if T01–T05 passed.
+- [x] Launch the configured VS Code executable with the dedicated user-data and extensions directories, subject to feasibility-spike findings.
+- [x] Open the run's disposable workspace.
+- [x] Detect the expected VS Code process/window and readiness within a configurable timeout.
+- [x] Avoid attaching to or closing unrelated user VS Code windows.
+- [x] Record startup duration and distinguish startup failure from timeout.
+- [x] Close only the test-owned instance during cleanup, even after test failure.
+- [x] Preserve the authenticated profile during cleanup. If the test-owned instance cannot be closed, preserve individual test results, record a separate cleanup `HARNESS ERROR`, and return nonzero even if T01–T05 passed.
 
-**Evidence:** T01 run output, startup timing, and controlled timeout and cleanup-failure checks.
+**Evidence/status — 2026-10-21:** Both phases and M1-04 are complete and developer validated on 2026-10-21 within the recorded scope. Installed-console T01 PASS in 2.67s, VS Code 1.135.0, expected overall exit 4 with T02–T05 SKIP. Eight controlled host cases and inert cleanup-failure/all-pass precedence checks passed. See the [Phase 2 report](../docs/reports/M1-04-phase2.md) and [plan](../docs/implementation-plans/M1-04.md). GUI workspaces are always retained after launch entry, independently of configured failure retention. Automatic recovery and unseen detached-child completeness remain deferred; developer acceptance does not establish full descendant-exit proof or combined Slice 2 acceptance.
 
 **Developer gate:** Review with M1-05 at the Slice 2 checkpoint; T01–T03 validation is required before M1-06.
 

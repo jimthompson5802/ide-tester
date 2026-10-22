@@ -8,7 +8,18 @@ version = "0.1.0"
 description = "Foundation for a local IDE smoke-test harness"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
-dependencies = ["PyYAML>=6,<7"]
+dependencies = [
+    "PyYAML>=6,<7",
+    "pyobjc-framework-Cocoa==12.2.2; sys_platform == 'darwin'",
+    "pyobjc-framework-ApplicationServices==12.2.2; sys_platform == 'darwin'",
+]
+
+[tool.uv]
+constraint-dependencies = [
+    "pyobjc-core==12.2.2; sys_platform == 'darwin'",
+    "pyobjc-framework-Quartz==12.2.2; sys_platform == 'darwin'",
+    "pyobjc-framework-CoreText==12.2.2; sys_platform == 'darwin'",
+]
 
 [project.scripts]
 ide-smoke = "ide_smoke.cli:main"

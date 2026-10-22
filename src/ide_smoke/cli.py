@@ -1,4 +1,4 @@
-"""Command-line entry point for foundation-only IDE smoke runs."""
+"""Command-line entry point for T01 launch checks."""
 
 import argparse
 import sys
@@ -15,10 +15,10 @@ class ArgumentParser(argparse.ArgumentParser):
 
 def main(argv: list[str] | None = None) -> int:
     parser = ArgumentParser(
-        prog="ide-smoke", description="Local IDE smoke-test harness (IDE operations pending)."
+        prog="ide-smoke", description="Local IDE smoke-test harness (T01 launch; T02–T05 pending)."
     )
     commands = parser.add_subparsers(dest="command", required=True)
-    run = commands.add_parser("run", help="Run IDE checks (not yet implemented)")
+    run = commands.add_parser("run", help="Run T01 launch checks (T02–T05 pending)")
     run.add_argument("--ide", required=True, choices=["vscode"])
     run.add_argument("--config", metavar="PATH", help="YAML settings; default: config/harness.local.yaml in the current directory")
     arguments = parser.parse_args(argv)

@@ -130,9 +130,9 @@ qualify them. Future GUI runs still require an unlocked, exclusively reserved
 desktop; profile validation supplies no GUI-readiness guarantee.
 
 The existing `ide-smoke run --ide vscode` command
-records profile-safety validation separately. Overall exit 4 remains expected
-while IDE operations are unimplemented. No passing smoke tests or separate public
-preflight command are delivered by this story.
+records profile-safety validation separately. M1-02 itself establishes no passing smoke test or separate public preflight
+command. Production T01 behavior is described below; exit 4 remains expected
+while T02–T05 are unimplemented.
 
 
 ## Manual marker creation
@@ -154,3 +154,55 @@ Review any rejected path or existing invalid marker manually. Never repair a
 personal profile to make it eligible. On this host `/usr/local/bin/code` is an
 available CLI path for basic resource checks; this guide does not qualify its
 runnability. The example executable path must be edited to match the host.
+
+
+## Production T01 launch requirements
+
+M1-04 Phase 2 runs T01 through the public CLI and is complete and developer
+validated on 2026-10-21. See the [execution evidence](reports/M1-04-phase2.md). The qualified
+combination is macOS 15.7.9, Python 3.12.15 arm64, PyObjC 12.2.2 and VS Code
+1.135.0 at `/Applications/Visual Studio Code.app/Contents/MacOS/Code`. Select
+that native executable; the `code` wrapper is an unsupported prerequisite.
+The selected bundle/executable and matching bundle/product version metadata are
+validated without substituting another installation.
+
+Reserve the unlocked desktop and dedicated profile exclusively for the entire
+run. Establish Accessibility permission and a visible graphical session manually.
+The harness checks trust/session and refuses observed profile conflicts before
+spawn. It inspects registered Code applications and same-user processes matching
+the selected executable; unregistered alternate installations are not comprehensively
+detected. These checks cannot establish exclusive reservation.
+
+The complete Darwin IPC path `<profile>/user-data/<version[:4]>-main.sock` must
+encode to fewer than 103 filesystem bytes, including suffix; use a short dedicated
+profile path. The persistent `profiles/m1-00` remains admitted unchanged. No
+profile creation, settings repair, sign-in or credential copying is automated.
+
+Version lookup, launch and readiness share one absolute startup deadline from
+`ide_startup_seconds`. Native calls use isolated workers bounded to 3 seconds
+or remaining time, requested AX timeout 0.2 seconds, exhaustive traversal up to
+600 nodes, and pauses up to 0.05 seconds between observations. Controller process
+creation is synchronous and not interruptibly bounded; there is no hard real-time
+launch guarantee. The positively owned app receives acknowledged
+`AXManualAccessibility` once, without persistent settings changes.
+
+T01 passively checks one owned workbench window with an exact workspace-basename
+title component plus full process workspace argument and AXWebArea/AXOutline/AXToolbar.
+Modal or unknown dialogs remain untouched and cannot pass. T01 establishes neither
+editor usability nor authentication; T02–T05 remain unimplemented. A successful
+T01 stores version and duration but the incomplete suite returns 4. Controlled
+prerequisites return 3; readiness/ownership/native errors return 4. An in-operation
+interrupt saves T01 HARNESS ERROR/interrupted with duration, skips dependents and
+returns 130 unless cleanup/evidence failure requires 4.
+
+Cleanup uses a fresh 10-second bound and app-specific graceful shutdown after
+revalidating the current original owner. It observes the main process, current
+session and previously observed birth identities, including observed reparenting.
+Unseen detached-child completeness and automatic recovery remain deferred.
+Every workspace whose session entered launch is retained regardless of
+`retain_on_failure`, normally as `gui_exit_scope_limited`. The flag stays truthful
+in the manifest; retention alone creates no cleanup error. Cleanup uncertainty
+preserves results/resources, records a separate cleanup error and returns 4.
+Local console diagnostics may show only current-owner PID/birth/workspace for
+manual inspection; saved artifacts confer no termination/deletion authority.
+Preserve retained profiles/workspaces; no stale sweep or forced kill is provided.

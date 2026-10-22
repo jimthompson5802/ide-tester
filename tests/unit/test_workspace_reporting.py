@@ -3,10 +3,16 @@ import json
 from pathlib import Path
 import pytest
 import yaml
-from ide_smoke.orchestrator import run_attempt
+from ide_smoke.orchestrator import run_attempt as _run_attempt
 from ide_smoke.reporting import Reporter
 from ide_smoke.results import TEST_IDS, Result, Outcome, Reason
 from ide_smoke.workspace import FIXTURE_BYTES
+
+
+def run_attempt(*args, **kwargs):
+    # Existing non-GUI workspace policy checks explicitly select inert operations.
+    kwargs.setdefault('_operations', {})
+    return _run_attempt(*args, **kwargs)
 
 
 def artifacts(tmp_path):

@@ -34,6 +34,7 @@ def summary(tmp_path):
 def attempt(tmp_path, config_file, monkeypatch, guard):
     monkeypatch.chdir(tmp_path)
     def run(**kwargs):
+        kwargs.setdefault("_operations", {})
         return run_attempt("vscode", str(config_file), _guard_factory=lambda: guard, **kwargs)
     return run
 
@@ -107,8 +108,8 @@ def test_interruption_preserves_completed_test(attempt, tmp_path):
     injected["T03"] = interrupt
     assert attempt(_operations=injected) == 130
     data = summary(tmp_path)
-    assert [t["outcome"] for t in data["tests"]] == ["PASS", "PASS", "SKIP", "SKIP", "SKIP"]
-    assert data["issues"][0]["reason"] == "interrupted"
+    assert [t["outcome"] for t in data["tests"]] == ["PASS", "PASS", "HARNESS ERROR", "SKIP", "SKIP"]
+    assert next(t for t in data["tests"] if t["outcome"] == "HARNESS ERROR")["reason"] == "interrupted"
 
 
 @pytest.mark.parametrize("interrupt", [False, True])
@@ -126,9 +127,9 @@ def test_cleanup_failure_preserves_results_and_overrides_interrupt(attempt, tmp_
     data = summary(tmp_path)
     assert cleaned == ["last"]
     assert data["cleanup"]["outcome"] == "HARNESS ERROR"
-    assert data["tests"][0]["outcome"] == ("SKIP" if interrupt else "PASS")
+    assert data["tests"][0]["outcome"] == ("HARNESS ERROR" if interrupt else "PASS")
     if interrupt:
-        assert data["issues"][0]["reason"] == "interrupted"
+        assert next(t for t in data["tests"] if t["outcome"] == "HARNESS ERROR")["reason"] == "interrupted"
 
 
 def test_guard_release_error_amends_summary(attempt, tmp_path, guard, monkeypatch):
@@ -153,7 +154,7 @@ def test_summary_failure_reports_inability_and_retains_snapshot(attempt, capsys,
             raise KeyboardInterrupt
         return passed(context, timeout)
     assert attempt(_operations=operations(first), _reporter_factory=FailingReporter) == 4
-    assert captured[0]["tests"][0]["outcome"] == ("SKIP" if interrupt else "PASS")
+    assert captured[0]["tests"][0]["outcome"] == ("HARNESS ERROR" if interrupt else "PASS")
     output = capsys.readouterr().err
     assert "No report was saved" in output
     assert "summary could not be saved" in output
@@ -218,6 +219,7 @@ def test_config_error_is_usage_error_with_private_summary(attempt, tmp_path, con
 
 def test_default_and_explicit_config_follow_caller_cwd(tmp_path, monkeypatch, config_file, guard):
     monkeypatch.setattr("ide_smoke.orchestrator.create_guard", lambda: guard)
+    monkeypatch.setattr("ide_smoke.orchestrator._default_operations", lambda *args, **kwargs: {})
     monkeypatch.chdir(tmp_path)
     assert main(["run", "--ide", "vscode"]) == 4
     assert summary(tmp_path)["result"]["reason"] == "operations_unimplemented"
@@ -309,7 +311,7 @@ def test_event_error_overrides_interrupted_exit(attempt, tmp_path):
     def interrupt(context, timeout):
         raise KeyboardInterrupt
     assert attempt(_operations=operations(interrupt), _reporter_factory=FailingReporter) == 4
-    assert [i["reason"] for i in summary(tmp_path)["issues"]] == ["interrupted", "event_write_failed"]
+    assert [i["reason"] for i in summary(tmp_path)["issues"]] == ["event_write_failed"]
 
 
 @pytest.mark.parametrize("invalid_result", [None, Result("invalid", Reason.PASSED), Result(Outcome.PASS, "SENSITIVE_REASON")])

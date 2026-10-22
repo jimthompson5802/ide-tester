@@ -6,6 +6,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Callable
 
+from ide_smoke.adapters.base import IDE, LifecycleError, CleanupError
 from ide_smoke.workspace import configured_manager, WorkspaceError, WorkspaceManifest, WorkspaceHandle
 from ide_smoke.config import Config, ConfigError, resolve_resources, load_config
 from ide_smoke.profile_safety import check_configured_profile
@@ -21,13 +22,31 @@ class OperationContext:
     workspace_path: Path | None = None
     target_path: Path | None = None
     cleanups: list[Callable[[], None]] = field(default_factory=list)
+    session: IDE | None = None
+    ide_version: str | None = None
 
     def register_cleanup(self, action: Callable[[], None]) -> None:
         self.cleanups.append(action)
 
 
+def _default_operations(context, executable, *, session_factory=None):
+    def t01(context, timeout):
+        factory = session_factory
+        if factory is None:
+            from ide_smoke.adapters.vscode import VSCodeIDE
+            factory = VSCodeIDE
+        session = context.session = factory(executable, context.config.profile_root)
+        context.register_cleanup(session.close)
+        deadline = time.monotonic() + timeout
+        context.ide_version = session.get_version(deadline=deadline)
+        session.launch(context.workspace_path, deadline=deadline)
+        session.wait_ready(deadline=deadline)
+        return Result(Outcome.PASS, Reason.PASSED)
+    return {"T01": t01}
+
+
 def run_attempt(ide: str, config_path: str | None = None, *,
-                _guard_factory=None, _operations=None, _reporter_factory=Reporter, _workspace_factory=configured_manager) -> int:
+                _guard_factory=None, _operations=None, _session_factory=None, _reporter_factory=Reporter, _workspace_factory=configured_manager) -> int:
     """Internal injection seams exercise inert operations; the CLI exposes none."""
     started = time.monotonic()
     issues: list[Result] = []
@@ -40,6 +59,7 @@ def run_attempt(ide: str, config_path: str | None = None, *,
     manifest = None
     interrupted = config_error = evidence_failed = False
     cleanup = Result(Outcome.PASS, Reason.CLEANUP_OK)
+    cleanup_diagnostics = []
 
     try:
         reporter = _reporter_factory(Path.cwd() / "reports")
@@ -90,7 +110,7 @@ def run_attempt(ide: str, config_path: str | None = None, *,
             workspace_ready = True
             context = OperationContext(config, handle, handle.path, handle.target)
             if _operations is None:
-                issues.append(Result(Outcome.ERROR, Reason.UNIMPLEMENTED))
+                _operations = _default_operations(context, executable, session_factory=_session_factory)
             emit("workspace_created", result=Result(Outcome.PASS, Reason.WORKSPACE_CREATED))
         if context is not None and _operations is not None:
             origin = None
@@ -115,6 +135,28 @@ def run_attempt(ide: str, config_path: str | None = None, *,
                     if (not isinstance(result, Result) or not isinstance(result.outcome, Outcome)
                             or not isinstance(result.reason, Reason) or result.outcome == Outcome.SKIP):
                         result = Result(Outcome.ERROR, Reason.INCOMPLETE)
+                except KeyboardInterrupt:
+                    interrupted = True
+                    result = Result(Outcome.ERROR, Reason.INTERRUPTED)
+                except LifecycleError as error:
+                    reasons = {
+                        "profile_busy": Reason.IDE_PROFILE_BUSY,
+                        "native_prerequisite_missing": Reason.IDE_PREREQUISITE,
+                        "unsupported_launcher": Reason.IDE_UNSUPPORTED_LAUNCHER,
+                        "unsupported_profile_path": Reason.IDE_UNSUPPORTED_PROFILE_PATH,
+                        "launch_failed": Reason.IDE_LAUNCH_FAILED,
+                        "early_exit": Reason.IDE_EARLY_EXIT,
+                        "readiness_timeout": Reason.IDE_READINESS_TIMEOUT,
+                        "native_timeout": Reason.IDE_NATIVE_TIMEOUT,
+                        "ownership_uncertain": Reason.IDE_OWNERSHIP_UNCERTAIN,
+                        "obstructed": Reason.IDE_OBSTRUCTED,
+                        "unknown_dialog": Reason.IDE_UNKNOWN_DIALOG,
+                        "version_unavailable": Reason.IDE_VERSION_UNAVAILABLE,
+                    }
+                    reason = reasons.get(error.reason, Reason.UNEXPECTED)
+                    blocked = reason in (Reason.IDE_PROFILE_BUSY, Reason.IDE_PREREQUISITE,
+                                         Reason.IDE_UNSUPPORTED_LAUNCHER, Reason.IDE_UNSUPPORTED_PROFILE_PATH)
+                    result = Result(Outcome.BLOCKED if blocked else Outcome.ERROR, reason)
                 except TimeoutError:
                     result = Result(Outcome.ERROR, Reason.TIMEOUT)
                 except Exception:
@@ -151,8 +193,34 @@ def run_attempt(ide: str, config_path: str | None = None, *,
                     interrupted = True
                     issues.append(Result(Outcome.ERROR, Reason.INTERRUPTED))
                     cleanup = Result(Outcome.ERROR, Reason.CLEANUP_FAILED)
+                except CleanupError as error:
+                    cleanup = Result(Outcome.ERROR, Reason.CLEANUP_FAILED)
+                    # Revalidate the allowlisted hints; never render exception text.
+                    try:
+                        safe = CleanupError(owned_pid=error.owned_pid, owned_birth=error.owned_birth,
+                                            workspace=error.workspace)
+                        hints = []
+                        if safe.owned_pid is not None:
+                            hints.append(f"owned_pid={safe.owned_pid}")
+                        if safe.owned_birth is not None:
+                            hints.append(f"owned_birth={safe.owned_birth}")
+                        if safe.workspace is not None:
+                            hints.append(f"workspace={safe.workspace}")
+                        if hints:
+                            cleanup_diagnostics.append("Owned cleanup inspection: " + "; ".join(hints))
+                    except Exception:
+                        pass
                 except Exception:
                     cleanup = Result(Outcome.ERROR, Reason.CLEANUP_FAILED)
+        gui_retention = False
+        if context and context.session is not None:
+            try:
+                gui_retention = context.session.requires_workspace_retention
+                if type(gui_retention) is not bool:
+                    raise ValueError
+            except (Exception, KeyboardInterrupt):
+                gui_retention = True
+                cleanup = Result(Outcome.ERROR, Reason.CLEANUP_FAILED)
         # Finalize after all operation/process callbacks, while exclusion is held.
         handle = manager.handle if manager else None
         if handle:
@@ -173,11 +241,12 @@ def run_attempt(ide: str, config_path: str | None = None, *,
             nonpassing = (bool(issues) or interrupted or len(tests) != len(TEST_IDS)
                           or any(t.outcome != Outcome.PASS for t in tests))
             ownership_uncertain = not manager.cleanup_qualified(handle)
-            retain = (ownership_uncertain or not initial_saved or cleanup.outcome == Outcome.ERROR
+            retain = (gui_retention or ownership_uncertain or not initial_saved or cleanup.outcome == Outcome.ERROR
                       or (manifest.retain_on_failure and nonpassing))
             if retain:
                 reason = ("ownership_uncertain" if ownership_uncertain else "evidence_unavailable" if not initial_saved else
-                          "operation_cleanup_failed" if cleanup.outcome == Outcome.ERROR else "nonpassing_run")
+                          "operation_cleanup_failed" if cleanup.outcome == Outcome.ERROR else
+                          "nonpassing_run" if manifest.retain_on_failure and nonpassing else "gui_exit_scope_limited")
                 manifest = replace(manifest, disposition="retained", reason=reason)
             else:
                 try:
@@ -226,7 +295,7 @@ def run_attempt(ide: str, config_path: str | None = None, *,
             "tests": [dict(test_id=test_id, **r.as_dict()) for test_id, r in zip(TEST_IDS, tests)],
             "cleanup": cleanup.as_dict(), "duration_seconds": time.monotonic() - started,
             "workspace": manifest.as_dict(),
-            "versions": {"ide": None, "extension": None}, "exit_code": code,
+            "versions": {"ide": context.ide_version if context else None, "extension": None}, "exit_code": code,
         }
 
     saved = False
@@ -289,4 +358,6 @@ def run_attempt(ide: str, config_path: str | None = None, *,
                                    if r.reason in (Reason.EVENT_FAILED, Reason.SUMMARY_FAILED, Reason.WORKSPACE_EVIDENCE))
     location = f"Summary saved: {reporter.summary_path}" if saved else "No report was saved."
     print(f"{result['outcome']}: {details} {location}", file=sys.stderr)
+    for diagnostic in cleanup_diagnostics:
+        print(diagnostic, file=sys.stderr)
     return summary["exit_code"]
