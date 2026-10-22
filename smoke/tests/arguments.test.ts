@@ -4,7 +4,7 @@ import { parseArguments } from '../src/arguments.js';
 
 test('CLI requires an explicit macOS app and accepts only supported suites', () => {
   assert.deepEqual(parseArguments(['--build', '/Applications/Code.app'], 'darwin'), {
-    build: '/Applications/Code.app', suite: 'all',
+    build: '/Applications/Code.app', suite: 'all', chatBackend: 'mock',
   });
   for (const suite of ['editing', 'chat', 'all']) {
     assert.equal(parseArguments(['--suite', suite, '--build', '/a.app'], 'darwin').suite, suite);

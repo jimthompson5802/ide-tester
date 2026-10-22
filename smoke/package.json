@@ -3,12 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": "26.3.1" },
+  "engines": {
+    "node": "26.3.1"
+  },
   "scripts": {
     "compile": "tsc -p tsconfig.json && tsc -p helper/tsconfig.json",
     "test:unit": "node --test --test-concurrency=1 dist/tests/*.test.js",
     "smoke": "node dist/src/cli.js",
-    "qualify": "node dist/src/qualify.js"
+    "qualify": "node dist/src/qualify.js",
+    "setup:real-chat": "node dist/src/setup-real-chat.js"
   },
   "devDependencies": {
     "@playwright/test": "1.61.1",

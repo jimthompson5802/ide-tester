@@ -2,7 +2,7 @@ import { writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 export interface ReportResult {
-  runId?: string; scope?: string; outcome: string; error?: string; durationMs?: number;
+  runId?: string; scope?: string; chatBackend?: 'mock' | 'real'; outcome: string; error?: string; durationMs?: number;
   checks?: { suite: string; outcome: string; durationMs?: number; error?: string }[];
   cleanup?: { disposition?: string; reservationRetained?: boolean; errors?: string[] };
   resourcesPath?: string; resultPath?: string;
@@ -16,7 +16,7 @@ const duration = (ms?: number) => ms === undefined ? 'Unavailable' : `${(ms / 10
 
 export function formatResult(result: ReportResult): string {
   const lines = [`Smoke test: ${status(result.outcome)}`, `Run ID: ${result.runId ?? 'Unavailable'}`,
-    `Scope: ${result.scope === 'foundation' ? 'Foundation' : result.scope === 'selected-suites' ? 'Selected suites' : 'Unavailable'}`, '',
+    `Scope: ${result.scope === 'foundation' ? 'Foundation' : result.scope === 'selected-suites' ? 'Selected suites' : 'Unavailable'}`, ...(result.chatBackend ? [`Chat backend: ${result.chatBackend}`] : []), '',
     'Suite       Result        Duration'];
   if (!result.checks?.length) lines.push('Suite information: Unavailable');
   for (const check of result.checks ?? []) {

@@ -71,3 +71,12 @@ test('text write failure returns nonzero, identifies reporting error and preserv
     assert.equal(await readFile(result.resultPath, 'utf8'), json);
   }
 });
+
+test('reports identify real and mock backends including blocked Chat prerequisites', () => {
+  for (const chatBackend of ['mock', 'real'] as const) {
+    const text = formatResult({ chatBackend, outcome: 'blocked', checks: [{ suite: 'chat', outcome: 'blocked', error: 'Rerun setup:real-chat' }] });
+    assert.match(text, new RegExp(`Chat backend: ${chatBackend}`));
+    assert.match(text, /Chat\s+BLOCKED/);
+    assert.match(text, /Rerun setup:real-chat/);
+  }
+});

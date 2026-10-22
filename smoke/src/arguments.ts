@@ -1,7 +1,8 @@
 import { isAbsolute } from 'node:path';
 
 export type Suite = 'editing' | 'chat' | 'all';
-export interface Options { build: string; suite: Suite; output?: 'text' | 'json' }
+export type ChatBackend = 'mock' | 'real';
+export interface Options { chatBackend?: ChatBackend; build: string; suite: Suite; output?: 'text' | 'json' }
 
 export function parseArguments(args: string[], platform: string = process.platform): Options {
   if (platform !== 'darwin') throw new Error('Only macOS is supported');
@@ -9,7 +10,7 @@ export function parseArguments(args: string[], platform: string = process.platfo
   for (let i = 0; i < args.length; i += 2) {
     const key = args[i];
     const value = args[i + 1];
-    if (!['--build', '--suite', '--output'].includes(key) || values.has(key) || !value || value.startsWith('--')) {
+    if (!['--build', '--suite', '--output', '--chat-backend'].includes(key) || values.has(key) || !value || value.startsWith('--')) {
       throw new Error(`Invalid or duplicate argument: ${key}`);
     }
     values.set(key, value);
@@ -26,5 +27,14 @@ export function parseArguments(args: string[], platform: string = process.platfo
   if (output !== undefined && output !== 'text' && output !== 'json') {
     throw new Error('--output must be text or json');
   }
-  return { build, suite, ...(output ? { output } : {}) };
+  const chatBackend = values.get('--chat-backend') ?? 'mock';
+  if (chatBackend !== 'mock' && chatBackend !== 'real') throw new Error('--chat-backend must be mock or real');
+  const options: Options = { build, suite, chatBackend, ...(output ? { output } : {}) };
+  validateBackend(options);
+  return options;
+}
+
+export function validateBackend(options: Options, foundation = false): void {
+  if (options.chatBackend === 'real' && foundation) throw new Error('Real backend is unavailable for foundation qualification');
+  if (options.chatBackend === 'real' && options.suite === 'editing') throw new Error('Real backend requires Chat; editing-only runs are unsupported');
 }

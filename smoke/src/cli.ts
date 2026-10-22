@@ -10,6 +10,8 @@ export const checkoutRoot = fileURLToPath(new URL('../../../', import.meta.url))
 
 export async function executeCLI(args: string[], checkout = checkoutRoot, qualify = false, output: (message: string) => void = console.log): Promise<number> {
   const started = Date.now();
+  const backendIndex = args.indexOf('--chat-backend');
+  const chatBackend: 'real' | 'mock' = backendIndex >= 0 && args[backendIndex + 1] === 'real' ? 'real' : 'mock';
   // Recover the requested presentation even when other arguments are invalid.
   const outputIndex = args.indexOf('--output');
   const mode = outputIndex >= 0 && args[outputIndex + 1] === 'json' ? 'json' : 'text';
@@ -24,10 +26,11 @@ export async function executeCLI(args: string[], checkout = checkoutRoot, qualif
       const cleanup = await finishRun(run, false, []);
       const resultPath = join(run.report, 'result.json');
       const result = { runId: run.id, scope: qualify ? 'foundation' : 'selected-suites',
-        outcome: 'blocked', error: prerequisite, suites: options?.suite,
+        chatBackend, outcome: 'blocked', error: prerequisite, suites: options?.suite,
         startedAt: new Date(started).toISOString(), durationMs: Date.now() - started,
         versions: { node: process.version, platform: process.platform, architecture: process.arch },
-        mockRequestCount: 0, cleanup, resourcesPath: run.resources, resultPath };
+        mockRequestEvidence: chatBackend === 'real' ? 'inapplicable' : 'applicable',
+        mockRequestCount: chatBackend === 'real' ? null : 0, cleanup, resourcesPath: run.resources, resultPath };
       await writeFile(resultPath, JSON.stringify(result, null, 2));
       return await reportResult(result, mode, output);
     }
@@ -35,7 +38,7 @@ export async function executeCLI(args: string[], checkout = checkoutRoot, qualif
     return await reportResult(result, mode, output);
   } catch (error) {
     // An existing or uncertain reservation must never be removed on this path.
-    return await reportResult({ outcome: 'harness_error', error: String(error) }, mode, output);
+    return await reportResult({ chatBackend, outcome: 'harness_error', error: String(error) }, mode, output);
   }
 }
 

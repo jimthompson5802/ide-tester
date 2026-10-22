@@ -1,6 +1,6 @@
 # Standalone VS Code smoke tester
 
-Status: implementation complete; foundation, selected suites and final handoff developer accepted. Compilation and 27 non-GUI tests pass. Editing-only, two-turn mocked Chat-only and combined commands were verified against VS Code 1.135.0 / Copilot Chat 0.63.0 on macOS arm64. The [completed plan and qualification evidence](../docs/vscode-smoke-tester-plan.md) preserve decisions and checks.
+Status: original mocked foundation, selected suites and final handoff developer accepted. Compilation and 41 non-GUI tests pass after optional real-backend implementation. Slice 1 is developer validated; slice 2 awaits developer validation. The recorded editing-only, two-turn mocked Chat-only and combined GUI checks used VS Code 1.135.0 / Copilot Chat 0.63.0 on macOS arm64 before these changes. No new GUI checks, manual sign-in or real service runs have been performed. The [original qualification record](../docs/vscode-smoke-tester-plan.md) and [real backend execution record](../docs/implementation-plans/real-chat-backend.md) distinguish those results.
 
 ## Non-GUI commands
 
@@ -39,13 +39,43 @@ npm --prefix smoke run smoke -- \
   --suite all
 ```
 
-Select `editing`, `chat`, or `all`; omission defaults to `all`. The runner uses one sequential process and no automatic retries, a 60-second launch deadline, and a 120-second deadline for each selected suite. Results use `scope: "selected-suites"` and a separate outcome/evidence entry for each check. A failed check stops dependent checks, which remain `not_run`.
+Select `editing`, `chat`, or `all`; omission defaults to `all`. The runner uses one sequential process and no automatic retries, a 60-second launch deadline, and a 120-second deadline for editing and mocked Chat. Real Chat allows 120 seconds per turn and 300 seconds total. Results use `scope: "selected-suites"` and a separate outcome/evidence entry for each check. A failed check stops dependent checks, which remain `not_run`.
 
 - Editing opens `existing.txt` through Quick Open, replaces its contents using the shipped driver, saves through VS Code, and independently compares exact UTF-8 bytes. It creates an untitled editor and saves through the simple Save As dialog to the initially absent `created.txt`. Both files are closed/reopened and their displayed lines and disk bytes checked. Result evidence includes paths, byte counts, SHA-256 digests and reopened display contents. Only initial fixture setup writes directly to disk; the helper never edits files.
 - Chat opens one fresh local sidebar session, selects Ask, and submits a prompt and follow-up through the UI. Each uses a unique marker and a distinct synthetic reply. Every turn requires the same local identity, the matching visible prompt, a fresh completed mock request and exactly one additional completed assistant bubble with the exact reply. The follow-up also verifies the original prompt/reply remain intact. Result evidence records session identity and both completed turns.
-- Combined runs editing and then Chat in the same isolated app/workspace. No Copilot CLI, Agents Window, tools, code-edit proposals or real-model responses are exercised.
+- Combined runs editing and then Chat in the same isolated app/workspace. The default mock backend exercises no Copilot CLI, Agents Window, tools, code-edit proposals or real-model responses. The optional real backend below exercises authenticated Chat.
 
 All three commands passed on 2026-10-22; see the [verification summary](../reports/smoke/selected-suites-verification-2026-10-22/checks.json) and [combined result](../reports/smoke/2026-10-22T15-05-40-631Z-8f01daf4-57b6-4749-8dd8-2745e7df7422/result.json). Editing-only took 2.899 seconds, Chat-only 3.948 seconds and combined 4.924 seconds including launch/shutdown. Every run confirmed shutdown, removed disposable resources and released the reservation.
+
+## Optional real Copilot backend
+
+Use `--chat-backend mock|real`; omission defaults to `mock`. Real mode supports `chat` and `all`. Editing-only runs and foundation qualification reject real mode. These new GUI paths await separately authorized qualification on the pinned host versions.
+
+After compilation, with GUI authorization and an unlocked, exclusively reserved desktop, initialize the dedicated profile:
+
+```sh
+npm --prefix smoke run setup:real-chat -- --build "/Applications/Visual Studio Code.app"
+```
+
+Setup accepts only `--build`. It reserves `reports/smoke/.reservation`, creates the ignored `profiles/smoke-real-chat` profile, and opens a disposable workspace. Follow the [official Copilot sign-in workflow](https://code.visualstudio.com/docs/setup/copilot) manually, then close the setup window. Setup confirms owned application shutdown before releasing the reservation. It records no screenshots or traces and does not verify sign-in success. Authentication is checked by the Chat run; expired/missing authentication, entitlement and quota prerequisites return `blocked` with setup instructions.
+
+After setup closes:
+
+```sh
+npm --prefix smoke run smoke -- \
+  --build "/Applications/Visual Studio Code.app" \
+  --suite chat --chat-backend real
+```
+
+Use `--suite all --chat-backend real` for editing followed by real Chat in the same dedicated instance and disposable workspace. Real mode starts no mock server, injects no endpoint overrides or synthetic credentials, and uses normal persistent secret storage. Launch environment variables are limited to normal host variables and dedicated state paths. Anonymous Chat is disabled. Setup can refresh this setting in older owned profiles while preserving their state. Existing mock endpoint/auth overrides are rejected.
+
+The profile has dedicated user data, extensions and state directories and is preserved after successful and failed runs. Setup rejects unowned directories and symlinked profile paths. The shared reservation and profile singleton checks require setup to be closed before testing. Inspect abnormal shutdowns deliberately; the runner does not remove profile locks or adopt existing profiles.
+
+The real journey opens a fresh local Chat session and selects Ask. It submits a unique `SMOKE_<UUID>` token with an exact-reply instruction, then asks for the same token from the previous answer using a different prompt marker. Both replies must contain exactly that token after trimming outer whitespace. Added prose or Markdown fails, even when connectivity works. Each turn requires exactly one fresh completed assistant bubble, the matching prompt and unchanged session; the follow-up must preserve the first exchange. The runner checks explicit error UI and exports only the active test Chat through VS Code's Export Chat command to verify raw Markdown and a successful terminal model state. This prevents formatted or cancelled token text from passing. Temporary exports are deleted after reading. Missing export/UI contracts produce `harness_error`.
+
+Real turns allow 120 seconds each and a 300-second total Chat deadline, with no automatic retries. Response mismatches, service errors and response timeouts return `failed`; prerequisite failures return `blocked`; harness/cleanup errors return `harness_error`. JSON records backend, submitted prompts, expected replies (`reply`), observed replies, session identity, completion, counts and timings, including available partial evidence on failure. Real reports use `mockRequestEvidence: "inapplicable"`, `mockRequestCount: null` and `requests: null`. Text output displays the backend.
+
+Real runs record no screenshots or Playwright traces, including combined runs, to keep authentication screens and credentials out of diagnostics even if sign-in expires during execution. Reports retain only the test conversation's selected evidence and sanitized error reasons. Dedicated profile data stays private and ignored. See the [execution record and remaining GUI checks](../docs/implementation-plans/real-chat-backend.md).
 
 ## Foundation GUI qualification
 
@@ -79,6 +109,7 @@ Both `smoke` and `qualify` print a plain-text summary by default and save the sa
 Smoke test: PASSED
 Run ID: <run-id>
 Scope: Selected suites
+Chat backend: mock
 
 Suite       Result        Duration
 Editing     PASSED        1.200 seconds
@@ -99,7 +130,7 @@ npm --prefix smoke run smoke -- --build "/Applications/Visual Studio Code.app" -
 
 The summary distinguishes PASSED, FAILED, BLOCKED, HARNESS ERROR and NOT RUN. Suite outcomes come from individual checks; a cleanup failure can leave suites PASSED while the final harness disposition is HARNESS ERROR. Available suite and total durations, failure reasons and cleanup errors are included, along with the resource path when resources are retained. Missing suite or cleanup information is shown as Unavailable. Early errors such as an existing reservation may have no report directory or saved artifacts. A text-report write failure returns nonzero and identifies the reporting error while preserving the saved JSON (JSON terminal mode adds a `reportingError` field for this error only).
 
-Each run reserves `reports/smoke/.reservation` exclusively and writes `reports/smoke/<run-id>/result.json`. Disposable resources use a short owned `/private/tmp/ide-smoke-*` directory to fit macOS's Unix-socket path limit; `resources.json` and the result record its exact location. Results record scope, selected suites, versions, timings, request counts, outcome and cleanup disposition. Failures retain disposable resources and, when a page is available, an app-only screenshot and trace. Missing prerequisites and failures return nonzero. A missing or timed-out application handle leaves shutdown uncertain and retains the reservation.
+Each run reserves `reports/smoke/.reservation` exclusively and writes `reports/smoke/<run-id>/result.json`. Disposable resources use a short owned `/private/tmp/ide-smoke-*` directory to fit macOS's Unix-socket path limit; `resources.json` and the result record its exact location. Results record scope, selected suites, versions, timings, request counts, outcome and cleanup disposition. Failures retain disposable resources. Mock runs also capture an app-only screenshot and trace when a page is available; real runs suppress those captures. Missing prerequisites and failures return nonzero. A missing or timed-out application handle leaves shutdown uncertain and retains the reservation.
 
 Exit code 0 means the requested checks passed and cleanup succeeded. Nonzero results distinguish `blocked` prerequisites, `failed` functional assertions and `harness_error` (including uncertain cleanup); inspect `error`, each check's outcome, and `cleanup.errors`. Selected checks that never ran remain `not_run`. Mock request counts may exceed submitted turn counts. Successful file evidence records paths and digests even though disposable files have been removed. Report links in these documents refer to ignored local evidence, which is not distributed with a clone.
 
@@ -107,4 +138,4 @@ After abnormal termination, inspect the reservation's run ID and PID, its report
 
 The [successful qualification result](../reports/smoke/2026-10-22T14-50-41-326Z-f2830f31-7388-4990-88b7-1c7bd787b5d1/result.json) records a 1.870-second launch and 1.398-second Chat check (3.629 seconds total). Two matching mock requests completed for the one submitted turn; the UI assertion required one new complete assistant bubble. App/mock shutdown succeeded, disposable resources were removed and the reservation was released. Earlier failed attempts and their evidence remain described in the plan. The developer authorized the compatibility adaptation on 2026-10-22; no VS Code rebuild or application modification was used.
 
-The developer accepted this foundation result before authorizing selected-suite implementation, then accepted the selected suites and final handoff. The later selected-suite results above extend coverage to editing and a follow-up. Qualification remains limited to the pinned host combination and mocked local Chat; real Copilot service behavior and excluded agent workflows remain outside scope.
+The developer accepted this foundation result before authorizing selected-suite implementation, then accepted the selected suites and final handoff. The later selected-suite results above extend coverage to editing and a follow-up. Qualification remains limited to the pinned host combination and mocked local Chat; real Copilot service behavior remains unverified, and excluded agent workflows remain outside scope.

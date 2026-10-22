@@ -25,3 +25,23 @@ test('latest-turn verification requires a new completed request and assistant bu
     { ...current, requests: [{ ...request, completed: false }] },
   ]) assert.equal(turnCompleted(before, invalid, 'turn-two', 'MOCK_REPLY_TWO'), false);
 });
+
+test('real turns require fresh complete exact replies without mock request evidence', () => {
+  const before = { session: 'local-session', responseCount: 1, requestSequence: 0,
+    priorTurns: [{ marker: 'first', reply: 'SMOKE_token' }] };
+  const current = { session: 'local-session', prompts: ['First [smoke:first]', 'Follow up [smoke:second]'],
+    responses: [{ text: '\nSMOKE_token ', completed: true }, { text: ' SMOKE_token\n', completed: true }], requests: [] };
+  assert.equal(turnCompleted(before, current, 'second', 'SMOKE_token', 'real'), true);
+  for (const invalid of [
+    { ...current, session: 'other' },
+    { ...current, prompts: ['First [smoke:first]', 'Stale [smoke:first]'] },
+    { ...current, responses: [current.responses[1]] },
+    { ...current, responses: [...current.responses, current.responses[1]] },
+    { ...current, responses: [current.responses[0], { text: 'SMOKE_token', completed: false }] },
+    { ...current, responses: [current.responses[0], { text: '', completed: true }] },
+    { ...current, responses: [current.responses[0], { text: '`SMOKE_token`', completed: true }] },
+    { ...current, responses: [current.responses[0], { text: 'Here: SMOKE_token', completed: true }] },
+    { ...current, responses: [{ text: 'changed', completed: true }, current.responses[1]] },
+  ]) assert.equal(turnCompleted(before, invalid, 'second', 'SMOKE_token', 'real'), false);
+  assert.equal(turnCompleted(before, current, 'second', 'SMOKE_token'), false);
+});
