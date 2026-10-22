@@ -4,6 +4,14 @@ import { DatabaseSync } from 'node:sqlite';
 import type { Run } from './resources.js';
 import { syntheticToken } from './mock.js';
 
+export const commonSettings = {
+    'files.autoSave': 'off', 'editor.formatOnSave': false, 'files.simpleDialog.enable': true,
+    'workbench.startupEditor': 'none', 'workbench.tips.enabled': false,
+    'window.restoreWindows': 'none', 'security.workspace.trust.enabled': false,
+    'update.mode': 'none', 'extensions.autoUpdate': false, 'extensions.autoCheckUpdates': false,
+    'telemetry.telemetryLevel': 'off', 'chat.disableAIFeatures': false,
+};
+
 export async function prepareProfile(run: Run, mockUrl: string): Promise<Record<string, string>> {
   const endpoint = new URL(mockUrl);
   if (endpoint.protocol !== 'http:' || endpoint.hostname !== '127.0.0.1' || !endpoint.port || endpoint.origin !== mockUrl) {
@@ -12,11 +20,7 @@ export async function prepareProfile(run: Run, mockUrl: string): Promise<Record<
   const storage = join(run.userData, 'User/globalStorage');
   await mkdir(storage, { recursive: true });
   await writeFile(join(run.userData, 'User/settings.json'), JSON.stringify({
-    'files.autoSave': 'off', 'editor.formatOnSave': false, 'files.simpleDialog.enable': true,
-    'workbench.startupEditor': 'none', 'workbench.tips.enabled': false,
-    'window.restoreWindows': 'none', 'security.workspace.trust.enabled': false,
-    'update.mode': 'none', 'extensions.autoUpdate': false, 'extensions.autoCheckUpdates': false,
-    'telemetry.telemetryLevel': 'off', 'chat.disableAIFeatures': false,
+    ...commonSettings,
     'chat.allowAnonymousAccess': true,
     'github.copilot.advanced.debug.overrideProxyUrl': mockUrl,
     'github.copilot.advanced.debug.overrideCapiUrl': mockUrl,

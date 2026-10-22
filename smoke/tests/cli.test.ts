@@ -70,3 +70,17 @@ test('invalid output is blocked and still saves both reports', async t => {
   assert.equal(result.outcome, 'blocked');
   assert.equal(await readFile(path.replace(/result.json$/, 'result.txt'), 'utf8'), message + '\n');
 });
+
+test('early argument failures retain the requested real backend and inapplicable mock evidence', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'real-cli-report-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  let message = '';
+  const code = await executeCLI(['--build', '/missing.app', '--suite', 'editing', '--chat-backend', 'real', '--output', 'json'], root, false, value => { message = value; });
+  assert.equal(code, 1);
+  const result = JSON.parse(message);
+  t.after(() => rm(result.resourcesPath, { recursive: true, force: true }));
+  assert.equal(result.outcome, 'blocked');
+  assert.equal(result.chatBackend, 'real');
+  assert.equal(result.mockRequestEvidence, 'inapplicable');
+  assert.equal(result.mockRequestCount, null);
+});

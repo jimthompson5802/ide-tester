@@ -13,9 +13,14 @@ export function sessionFromLog(log: string): string {
   return session;
 }
 
-export async function readLocalSession(userData: string): Promise<string> {
+export async function rendererLogs(userData: string): Promise<string[]> {
   const logs: string[] = [];
   for await (const file of glob('logs/*/window1/renderer.log', { cwd: userData })) logs.push(file);
+  return logs;
+}
+
+export async function readLocalSession(userData: string, previousLogs: readonly string[] = []): Promise<string> {
+  const logs = (await rendererLogs(userData)).filter(file => !previousLogs.includes(file));
   if (logs.length !== 1) return '';
   return sessionFromLog(await readFile(join(userData, logs[0]), 'utf8'));
 }
