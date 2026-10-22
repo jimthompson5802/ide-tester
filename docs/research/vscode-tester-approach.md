@@ -2,6 +2,7 @@
 In VS Code, **smoke tests** are lightweight end-to-end checks that validate critical user journeys after a build (for example: app launch, window/workbench readiness, basic commands, and key UI interactions), to quickly catch “is the product basically working?” regressions.
 
 For the exact commands in that `package.json` URL, I should read the file directly and enumerate the smoke-specific scripts (names + what each runs). If you want, I can do that next and give you a precise list from `main/package.json`.
+
 ---
 
 Great — from `microsoft/vscode`’s `package.json`, the smoke-test scripts are:
