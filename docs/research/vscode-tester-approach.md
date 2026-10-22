@@ -102,3 +102,99 @@ The `Chat` helper is part of the `test/automation` package.
 - Don't rely on the test-only commands. Use the standard chat commands instead.
 
 I can sketch a Playwright script for the real-Copilot version, or look at `test/automation`'s `Chat` class to show which selectors and waits it uses.
+
+---
+
+Search complete: Check smoke profile support
+
+Searched codebase for "smoke test runner options launch configuration VS Code user profile user-data-dir", 24 results
+
+Searched codebase for "argument parsing CLI flags vscode launch args profile directory", 27 results
+
+Searched for files matching `**/smoke*.{ts,js,py,go,java}`, 2 matches
+
+Searched for regex `smoke.*test.*runner|smoke.*runner`, 26 results
+
+Searched for regex `user-profile|user-data-dir|userDataDir|userProfile`, 585 results
+
+Searched for regex `--build.*installed.*app|build.*installed.*app`, 3 results
+
+Searched for files matching `**/launch*.{ts,js,py,go,java}`, 4 matches
+
+Searched for regex `argv|arguments.*parse|argparse|getopt|parse.*args|command.*line.*arg`, 900 results
+
+Searched for files matching `**/smoke-test-runner*`, no matches
+
+Searched for text `smoke-test-runner`, 11 results
+
+Searched for files matching `**/smoke/**/*runner*`, no matches
+
+Searched for regex `--build.*installed.*app|build.*installed.*app`, 3 results
+
+Searched for files matching `**/test/smoke/**`, 66 matches
+
+Searched for regex `user-data-dir|userDataDir|user data dir|user profile`, 521 results
+
+Searched for files matching `**/test/scenario/**`, 11 matches
+
+Searched for regex `assertNoProfileOverrides|reject per-run arguments`, 3 results
+
+Searched for files matching `**/test/smoke/**/*userDataDir*`, no matches
+
+Searched for regex `getRandomUserDataDir|randomized user-data directories|isolated profile`, 22 results
+
+Searched for files matching `**/test/**/*smoke*test*runner*`, no matches
+
+Searched for regex `smoke-test-runner.log|smoke tests electron|Azure DevOps Flaky Smoke Tests`, 12 results
+
+Searched for files matching `**/build/**/*smoke*test*`, 2 matches
+
+Searched for text `--user-data-dir` (`**/test/smoke/**`), 3 results
+
+Read , lines 1 to 260
+
+Read , lines 250 to 340
+
+Searched for regex `getApplication\(|--user-data-dir|userDataDir|electronArgs|profile` (`**/test/smoke/src/main.ts`), 6 results
+
+Searched for regex `userDataDir|--user-data-dir|--extensions-dir|extraArgs` (`**/test/automation/src/**`), 20 results
+
+Searched for regex `--profile|--user-data-dir` (`**/src/vs/platform/environment/**`), 4 results
+
+Read , lines 260 to 455
+
+Not against an **existing installed profile** with the standard smoke runner. It launches VS Code with a temporary `--user-data-dir` and extensions directory, then removes them after the run. That isolation prevents the tests from changing your normal profile.
+
+You can pass a profile name to the temporary test instance:
+
+```bash
+npm run smoketest-no-compile -- --build "/Applications/Visual Studio Code.app" --electronArgs="--profile=SmokeTest"
+```
+
+That selects or creates `SmokeTest` **inside the runner’s temporary user-data directory**; it won’t use the profile or settings from your installed VS Code. Reusing an actual profile would require changing the runner, and is risky because smoke tests can alter user data.
+
+---
+
+Read , lines 1 to 115
+
+Searched for regex `use-inmemory-secretstorage|useInMemorySecretStorage` (`**/src/vs/**`), 9 results
+
+Searched for regex `Authentication|Copilot.*auth|sign in|Github Copilot` (`**/test/smoke/src/areas/chat/**`), 8 results
+
+Read , lines 160 to 220
+
+**Correction:** The earlier `--profile=SmokeTest` suggestion would create/use a profile inside the smoke runner’s temporary data directory; it would not inherit your Copilot sign-in. The runner also enables in-memory secret storage by default.
+
+You can try using a **copy** of your existing VS Code user-data directory, so the tests won’t modify your normal profile. On macOS, quit VS Code first, then from the repository root:
+
+```bash
+cp -a "$HOME/Library/Application Support/Code" /tmp/vscode-smoke-copilot
+
+npm run smoketest-no-compile -- --build "/Applications/Visual Studio Code.app" \
+  --electronArgs="--user-data-dir=/tmp/vscode-smoke-copilot --use-inmemory-secretstorage=false"
+```
+
+If you use a named profile, add `--profile=YourProfileName` inside `--electronArgs`. This is a workaround, not a dedicated smoke-runner option: it relies on extra Electron arguments overriding the runner’s defaults. The runner still uses its own extensions directory, so this works only if the Copilot extension is available in the installed app. The generated arguments and in-memory secret-storage setting are in `electron.ts:24-52`; the runner’s temporary data directory is set in `main.ts:279`.
+
+If Copilot still isn’t authenticated, the reliable route is to adjust the smoke-test harness to accept a user-data directory and disable in-memory secret storage, then compile the smoke tests. That compiles the test harness, not VS Code.
+
