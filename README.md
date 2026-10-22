@@ -4,6 +4,12 @@ A planned smoke-test harness for Visual Studio Code or IntelliJ IDEA and selecte
 
 **Status:** Milestone 0 and M1-00 (Slice 0) were completed and developer validated on 2026-10-20. M1-01 is complete and developer validated: Phase 1 and Phase 2 were accepted on 2026-10-20. Phase 2 adds strict YAML configuration, guarded runs, structured events, saved summaries, and non-GUI acceptance tests. M1-04 now implements production T01 launch/readiness with observed owned shutdown and conservative GUI workspace retention; Phase 2 was developer validated on 2026-10-21. T02–T05 remain unimplemented. See the [T01 evidence](docs/reports/M1-04-phase2.md). See the [M1-01 evidence](docs/reports/M1-01-phase2.md). M1-02 profile safety is complete and developer validated on 2026-10-21. See the [M1-02 evidence](docs/reports/M1-02-phase2.md). M1-03 workspace safety is complete and developer validated on 2026-10-21; combined Slice 1 was developer validated on 2026-10-21.
 
+**Current work:** M1-05 (T02/T03) is **on hold** while the developer rethinks the
+editor tests. Phase 1 is incomplete; see the [hold checkpoint](docs/reports/M1-05-phase1.md#hold-checkpoint--2026-10-21)
+and [plan](docs/implementation-plans/M1-05.md). M1-06 is the intended next story;
+**no M1-06 work may begin without explicit developer approval**. This sequencing
+decision does not accept M1-05 or Slice 2. Production T02–T05 remain unavailable.
+
 ## Completed work
 
 - **Milestone 0 — Environment setup:** Verified the existing macOS tooling and created an isolated, repository-local uv environment using Python 3.12.15 arm64. See the [setup implementation plan](specifications/ide-milestone0-implementation-plan.md) and [final checks](docs/implementation-plans/M0-05.md#execution-results--2026-10-20).

@@ -272,3 +272,52 @@ T02–T05 and authentication are unassessed. Overall public exit 4 remains expec
 The developer stated “i validate Phase 2” on 2026-10-21; Phase 2 and M1-04
 are complete and accepted within the recorded scope. Slice 2 acceptance remains
 pending; M1-05 and later work require separate authorization.
+
+## M1-05 Phase 1 execution — 2026-10-21
+
+**Current override: M1-05 is ON HOLD by developer direction.** Preserve partial
+code/tests and [hold evidence](docs/reports/M1-05-phase1.md#hold-checkpoint--2026-10-21)
+while T02/T03 are reconsidered. Do not resume M1-05 automatically. M1-06 is the
+developer's intended next story, overriding the original story-order prerequisite
+without accepting M1-05 or Slice 2. **Do not start any M1-06 planning,
+investigation, implementation or GUI work without explicit developer approval.**
+No M1-06 work has started. Desktop/profile reservation is released and settings
+are restored. All 17 host attempts retained original fixtures with matching
+manifests and recorded cleanup PASS; no output file was created. The latest
+sender run-loop hypothesis is inert-tested only, not host-qualified. The last
+full suite (541 tests) predates the revised workflow; see the report for current
+focused checks. Historical execution entries below do not authorize resumption.
+
+Phase 1 was authorized with TDD/subagents; see the
+[plan](docs/implementation-plans/M1-05.md) and
+[partial evidence](docs/reports/M1-05-phase1.md). P1-01 is complete; other tasks
+remain incomplete. Four unsuccessful Quick Open input-focus fixes reached the
+guidance stop. Scoped AX focus, an
+explicitly authorized temporary accessibility setting, bounded focus confirmation,
+and supported AXPress all failed to establish focus. No path text or file edits
+followed; replacement/Save remain unavailable. Production T02–T05 are unchanged.
+All 541 non-GUI tests passed. All 13 host workspaces are retained with original
+fixture bytes and matching manifests; observed cleanup, narrow preservation and
+guard checks passed. Exact original settings were restored, GUI work stopped and
+desktop/profile reservation released. No dependencies changed. Phase 1 is not
+accepted and Phase 2 remains unauthorized.
+
+The developer subsequently directed a revised sequence: new empty untitled
+editor, enter fixed text, Save As `created.py` in the current workspace root,
+independent exact disk comparison. Desktop/profile reservation was renewed for
+this revised Phase 1 investigation, then released at the hold checkpoint. This supplied guidance for the new approach;
+the old Quick Open focus path remains unqualified. Preserve the old evidence,
+leave `example.py` untouched, require the new destination initially absent, and
+qualify full destination identity after Save As. Read the revised plan/report
+before resuming. Settings remain at their restored original values; this revision
+does not authorize further settings changes or Phase 2.
+
+After the hold, the developer separately requested regression verification and
+renewed desktop/profile reservation. The current full non-GUI suite passed
+**544 tests in 12.75s**; normal installed-console T01 passed in **2.73s** and all
+eight existing controlled lifecycle checks produced expected outcomes. Cleanup,
+narrow preservation, manifests and guard checks passed; final preflight found
+no conflicts across 26 dedicated profiles. See the
+[regression report](docs/reports/post-hold-regression-checks.md). GUI checks are
+stopped and reservation released. M1-05 remains on hold, T02–T05 remain
+unavailable, and M1-06 remains unstarted pending explicit approval.

@@ -248,6 +248,12 @@ GitHub issue #20 retains its earlier scope and has not been edited.
 
 ### Story M1-05 — Open, edit, and save a file (T02–T03)
 
+**Status — 2026-10-21: ON HOLD by developer direction.** Phase 1 is incomplete
+and unaccepted while T02/T03 are reconsidered. Preserve the partial probe and
+evidence; see the [plan](../docs/implementation-plans/M1-05.md) and
+[hold checkpoint](../docs/reports/M1-05-phase1.md#hold-checkpoint--2026-10-21).
+No acceptance criteria or Slice 2 gate are marked complete by this hold.
+
 **Priority:** Must | **Dependencies:** M1-04
 
 **Slice:** 2 — IDE basics
@@ -270,6 +276,13 @@ GitHub issue #20 retains its earlier scope and has not been edited.
 ---
 
 ### Story M1-06 — Open Copilot Chat and detect availability (T04)
+
+**Scheduling decision — 2026-10-21:** The developer selected M1-06 as the next
+intended story while M1-05 is on hold. This overrides the original story-order
+prerequisite for scheduling without accepting M1-05 or Slice 2. **No M1-06
+planning, investigation, implementation or GUI work may start without explicit
+developer approval.** None has started; historical dependency requirements below
+remain recorded for the future plan to account for the held editor tests.
 
 **Priority:** Must | **Dependencies:** M1-00 approved, M1-05; Slice 2 approved
 
