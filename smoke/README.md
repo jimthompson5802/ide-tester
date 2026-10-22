@@ -1,5 +1,7 @@
 # Standalone VS Code smoke tester
 
+The approach used here is based on the [VS Code IDE smoke testing framework](https://github.com/microsoft/vscode/tree/main/test/smoke): launch an installed VS Code build, drive the workbench UI, and verify observable results. This repository implements a standalone tester with its own editing and Copilot Chat suites, isolation, and reporting.
+
 Status: original mocked foundation, selected suites and final handoff developer accepted. Compilation and 44 non-GUI tests pass after optional real-backend implementation. Slice 1 is developer validated; slice 2 awaits developer validation. The recorded editing-only, two-turn mocked Chat-only and combined GUI checks used VS Code 1.135.0 / Copilot Chat 0.63.0 on macOS arm64 before these changes. An authorized real two-turn Chat run passed on 2026-10-22 after readiness and transcript fixes. Setup, combined real mode and signed-out blocking remain GUI-unverified. The [original qualification record](../docs/vscode-smoke-tester-plan.md) and [real backend execution record](../docs/implementation-plans/real-chat-backend.md) distinguish those results.
 
 ## Non-GUI commands
