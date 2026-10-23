@@ -10,7 +10,7 @@ For the high-level project structure, see [Repository contents](README.md#reposi
 
 - For current scope, retained artifacts, and environment limitations, read [README.md](README.md).
 - For work under `smoke/`, read [tester instructions](smoke/AGENTS.md); they add tester-specific guidance to these repository-wide rules.
-- For environment work, read the historical [Milestone 0 setup guide](specifications/ide-milestone0-environment-setup.md) and inspect current `pyproject.toml`, `uv.lock`, and `.python-version`.
+- Before proposing or performing authorized work on the preserved Python environment, read the [preservation guide](docs/preserved-python-environment.md).
 - For architecture or milestone planning, read the historical [harness proposal](specifications/ide-copilot-smoke-harness-proposal.md). Review its assumptions before adopting them.
 - For a selected Milestone 1 story, read the [historical backlog](specifications/ide-copilot-milestone1-user-stories.md) and applicable [implementation plan](docs/implementation-plans/). Historical acceptance does not establish current implementation.
 - For VS Code testing approaches, read the [testing overview](docs/vscode-testing-overview.md) and [smoke testing research](docs/research/vscode-tester-approach.md). Distinguish extension-host/API tests from evidence that real IDE and Copilot UI interactions work.
@@ -19,19 +19,13 @@ For the high-level project structure, see [Repository contents](README.md#reposi
 
 Documentation work stays within its requested scope; it does not initiate setup or implementation.
 
-Apply YAGNI. Add dependencies, tooling, abstractions, or platform support only for approved current acceptance criteria. The historical macOS-first, Windows, IntelliJ, scheduling, and adapter designs remain proposals until selected for replacement work.
+Apply YAGNI: add dependencies, tooling, abstractions, or platform support only when needed to satisfy approved current acceptance criteria.
 
-### Preserved local resources
+## Preserved resources
 
 Preserve all existing dedicated profiles and their markers, plus `reports/m1-03/preserved-workspaces/`. Keep `.vscode/` settings unchanged unless separately requested. Inspect retained environment references before proposing changes. Preserve local environments and private data during branch changes; ignored files are shared across branches in this checkout.
 
-### Preserved Python environment
-
-Preserve the existing `.venv/`, `.vscode/`, `pyproject.toml`, `uv.lock`, and `.python-version`. Metadata and installed entry points may reference deleted source; installation and CLI commands are unavailable until a replacement package is approved and implemented.
-
-Use uv for the repository-local environment. Reuse existing Homebrew uv and `/opt/homebrew/bin/python3.12`; do not install another uv or download Python. Python 3.12.15 arm64 was historically qualified. Recheck architecture in the actual execution context before authorized environment work, and use `.venv/bin/python` explicitly. Keep system Python unchanged.
-
-Use `pyproject.toml` and `uv.lock` as the sources of truth for declared dependencies and exact versions. For separately authorized dependency work, preserve extra distributions with `--inexact`, install compatible wheels with source builds and Python downloads disabled, and install local pure-Python source offline only after its backend is available. Plain `uv sync` can prune preserved packages. Report-local uv caches and qualification environments were intentionally removed; do not assume offline artifacts are still available. Compiler/toolchain installation is outside this workflow.
+Preserve the existing `.venv/`, `pyproject.toml`, `uv.lock`, and `.python-version`. Changes to the retained Python environment require separate authorization and the preservation guide's procedures.
 
 ## Validation
 
@@ -47,9 +41,9 @@ Report checks actually performed and their limitations.
 
 ## Safety and authorization
 
-Authorize replacement implementation separately from planning. Work in approved reviewable slices and obtain explicit developer validation before advancing through an unapproved phase, slice, or milestone gate. Honor approvals already given for the applicable work.
+Planning does not authorize implementation. Work in approved reviewable slices and obtain explicit developer validation before advancing through an unapproved phase, slice, or milestone gate. Honor approvals already given for the applicable work.
 
-GUI automation requires separate authorization, an unlocked exclusively reserved desktop, sequential runs, dedicated persistent test profiles, and disposable workspaces. Target only test-owned processes/windows and constrain cleanup to explicitly owned paths. Preserved profiles and saved workspace data do not automatically become replacement-harness resources.
+GUI automation requires separate authorization, an unlocked exclusively reserved desktop, sequential runs, dedicated persistent test profiles, and disposable workspaces. Target only test-owned processes/windows and constrain cleanup to explicitly owned paths. Preserved profiles and saved workspace data require explicit authorization before use by the current tester; honor authorization already given for the applicable resources.
 
 Authentication is manual. Never automate passwords or MFA, extract credentials, or copy authenticated profiles between hosts. Classify expired authentication as blocked. Keep tokens, private conversations, and unrelated desktop content out of committed evidence and diagnostics.
 
@@ -63,6 +57,6 @@ Use Conventional Commits: `<type>(<optional scope>): <description>`. Select `fea
 
 ## Current status
 
-The standalone TypeScript tester is developer accepted. For tester verification history and pending real-backend validation gates, read [smoke/AGENTS.md](smoke/AGENTS.md). Further scope requires developer direction.
+The standalone TypeScript tester under `smoke/` is the active implementation and is developer accepted. For tester verification history and pending real-backend validation gates, read [smoke/AGENTS.md](smoke/AGENTS.md). Further scope requires developer direction.
 
-The previous Python harness was removed; historical specifications and the root uv environment remain. Historical decisions, completion records, commands, and approvals are reference material pending review, not current functionality or authorization. M1-05 remains on hold; M1-06 and replacement design/implementation require explicit developer direction. No outstanding milestone or slice gate is accepted by the reset.
+Historical Python harness designs, decisions, completion records, commands, and approvals are reference material, not evidence of current functionality or authorization. Adopting historical designs requires explicit developer direction. M1-05 remains on hold; M1-06 requires explicit developer direction. Historical acceptance does not satisfy current phase, slice, or milestone gates.

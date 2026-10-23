@@ -42,6 +42,7 @@ flowchart TB
 ## Start here
 
 - [Current setup, commands, artifacts and compatibility](smoke/README.md) — the delivered standalone tester.
+- [Preserved Python environment](docs/preserved-python-environment.md) — preservation rules and procedures for separately authorized Python environment work.
 - [Harness proposal](specifications/ide-copilot-smoke-harness-proposal.md) — historical architecture and milestone design, pending review for the replacement.
 - [Milestone 1 user stories](specifications/ide-copilot-milestone1-user-stories.md) — historical acceptance criteria and delivery slices.
 - [Milestone 0 environment setup](specifications/ide-milestone0-environment-setup.md) and [implementation plan](specifications/ide-milestone0-implementation-plan.md) — retained environment planning.
@@ -62,11 +63,7 @@ npm --prefix smoke run smoke -- --build "/Applications/Visual Studio Code.app" -
 
 GUI execution needs authorization and an unlocked reserved desktop. Select `editing`, `chat`, or `all` (default). See [usage and recovery](smoke/README.md) for results, isolation and version requirements.
 
-The existing `.venv/`, `pyproject.toml`, `uv.lock`, and `.python-version` are preserved unchanged. Reuse the existing Homebrew uv and `/opt/homebrew/bin/python3.12`; Python 3.12.15 arm64 was historically qualified. Recheck the execution context before separately authorized environment work.
-
-Root Python package metadata, the editable installation, and `.venv/bin/ide-smoke` may still reference the removed `src/ide_smoke/` package. Historical Python installation, build, synchronization, and CLI examples remain unavailable. Preserve that environment without reinstalling or regenerating its lock.
-
-Future authorized dependency work must retain the wheel-only dependency/offline local-package approach: preserve extra installed distributions with `--inexact`, disable third-party source builds and Python downloads, and install a local package only after its source and build backend are available. Exact dependency declarations and pins remain in `pyproject.toml` and `uv.lock`.
+The retained Python environment is preserved separately from the TypeScript tester. Its metadata and installed entry points may reference removed source. Before proposing or performing authorized Python environment changes, follow the [preservation guide](docs/preserved-python-environment.md) for interpreter constraints, dependency procedures, and historical limitations.
 
 ## Development workflow
 
@@ -80,6 +77,7 @@ The replacement plan is complete and developer accepted. Follow [repository inst
 - `smoke/` — standalone TypeScript tester, helper extension, and non-GUI tests.
 - `docs/implementation-plans/` — historical implementation plans and decisions.
 - `docs/research/` and `docs/vscode-testing-overview.md` — retained research and background.
+- `docs/preserved-python-environment.md` — current preservation and authorized-work procedures for the retained Python environment.
 - `.agents/skills/` and `.github/` — workflow skills and issue/PR templates.
 - Root uv metadata and `LICENSE` — preserved project environment definitions and licensing.
 
