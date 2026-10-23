@@ -4,6 +4,8 @@
 
 This repository contains a standalone TypeScript VS Code smoke tester under `smoke/`. Retained Python environment files and historical planning documents have separate preservation and authorization rules below.
 
+For the high-level project structure, see [Repository contents](README.md#repository-contents). For tester module responsibilities, see [Project structure](smoke/AGENTS.md#project-structure).
+
 ## Start here
 
 - For current scope, retained artifacts, and environment limitations, read [README.md](README.md).

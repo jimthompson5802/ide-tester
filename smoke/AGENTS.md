@@ -8,6 +8,27 @@ These instructions apply to `smoke/` in addition to the [repository-wide instruc
 - For changes to the optional real Copilot backend, read the [backend plan and execution record](../docs/implementation-plans/real-chat-backend.md), including pending validation gates.
 - For original implementation decisions or qualification evidence, read the [completed replacement plan](../docs/vscode-smoke-tester-plan.md). Recorded GUI authorization applies to its recorded runs.
 
+## Project structure
+
+Paths below are relative to `smoke/`:
+
+| Path | Responsibility |
+| --- | --- |
+| `src/cli.ts`, `src/arguments.ts`, `src/qualify.ts` | CLI execution, option validation, and foundation qualification entry point. |
+| `src/runner.ts`, `src/app.ts`, `src/workbench.ts` | Suite orchestration, installed VS Code discovery, and Playwright workbench interactions. |
+| `src/editing.ts`, `src/files.ts` | Editing scenarios and independent saved-file verification. |
+| `src/chat.ts`, `src/turn.ts`, `src/session.ts` | Chat prompts and evidence validation, turn completion, and session discovery from renderer logs. |
+| `src/mock.ts`, `src/profile.ts` | Mock Chat service and mock profile preparation. |
+| `src/real-profile.ts`, `src/setup-real-chat.ts` | Persistent real-backend profile checks and setup for manual authentication. |
+| `src/resources.ts`, `src/report.ts` | Owned run resources, cleanup, and result reporting. |
+| `helper/extension.ts`, `helper/package.json` | VS Code helper extension implementation and manifest. |
+| `tests/` | Non-GUI tests for tester behavior. |
+| `package.json`, `package-lock.json`, `.npmrc` | Commands, dependency declarations and lock, and installation policy. |
+| `tsconfig.json`, `helper/tsconfig.json` | Tester/test and helper compilation settings. |
+| `dist/`, `helper/dist/` | Generated JavaScript and source maps; make implementation changes in the TypeScript sources. |
+
+For generated run artifacts and private local profile locations, follow [results and recovery](README.md#results-and-recovery) and [real backend setup](README.md#optional-real-copilot-backend).
+
 ## Commands
 
 Run these from the repository root. Use the Node version and host requirements in [README.md](README.md#non-gui-commands); scripts and the engine requirement are defined in [package.json](package.json).
