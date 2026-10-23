@@ -1,0 +1,634 @@
+{
+  "nodes": [
+    {
+      "unique-id": "internet",
+      "node-type": "ecosystem",
+      "name": "Internet",
+      "description": "Groups external services accessed over the Internet."
+    },
+    {
+      "unique-id": "github-copilot",
+      "node-type": "service",
+      "name": "Github Copilot",
+      "description": "Provides the remote Copilot Chat backend used by real-backend smoke tests."
+    },
+    {
+      "unique-id": "macos-desktop",
+      "node-type": "ecosystem",
+      "name": "MacOs Desktop",
+      "description": "Groups the smoke tester, dedicated VS Code application, workspace, profile, and smoke test results."
+    },
+    {
+      "unique-id": "developer",
+      "node-type": "actor",
+      "name": "Developer",
+      "description": "Invokes smoke commands and manually signs into the real Chat profile."
+    },
+    {
+      "unique-id": "smoke-tester",
+      "node-type": "service",
+      "name": "Smoke tester CLI",
+      "description": "Runs Playwright suites, hosts the in-process mock API, and records results.",
+      "interfaces": [
+        {
+          "unique-id": "cli",
+          "command": "npm --prefix smoke run smoke -- --build <app> --suite <editing|chat|all>"
+        },
+        {
+          "unique-id": "mock-api",
+          "host": "127.0.0.1",
+          "protocol": "HTTP",
+          "port-allocation": "Ephemeral OS-assigned port via listen(0)",
+          "endpoints": [
+            {
+              "method": "GET",
+              "path": "/models"
+            },
+            {
+              "method": "GET",
+              "path": "/models/smoke-model"
+            },
+            {
+              "method": "GET",
+              "path": "/models/smoke-model/policy"
+            },
+            {
+              "method": "GET",
+              "path": "/copilot_internal/v2/token"
+            },
+            {
+              "method": "GET",
+              "path": "/copilot_internal/v2/nltoken"
+            },
+            {
+              "method": "POST",
+              "path": "/models/session"
+            },
+            {
+              "method": "POST",
+              "path": "/models/session/intent"
+            },
+            {
+              "method": "POST",
+              "path": "/chat/completions"
+            }
+          ],
+          "completion-response-format": "Server-sent events"
+        }
+      ]
+    },
+    {
+      "unique-id": "vscode",
+      "node-type": "system",
+      "name": "Dedicated VS Code application",
+      "description": "Runs the editor, bundled Copilot Chat, and development helper extension.",
+      "interfaces": [
+        {
+          "unique-id": "automation",
+          "mechanism": "Playwright Electron page automation and window.driver",
+          "methods": [
+            "whenWorkbenchRestored",
+            "typeInEditor"
+          ],
+          "helper-command": "ideTester.openLocalChat"
+        }
+      ]
+    },
+    {
+      "unique-id": "workspace",
+      "node-type": "data-asset",
+      "name": "Disposable workspace",
+      "description": "Holds editing fixtures and temporary exports of the active test Chat.",
+      "interfaces": [
+        {
+          "unique-id": "workspace-files",
+          "path": "/private/tmp/ide-smoke-<generated>/workspace"
+        }
+      ]
+    },
+    {
+      "unique-id": "profile",
+      "node-type": "data-asset",
+      "name": "Dedicated profile and state",
+      "description": "Holds isolated settings, global storage, extensions, renderer logs, and backend state.",
+      "interfaces": [
+        {
+          "unique-id": "profile-files",
+          "paths": [
+            "/private/tmp/ide-smoke-<generated>/user-data",
+            "/private/tmp/ide-smoke-<generated>/extensions",
+            "/private/tmp/ide-smoke-<generated>/copilot-state",
+            "profiles/smoke-real-chat/"
+          ]
+        }
+      ]
+    },
+    {
+      "unique-id": "smoke-test-results",
+      "node-type": "data-asset",
+      "name": "Smoke test results",
+      "description": "Retains results, resource ownership records, and mock-mode failure diagnostics.",
+      "interfaces": [
+        {
+          "unique-id": "smoke-test-results-files",
+          "path": "reports/smoke/<run-id>",
+          "reservation-path": "reports/smoke/.reservation"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "internet-composition",
+      "relationship-type": {
+        "composed-of": {
+          "container": "internet",
+          "nodes": [
+            "github-copilot"
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "macos-desktop-composition",
+      "relationship-type": {
+        "composed-of": {
+          "container": "macos-desktop",
+          "nodes": [
+            "smoke-tester",
+            "vscode",
+            "workspace",
+            "profile",
+            "smoke-test-results"
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "vscode-to-github-copilot",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "vscode"
+          },
+          "destination": {
+            "node": "github-copilot"
+          }
+        }
+      },
+      "description": "test chat interface"
+    },
+    {
+      "unique-id": "smoke-tester-to-vscode",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "smoke-tester"
+          },
+          "destination": {
+            "node": "vscode"
+          }
+        }
+      },
+      "description": "Launches, drives, observes, and shuts down the owned application."
+    },
+    {
+      "unique-id": "smoke-tester-to-workspace",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "smoke-tester"
+          },
+          "destination": {
+            "node": "workspace"
+          }
+        }
+      },
+      "description": "Creates fixtures, verifies saved bytes, and reads then deletes Chat exports."
+    },
+    {
+      "unique-id": "vscode-to-workspace",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "vscode"
+          },
+          "destination": {
+            "node": "workspace"
+          }
+        }
+      },
+      "description": "Opens, edits, saves, reopens, and exports test-owned files."
+    },
+    {
+      "unique-id": "smoke-tester-to-profile",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "smoke-tester"
+          },
+          "destination": {
+            "node": "profile"
+          }
+        }
+      },
+      "description": "Prepares or checks settings and ownership and reads renderer logs."
+    },
+    {
+      "unique-id": "vscode-to-profile",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "vscode"
+          },
+          "destination": {
+            "node": "profile"
+          }
+        }
+      },
+      "description": "Uses dedicated profile directories and writes session logs."
+    },
+    {
+      "unique-id": "smoke-tester-to-smoke-test-results",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "smoke-tester"
+          },
+          "destination": {
+            "node": "smoke-test-results"
+          }
+        }
+      },
+      "description": "Writes results and ownership records and captures mock-mode failure diagnostics."
+    },
+    {
+      "unique-id": "developer-to-smoke-tester",
+      "relationship-type": {
+        "interacts": {
+          "actor": "developer",
+          "nodes": [
+            "smoke-tester"
+          ]
+        }
+      },
+      "description": "Invokes suite, foundation, and real-profile setup commands."
+    },
+    {
+      "unique-id": "developer-to-vscode",
+      "relationship-type": {
+        "interacts": {
+          "actor": "developer",
+          "nodes": [
+            "vscode"
+          ]
+        }
+      },
+      "description": "Signs in manually and closes the dedicated setup window."
+    }
+  ],
+  "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
+  "unique-id": "smoke-architecture",
+  "name": "VS Code smoke tester",
+  "description": "Initial static discovery of smoke/ executable code, including mock and real-profile modes.",
+  "flows": [
+    {
+      "unique-id": "setup-smoke-test-profile",
+      "name": "Setting up the smoke test profile",
+      "description": "Creates or checks the dedicated persistent real-Chat profile, launches a setup window for manual sign-in, and preserves the profile after shutdown. Setup completion does not verify authentication; the real Chat test checks readiness.",
+      "transitions": [
+        {
+          "relationship-unique-id": "developer-to-smoke-tester",
+          "sequence-number": 1,
+          "description": "Invoke setup:real-chat with the dedicated VS Code build.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-smoke-test-results",
+          "sequence-number": 2,
+          "description": "Reserve exclusive execution and record ownership of disposable setup resources.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-workspace",
+          "sequence-number": 3,
+          "description": "Create a disposable setup workspace and initial fixture.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-profile",
+          "sequence-number": 4,
+          "description": "Create or validate the marked persistent profile; reject mock overrides and require the profile to be closed.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-vscode",
+          "sequence-number": 5,
+          "description": "Check platform and build compatibility and launch the dedicated setup window with the real profile and filtered environment.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "vscode-to-profile",
+          "sequence-number": 6,
+          "description": "Load the persistent profile and retain settings and authentication state managed by VS Code.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "developer-to-vscode",
+          "sequence-number": 7,
+          "description": "Complete sign-in manually using the Copilot setup workflow, then close the dedicated window.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-vscode",
+          "sequence-number": 8,
+          "description": "Wait for window closure and confirm the owned application shuts down.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-workspace",
+          "sequence-number": 9,
+          "description": "Remove owned disposable setup resources after successful shutdown; preserve the persistent profile.",
+          "direction": "source-to-destination"
+        }
+      ],
+      "metadata": {
+        "sources": [
+          "smoke/src/setup-real-chat.ts",
+          "smoke/src/real-profile.ts",
+          "smoke/src/resources.ts"
+        ],
+        "scope-note": "Authentication is manual. Setup writes resource ownership records, not the normal smoke result.json/result.txt reports. Failed or uncertain cleanup retains owned resources for inspection."
+      }
+    },
+    {
+      "unique-id": "smoke-test-mock-chat",
+      "name": "Smoke test with mock chat service",
+      "description": "Runs the Chat smoke suite with a disposable synthetic profile and the tester-hosted loopback mock, verifies two exchanges in one fresh local Ask session, then records results and cleans up owned resources.",
+      "transitions": [
+        {
+          "relationship-unique-id": "developer-to-smoke-tester",
+          "sequence-number": 1,
+          "description": "Invoke the Chat smoke suite with --chat-backend mock (the default).",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-smoke-test-results",
+          "sequence-number": 2,
+          "description": "Reserve exclusive execution and record resource ownership.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-workspace",
+          "sequence-number": 3,
+          "description": "Create the disposable workspace and initial fixture.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-profile",
+          "sequence-number": 4,
+          "description": "After compatibility and helper checks, start the in-process mock and prepare disposable settings and synthetic authentication with loopback endpoint overrides.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-vscode",
+          "sequence-number": 5,
+          "description": "Launch the dedicated application with the helper, smoke driver, isolated profile, and mock-mode tracing.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "vscode-to-profile",
+          "sequence-number": 6,
+          "description": "Load disposable settings and backend state and write renderer logs.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-vscode",
+          "sequence-number": 7,
+          "description": "Open a fresh local Ask session, submit two marked prompts, and observe deterministic replies from the tester-hosted mock. Verify session identity, response counts, completion state, and matching recorded mock requests for each turn.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-profile",
+          "sequence-number": 8,
+          "description": "Read renderer logs to corroborate the active local Chat session identity during verification.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-vscode",
+          "sequence-number": 9,
+          "description": "Collect applicable mock failure diagnostics, shut down the owned application, and close the in-process mock.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-workspace",
+          "sequence-number": 10,
+          "description": "Remove owned disposable resources on success; retain them on failure or uncertain shutdown.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-smoke-test-results",
+          "sequence-number": 11,
+          "description": "Write outcome, turn evidence, mock request evidence, timings, cleanup disposition, and applicable failure screenshot or trace.",
+          "direction": "source-to-destination"
+        }
+      ],
+      "metadata": {
+        "sources": [
+          "smoke/src/cli.ts",
+          "smoke/src/runner.ts",
+          "smoke/src/profile.ts",
+          "smoke/src/mock.ts",
+          "smoke/src/workbench.ts",
+          "smoke/src/turn.ts",
+          "smoke/src/report.ts"
+        ],
+        "scope-note": "Chat-only smoke path; optional editing checks are omitted. The mock is internal to smoke-tester. Its loopback requests have no separate relationship in this model, so the Chat execution transition summarizes that exchange. No Github Copilot transition applies."
+      }
+    },
+    {
+      "unique-id": "smoke-test-real-chat",
+      "name": "Smoke test with real test service",
+      "description": "Runs the Chat smoke suite against Github Copilot using the previously configured persistent profile. Verifies an exact token reply and a follow-up recalling that token in the same session, without recording screenshots or traces.",
+      "transitions": [
+        {
+          "relationship-unique-id": "developer-to-smoke-tester",
+          "sequence-number": 1,
+          "description": "Invoke the Chat smoke suite with --chat-backend real after completing profile setup and closing the setup window.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-smoke-test-results",
+          "sequence-number": 2,
+          "description": "Reserve exclusive execution and record ownership of disposable run resources.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-workspace",
+          "sequence-number": 3,
+          "description": "Create a disposable workspace for the run and temporary Chat exports.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-profile",
+          "sequence-number": 4,
+          "description": "Check the existing persistent profile, ownership, absence of mock overrides, and closed-profile prerequisite; capture the renderer-log baseline.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-vscode",
+          "sequence-number": 5,
+          "description": "After compatibility and helper checks, launch the application with the persistent profile and filtered real-backend environment, without screenshots or traces.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "vscode-to-profile",
+          "sequence-number": 6,
+          "description": "Use the persistent profile and existing authentication state; write renderer session logs.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-vscode",
+          "sequence-number": 7,
+          "description": "Open a fresh local Ask session, check authentication and Chat readiness, and submit the first marked prompt requesting an exact generated token.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "vscode-to-github-copilot",
+          "sequence-number": 8,
+          "description": "Send the first Chat prompt to the real Copilot service and receive its response.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "vscode-to-workspace",
+          "sequence-number": 9,
+          "description": "Export the active test conversation to a temporary workspace file after the first completed response.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-workspace",
+          "sequence-number": 10,
+          "description": "Read and verify the exported prompt, exact token, and terminal completion state, then delete the export.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-vscode",
+          "sequence-number": 11,
+          "description": "Verify the same session remains active and submit the follow-up asking for the previous token without restating it.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "vscode-to-github-copilot",
+          "sequence-number": 12,
+          "description": "Send the follow-up prompt to the real Copilot service and receive its response.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "vscode-to-workspace",
+          "sequence-number": 13,
+          "description": "Export the active two-turn test conversation to a temporary workspace file.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-workspace",
+          "sequence-number": 14,
+          "description": "Verify both marked prompts, exact replies, and terminal completion states, then delete the export.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-profile",
+          "sequence-number": 15,
+          "description": "Corroborate local session identity from renderer logs throughout the exchange.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-vscode",
+          "sequence-number": 16,
+          "description": "Shut down the owned application after verification or an unsuccessful run.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-workspace",
+          "sequence-number": 17,
+          "description": "Remove disposable resources on success; retain failed or uncertain resources while preserving the persistent profile.",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "smoke-tester-to-smoke-test-results",
+          "sequence-number": 18,
+          "description": "Write outcome, test-conversation evidence, timings, and cleanup disposition. Authentication, entitlement, or quota prerequisites produce blocked outcomes; mock request evidence is inapplicable.",
+          "direction": "source-to-destination"
+        }
+      ],
+      "metadata": {
+        "sources": [
+          "smoke/src/runner.ts",
+          "smoke/src/real-profile.ts",
+          "smoke/src/chat.ts",
+          "smoke/src/workbench.ts",
+          "smoke/src/session.ts",
+          "smoke/src/report.ts"
+        ],
+        "scope-note": "Chat-only smoke path; optional editing checks are omitted. Service request/response exchanges are summarized by the existing connects relationship. Sequence numbers order architectural milestones; session-log checks recur during both turns. Failure paths may stop before later transitions."
+      }
+    }
+  ],
+  "metadata": {
+    "_layout": {
+      "internet": {
+        "x": 723,
+        "y": 1143,
+        "w": 375,
+        "h": 201
+      },
+      "github-copilot": {
+        "x": 107,
+        "y": 94,
+        "w": 250,
+        "h": 60
+      },
+      "macos-desktop": {
+        "x": 13,
+        "y": 406,
+        "w": 950,
+        "h": 710
+      },
+      "developer": {
+        "x": 370,
+        "y": 0,
+        "w": 250,
+        "h": 60
+      },
+      "smoke-tester": {
+        "x": 225,
+        "y": 180,
+        "w": 250,
+        "h": 60
+      },
+      "vscode": {
+        "x": 587,
+        "y": 423,
+        "w": 250,
+        "h": 60
+      },
+      "workspace": {
+        "x": 0,
+        "y": 540,
+        "w": 250,
+        "h": 60
+      },
+      "profile": {
+        "x": 628,
+        "y": 540,
+        "w": 250,
+        "h": 60
+      },
+      "smoke-test-results": {
+        "x": 205,
+        "y": 360,
+        "w": 250,
+        "h": 60
+      }
+    }
+  }
+}
