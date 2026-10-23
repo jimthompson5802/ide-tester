@@ -39,10 +39,6 @@ flowchart TB
 [Solution Design document](./architectures/smoke-solution-design.md)
 
 
-**Historical Note**: The previous Python harness, tests, experiments, and execution reports were removed. Specifications, historical plans, research, development workflows, and the existing uv/Python environment remain.
-
-
-
 ## Start here
 
 - [Current setup, commands, artifacts and compatibility](smoke/README.md) — the delivered standalone tester.
@@ -89,4 +85,18 @@ The replacement plan is complete and developer accepted. Follow [repository inst
 
 Ignored local `.vscode/`, `.venv/`, and `profiles/` remain unchanged. Previously preserved workspace data remains in `reports/m1-03/preserved-workspaces/`. Other raw reports, report-local uv caches/environments, disposable workspaces, local harness configuration, and experiment state were removed. Ignored files are shared across branch switches in this checkout; they are not distributed with the branch. Profiles and saved workspace data remain private local resources, not automatic inputs to a replacement harness.
 
-The pre-reset tracked implementation is recoverable from commit `71dbe3188d1056d91bb248b43174c3545e120bf9`. Deleted ignored artifacts are not recoverable from Git.
+## Historical Notes
+
+The [`homegrown-smoke-tester` branch](https://github.com/jimthompson5802/ide-tester/tree/homegrown-smoke-tester) archives the earlier Python/PyObjC harness that preceded the TypeScript tester now on `main`.
+
+The archived implementation includes:
+
+- A Python CLI, YAML configuration, orchestration, reporting, profile safety, and disposable workspace management.
+- A production T01 launch/readiness check using macOS UI automation and owned-process cleanup.
+- Incomplete editor automation for opening, editing, and saving files.
+- Copilot Chat feasibility scripts demonstrating a fixed prompt/response exchange.
+- Tests, implementation plans, qualification reports, and accessibility research.
+
+At the archive checkpoint, records reported **544 passing non-GUI tests** and successful T01 host checks. Production **T02–T05 remained unavailable**, and editor automation was on hold. These results have not been rerun; historical approvals do not authorize resuming the work.
+
+The earlier implementation, tests, experiments, and execution reports were removed from `main`. Specifications, historical plans, research, development workflows, and the existing uv/Python environment remain. The archived branch points to commit `71dbe31`, dated 2026-10-22; deleted ignored artifacts are not recoverable from Git.
