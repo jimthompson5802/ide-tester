@@ -4,7 +4,44 @@ This branch contains the standalone TypeScript VS Code smoke tester under [`smok
 
 The optional [real Copilot backend](docs/implementation-plans/real-chat-backend.md) supports `--chat-backend real` for Chat and combined runs, with a dedicated persistent profile and manual sign-in setup. Slice 1 is developer validated; slice 2 implementation and non-GUI verification are complete, pending developer validation. An authorized real two-turn Chat run passed after readiness and transcript fixes; combined real mode and signed-out blocking remain unverified. See [setup and real-mode usage](smoke/README.md#optional-real-copilot-backend).
 
-The previous Python harness, tests, experiments, and execution reports were removed. Specifications, historical plans, research, development workflows, and the existing uv/Python environment remain.
+
+```mermaid
+flowchart TB
+    developer(["Developer"])
+
+    subgraph macos_desktop["MacOs Desktop"]
+        smoke_tester["Smoke tester CLI"]
+        vscode["Dedicated VS Code application"]
+        workspace[("Disposable workspace")]
+        profile[("Dedicated profile and state")]
+        results[("Smoke test results")]
+    end
+
+    subgraph internet["Internet"]
+        copilot["Github Copilot"]
+    end
+
+    developer -.->|"Invokes suite, foundation, and real-profile setup commands"| smoke_tester
+    developer -.->|"Signs in manually and closes setup window"| vscode
+
+    smoke_tester -->|"Launches, drives, observes, and shuts down"| vscode
+    vscode -->|"Test chat interface"| copilot
+
+    smoke_tester -->|"Creates fixtures, verifies saved bytes, reads and deletes Chat exports"| workspace
+    vscode -->|"Opens, edits, saves, reopens, and exports test files"| workspace
+
+    smoke_tester -->|"Prepares or checks settings and ownership; reads renderer logs"| profile
+    vscode -->|"Uses dedicated profile directories; writes session logs"| profile
+
+    smoke_tester -->|"Writes results and ownership records; captures mock-mode failure diagnostics"| results
+```
+
+[Solution Design document](./architectures/smoke-solution-design.md)
+
+
+**Historical Note**: The previous Python harness, tests, experiments, and execution reports were removed. Specifications, historical plans, research, development workflows, and the existing uv/Python environment remain.
+
+
 
 ## Start here
 

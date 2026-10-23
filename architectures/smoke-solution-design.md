@@ -12,7 +12,7 @@ The design supports two execution models:
 The architecture is intentionally strict about isolation and ownership. Each run reserves a dedicated report and resource directory, creates ephemeral workspace content, uses a dedicated profile or synthetic profile state, and records outcome, timings, and cleanup status separately from the application under test.
 
 ```mermaid
-flowchart LR
+flowchart TB
     D[Developer] --> S[Smoke tester CLI]
     S --> V[Dedicated VS Code app]
     V --> G[GitHub Copilot]
@@ -314,7 +314,7 @@ The system is designed to minimize data exposure and treat authentication as an 
 The deployment model is local and execution-scoped. There is no distributed service or cloud orchestrator; the smoke tester is a local TypeScript process running on macOS and launching a dedicated VS Code instance.
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph P[Execution host: macOS]
         C[Smoke tester CLI]
         V[Dedicated VS Code build]
