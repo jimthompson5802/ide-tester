@@ -45,7 +45,7 @@ Tests use the approved plan’s public boundaries: turn/transcript validation (e
 
 - [ ] Default mocked Chat on VS Code 1.135.0 / Copilot Chat 0.63.0, macOS arm64.
 - [x] Real two-turn Chat — authorized reproduction and fixes, 2026-10-22; evidence below.
-- [ ] Combined editing and real Chat.
+- [x] Combined editing and real Chat — developer-authorized run passed on 2026-10-23; evidence below.
 - [ ] Signed-out real Chat blocks with setup instructions.
 
 ## Slice 2 verification — 2026-10-22
@@ -85,3 +85,18 @@ Red/green tests cover launch logging, plain-text prompt construction, empty star
 The original real Chat command passed both turns, raw completion checks and cleanup in 6.508 seconds on VS Code 1.135.0 / Copilot Chat 0.63.0, macOS arm64, Node 26.3.1. [Passing result](../../reports/smoke/2026-10-22T17-10-12-175Z-563268cf-ea30-4927-9d7e-c4cc44a9881f/result.json). Disposable resources were removed, the reservation released, and the dedicated profile preserved. The first sandbox launch failed before reproduction and left a reservation; after confirming its PID and owned processes were absent, that reservation was archived under its run report before recovery.
 
 This evidence verifies real two-turn Chat only. Setup, combined real mode, signed-out blocking and a new mock GUI regression were not verified in this diagnosis. Slice 2 developer validation remains pending.
+
+## Issue #36 device-code preference — 2026-10-23
+
+The [issue #36 fix plan and progress record](issue-36-device-code-sign-in.md) implements device-code authentication as the preferred initial flow in the dedicated real profile. New profiles set `github-authentication.preferDeviceCodeFlow` to true. Setup refreshes missing or false preferences only in closed, owned profiles, together with the existing anonymous-access setting, preserving unrelated settings and state. Normal real runs do not migrate settings or require the preference. Console and README guidance describe manual device-code entry.
+
+TDD confirmed the new-profile assertion failed with an undefined preference before the default was added; the migration assertion then failed before setup refresh was extended. Compilation and all 10 targeted profile tests pass. All 48 non-GUI tests pass with authorized loopback binding; the sandbox initially blocked four mock HTTP tests and one dependent runner check with `EPERM`. Regression coverage includes missing/false migration, singleton-marker refusal without settings changes, state preservation, idempotent setup, and non-mutating normal reads. At the initial non-GUI checkpoint, no GUI launch, sign-out, credential access, or retained local profile modification had been performed. Manual sign-in and real Chat verification were pending at that checkpoint; subsequent authorization, results, and developer acceptance are recorded below. This work does not accept the outstanding slice 2 gate.
+
+## Authorized setup and real smoke verification — 2026-10-23
+
+After the issue #36 preference fix, the developer requested setup, then real Chat-only and combined smoke runs. The earlier unlocked, exclusively reserved desktop confirmation remained in effect. Setup exited successfully with the persistent profile preserved. The developer subsequently validated the issue #36 fix on 2026-10-23; manual sign-in acceptance is developer-confirmed rather than inferred from setup closure.
+
+- Chat-only: `npm --prefix smoke run smoke -- --build "/Applications/Visual Studio Code.app" --suite chat --chat-backend real` passed both turns and cleanup. Chat: 6.249 seconds; total: 7.704 seconds. [Local result](../../reports/smoke/2026-10-23T15-27-03-683Z-f5c2f29b-7f0a-4dd0-b783-f90cc87b2723/result.json).
+- Combined: the same command with `--suite all --chat-backend real` passed editing (0.395 seconds), real Chat (14.250 seconds), and cleanup. Total: 16.123 seconds. [Local result](../../reports/smoke/2026-10-23T15-27-28-468Z-dc8e291b-edda-4d52-b71f-c2de12267dbb/result.json).
+
+Both runs used the pinned compatibility gate (macOS arm64, Node 26.3.1, VS Code 1.135.0 / Copilot Chat 0.63.0), removed disposable resources, released the reservation, and preserved the authenticated profile. Real runs suppress screenshots and traces. These results verify authenticated profile reuse across launches and combined real mode. The developer explicitly accepted the issue #36 fix on 2026-10-23: “i validate that fix for issue 36 works”. Signed-out blocking and the separate slice 2 developer-validation gate remain pending.

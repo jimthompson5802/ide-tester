@@ -30,6 +30,7 @@ export async function setupRealChat(args: string[], checkout = checkoutRoot): Pr
         '--skip-welcome', '--skip-release-notes', '--locale=en'] });
     const page = await app.firstWindow({ timeout: 60_000 });
     console.log('Sign in manually using VS Code’s Copilot setup workflow: https://code.visualstudio.com/docs/setup/copilot');
+    console.log('Device-code sign-in is preferred. Click “Copy & Continue to Browser”, enter the code manually on GitHub, and finish authorization.');
     console.log('Close this dedicated VS Code window when finished. No authentication screenshots or traces are recorded.');
     if (!page.isClosed()) await new Promise<void>(resolve => page.once('close', () => resolve()));
     succeeded = true;

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, rm, access, symlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, access, symlink, writeFile, stat, utimes } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { realProfile, backendLaunch } from '../src/real-profile.js';
@@ -26,6 +26,7 @@ test('real profile requires setup ownership and survives disposable run cleanup'
   assert.deepEqual(await realProfile(root), profile);
   const settings = JSON.parse(await readFile(join(profile.userData, 'User/settings.json'), 'utf8'));
   assert.equal(settings['files.autoSave'], 'off');
+  assert.equal(settings['github-authentication.preferDeviceCodeFlow'], true);
   assert.ok(!Object.keys(settings).some(key => /override/.test(key)));
   const launch = backendLaunch('real', profile, { PRIVATE_PASSWORD: 'private', HOME: '/normal-home', GITHUB_PAT: 'private', HTTPS_PROXY: 'http://proxy', VSCODE_COPILOT_CHAT_TOKEN: 'private' });
   assert.equal(launch.env.HOME, '/normal-home');
@@ -94,8 +95,82 @@ test('setup refreshes owned older settings without losing sign-in state and real
   await assert.rejects(realProfile(root), /setup:real-chat/);
   await realProfile(root, true);
   assert.equal(JSON.parse(await readFile(path, 'utf8'))['chat.allowAnonymousAccess'], false);
+  assert.equal(JSON.parse(await readFile(path, 'utf8'))['github-authentication.preferDeviceCodeFlow'], true);
   assert.equal(JSON.parse(await readFile(path, 'utf8'))['editor.fontSize'], 15);
   assert.equal(await readFile(join(profile.state, 'preserved'), 'utf8'), 'owned sign-in state placeholder');
   await writeFile(path, JSON.stringify({ 'chat.allowAnonymousAccess': false, 'github.copilot.advanced.debug.overrideProxyUrl': 'http://127.0.0.1:1' }));
   await assert.rejects(realProfile(root), /mock.*override/i);
+});
+
+test('setup migrates missing or false device-code preferences while preserving settings and profile state', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'real-device-migration-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const profile = await realProfile(root, true);
+  const settingsPath = join(profile.userData, 'User/settings.json');
+  const statePath = join(profile.state, 'preserved');
+  await writeFile(statePath, 'owned sign-in state placeholder');
+  for (const preference of [undefined, false]) {
+    const settings = { 'chat.allowAnonymousAccess': false, 'editor.fontSize': 15,
+      'github-authentication.preferDeviceCodeFlow': preference };
+    await writeFile(settingsPath, JSON.stringify(settings));
+    await realProfile(root, true);
+    assert.deepEqual(JSON.parse(await readFile(settingsPath, 'utf8')), {
+      'chat.allowAnonymousAccess': false, 'editor.fontSize': 15,
+      'github-authentication.preferDeviceCodeFlow': true
+    });
+    assert.equal(await readFile(statePath, 'utf8'), 'owned sign-in state placeholder');
+  }
+});
+
+test('setup refuses device-code migration while any profile singleton marker exists', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'real-device-lock-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const profile = await realProfile(root, true);
+  const settingsPath = join(profile.userData, 'User/settings.json');
+  for (const marker of ['SingletonLock', 'SingletonSocket', 'SingletonCookie']) {
+    for (const preference of [undefined, false]) {
+      const before = JSON.stringify({ 'chat.allowAnonymousAccess': false,
+        'github-authentication.preferDeviceCodeFlow': preference });
+      await writeFile(settingsPath, before);
+      const markerPath = join(profile.userData, marker);
+      await writeFile(markerPath, 'owned setup running');
+      await assert.rejects(realProfile(root, true), /Close.*setup/);
+      assert.equal(await readFile(settingsPath, 'utf8'), before);
+      await access(markerPath);
+      await rm(markerPath);
+    }
+  }
+});
+
+test('setup leaves already-correct profile settings untouched', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'real-device-idempotent-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const profile = await realProfile(root, true);
+  const settingsPath = join(profile.userData, 'User/settings.json');
+  const before = await readFile(settingsPath, 'utf8');
+  const oldTime = new Date('2000-01-01T00:00:00Z');
+  await utimes(settingsPath, oldTime, oldTime);
+  const beforeStat = await stat(settingsPath);
+  await realProfile(root, true);
+  await realProfile(root, true);
+  assert.equal(await readFile(settingsPath, 'utf8'), before);
+  assert.equal((await stat(settingsPath)).mtimeMs, beforeStat.mtimeMs);
+});
+
+test('normal real-profile reads tolerate missing or false device-code preference without rewriting settings', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'real-device-read-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const profile = await realProfile(root, true);
+  const settingsPath = join(profile.userData, 'User/settings.json');
+  for (const preference of [undefined, false]) {
+    const before = JSON.stringify({ 'chat.allowAnonymousAccess': false, 'editor.fontSize': 15,
+      'github-authentication.preferDeviceCodeFlow': preference });
+    await writeFile(settingsPath, before);
+    const oldTime = new Date('2000-01-01T00:00:00Z');
+    await utimes(settingsPath, oldTime, oldTime);
+    const beforeStat = await stat(settingsPath);
+    assert.deepEqual(await realProfile(root), profile);
+    assert.equal(await readFile(settingsPath, 'utf8'), before);
+    assert.equal((await stat(settingsPath)).mtimeMs, beforeStat.mtimeMs);
+  }
 });

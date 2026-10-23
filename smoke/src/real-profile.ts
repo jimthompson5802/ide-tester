@@ -31,17 +31,21 @@ export async function realProfile(checkout: string, initialize = false): Promise
   }
   if (created) {
     await mkdir(join(paths.userData, 'User'));
-    await writeFile(join(paths.userData, 'User/settings.json'), JSON.stringify({ ...commonSettings, 'chat.allowAnonymousAccess': false }, null, 2), { flag: 'wx' });
+    await writeFile(join(paths.userData, 'User/settings.json'), JSON.stringify({ ...commonSettings,
+      'chat.allowAnonymousAccess': false, 'github-authentication.preferDeviceCodeFlow': true }, null, 2), { flag: 'wx' });
   }
   const settingsPath = join(paths.userData, 'User/settings.json');
   const settings = JSON.parse(await readFile(settingsPath, 'utf8')) as Record<string, unknown>;
   if (Object.keys(settings).some(key => key.startsWith('github.copilot.') && /override/i.test(key))) {
     throw new ProfilePrerequisite('Real profile contains mock endpoint/auth overrides; remove those settings before setup');
   }
-  if (settings['chat.allowAnonymousAccess'] !== false) {
-    if (!initialize) throw new ProfilePrerequisite('Real profile requires authenticated Chat; rerun setup:real-chat');
+  if (!initialize && settings['chat.allowAnonymousAccess'] !== false) {
+    throw new ProfilePrerequisite('Real profile requires authenticated Chat; rerun setup:real-chat');
+  }
+  if (initialize && (settings['chat.allowAnonymousAccess'] !== false || settings['github-authentication.preferDeviceCodeFlow'] !== true)) {
     await requireClosedProfile(paths);
-    await writeFile(settingsPath, JSON.stringify({ ...settings, 'chat.allowAnonymousAccess': false }, null, 2));
+    await writeFile(settingsPath, JSON.stringify({ ...settings,
+      'chat.allowAnonymousAccess': false, 'github-authentication.preferDeviceCodeFlow': true }, null, 2));
   }
   return paths;
 }

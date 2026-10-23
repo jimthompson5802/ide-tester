@@ -2,7 +2,7 @@
 
 The approach used here is based on the [VS Code IDE smoke testing framework](https://github.com/microsoft/vscode/tree/main/test/smoke): launch an installed VS Code build, drive the workbench UI, and verify observable results. This repository implements a standalone tester with its own editing and Copilot Chat suites, isolation, and reporting.
 
-Status: original mocked foundation, selected suites and final handoff developer accepted. Compilation and 44 non-GUI tests pass after optional real-backend implementation. Slice 1 is developer validated; slice 2 awaits developer validation. The recorded editing-only, two-turn mocked Chat-only and combined GUI checks used VS Code 1.135.0 / Copilot Chat 0.63.0 on macOS arm64 before these changes. An authorized real two-turn Chat run passed on 2026-10-22 after readiness and transcript fixes. Setup, combined real mode and signed-out blocking remain GUI-unverified. The [original qualification record](../docs/vscode-smoke-tester-plan.md) and [real backend execution record](../docs/implementation-plans/real-chat-backend.md) distinguish those results.
+Status: original mocked foundation, selected suites and final handoff developer accepted. Compilation and 48 non-GUI tests pass after optional real-backend implementation. Slice 1 is developer validated; slice 2 awaits developer validation. The recorded editing-only, two-turn mocked Chat-only and combined GUI checks used VS Code 1.135.0 / Copilot Chat 0.63.0 on macOS arm64 before these changes. An authorized real two-turn Chat run passed on 2026-10-22 after readiness and transcript fixes. Authorized setup closed successfully and real Chat-only and combined runs passed on 2026-10-23. The developer validated the issue #36 sign-in fix on 2026-10-23; signed-out blocking remains unverified. The [original qualification record](../docs/vscode-smoke-tester-plan.md) and [real backend execution record](../docs/implementation-plans/real-chat-backend.md) distinguish those results.
 
 ## Non-GUI commands
 
@@ -51,7 +51,7 @@ All three commands passed on 2026-10-22; see the tracked [verification record](.
 
 ## Optional real Copilot backend
 
-Use `--chat-backend mock|real`; omission defaults to `mock`. Real mode supports `chat` and `all`. Editing-only runs and foundation qualification reject real mode. Real two-turn Chat passed on the pinned host versions on 2026-10-22; setup, combined real mode and signed-out blocking await separately authorized qualification.
+Use `--chat-backend mock|real`; omission defaults to `mock`. Real mode supports `chat` and `all`. Editing-only runs and foundation qualification reject real mode. Real two-turn Chat passed on the pinned host versions on 2026-10-22; combined real mode also passed on 2026-10-23. The issue #36 sign-in fix is developer validated; signed-out blocking remains unverified.
 
 After compilation, with GUI authorization and an unlocked, exclusively reserved desktop, initialize the dedicated profile:
 
@@ -61,6 +61,8 @@ npm --prefix smoke run setup:real-chat -- --build "/Applications/Visual Studio C
 
 Setup accepts only `--build`. It reserves `reports/smoke/.reservation`, creates the ignored `profiles/smoke-real-chat` profile, and opens a disposable workspace. Follow the [official Copilot sign-in workflow](https://code.visualstudio.com/docs/setup/copilot) manually, then close the setup window. Setup confirms owned application shutdown before releasing the reservation. It records no screenshots or traces and does not verify sign-in success. Authentication is checked by the Chat run; expired/missing authentication, entitlement and quota prerequisites return `blocked` with setup instructions.
 
+Setup sets `github-authentication.preferDeviceCodeFlow` to `true` so the initial sign-in uses device-code authentication. Click **Copy & Continue to Browser**, enter the device code manually on GitHub, and finish authorization before closing the dedicated window. This avoids starting with the HTTP loopback flow that Safari blocked with HTTPS-Only enabled in [issue #36](https://github.com/jimthompson5802/ide-tester/issues/36). The preference is covered by non-GUI tests; the developer validated the sign-in fix on 2026-10-23 after manual setup and passing real Chat-only and combined smoke runs. See the [fix plan and verification record](../docs/implementation-plans/issue-36-device-code-sign-in.md).
+
 After setup closes:
 
 ```sh
@@ -69,7 +71,7 @@ npm --prefix smoke run smoke -- \
   --suite chat --chat-backend real
 ```
 
-Use `--suite all --chat-backend real` for editing followed by real Chat in the same dedicated instance and disposable workspace. Real mode starts no mock server, injects no endpoint overrides or synthetic credentials, and uses normal persistent secret storage. Launch environment variables are limited to normal host variables and dedicated state paths. Anonymous Chat is disabled. Setup can refresh this setting in older owned profiles while preserving their state. Existing mock endpoint/auth overrides are rejected.
+Use `--suite all --chat-backend real` for editing followed by real Chat in the same dedicated instance and disposable workspace. Real mode starts no mock server, injects no endpoint overrides or synthetic credentials, and uses normal persistent secret storage. Launch environment variables are limited to normal host variables and dedicated state paths. Anonymous Chat is disabled. Setup refreshes anonymous-access and device-code settings in older closed, owned profiles while preserving unrelated settings and authentication state; an explicit device-code preference of `false` becomes `true` during setup. Normal test runs leave these settings unchanged and do not require the device-code preference. Existing mock endpoint/auth overrides are rejected.
 
 The profile has dedicated user data, extensions and state directories and is preserved after successful and failed runs. Setup rejects unowned directories and symlinked profile paths. The shared reservation and profile singleton checks require setup to be closed before testing. Inspect abnormal shutdowns deliberately; the runner does not remove profile locks or adopt existing profiles.
 
