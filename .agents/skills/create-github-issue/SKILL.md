@@ -33,18 +33,32 @@ Leave labels, assignees, projects, and milestones unset unless supplied by the u
    gh issue list --repo jimthompson5802/ide-tester --state all --search 'M0-03 in:title' --json number,title,state,url
    ```
 
-   Replace the example search with the requested issue's identifier or terms. Inspect relevant matches. If the same work is already tracked, return that issue's URL instead of creating a duplicate unless the user requested a separate issue.
+   Replace the example search with the requested issue's identifier or terms. Also list recent issues without `--search`, because newly created issues may not appear in search results yet:
+
+   ```bash
+   gh issue list --repo jimthompson5802/ide-tester --state all --limit 100 --json number,title,body,state,url,createdAt
+   ```
+
+   Inspect relevant matches from both sources. If the same work is already tracked, return that issue's URL instead of creating a duplicate unless the user requested a separate issue.
 3. Prepare the complete title and Markdown description before publication. Check user story and feature bodies against the current template and their requirements against the sources. Write the description with real newlines to a unique temporary UTF-8 file outside tracked project files using a file-writing tool or safely quoted input. Pass its path through `--body-file` so Markdown, backticks, and shell metacharacters remain literal.
-4. When creation is authorized, publish with an explicit repository target. For example, after writing the actual body to the temporary path:
+4. Before publishing, inspect installed CLI capabilities and verify that requested metadata (including template defaults) is supported and available in the target repository. Use `gh label list` for labels and `gh api` for metadata unavailable through other CLI commands, including supported issue types. Apply only confirmed metadata. Report unavailable defaults, such as a `Feature` type when the repository has no issue types configured, rather than discovering this through a creation attempt. If metadata lookup fails, resolve that prerequisite before publishing.
+5. When creation is authorized, record the attempt's start time and publish once with an explicit repository target. For example, after writing the actual body to the temporary path:
 
    ```bash
    gh issue create --repo jimthompson5802/ide-tester --title 'M0-03: Install Python 3.12 and create the checkout-local environment' --body-file /tmp/ide-tester-issue-body.md
    ```
 
-   Use the actual title and unique temporary file path. Apply the resolved metadata, including applicable template defaults. Inspect installed CLI capabilities when needed; use `gh api` for metadata such as issue type if `gh issue create` cannot set it. Report any default that cannot be applied rather than silently omitting it. If sandbox permissions block the operation, use the environment's approval mechanism.
-5. Verify the returned issue using `gh issue view ISSUE_NUMBER --repo jimthompson5802/ide-tester --json number,title,body,url`. Check that the title and description, including all acceptance criteria and applicable template sections, match the prepared content. Verify resolved metadata too, using `gh api` for fields unavailable in `gh issue view` if needed. Remove only the temporary file created for this operation.
+   Use the actual title and unique temporary file path. Apply the confirmed metadata. If sandbox permissions block the operation, use the environment's approval mechanism; reconcile any uncertain attempt as described below before repeating creation.
+6. Verify the returned issue using `gh issue view ISSUE_NUMBER --repo jimthompson5802/ide-tester --json number,title,body,url`. Check that the title and description, including all acceptance criteria and applicable template sections, match the prepared content. Verify resolved metadata too, using `gh api` for fields unavailable in `gh issue view` if needed. Remove only the temporary file created for this operation.
 
-If publication fails or its outcome is uncertain, inspect any returned URL and search for the issue before retrying. Stop when authentication, permissions, or service availability prevents reliable verification; report the blocker and retain the prepared content for recovery. Avoid blind retries that could publish duplicates.
+### Reconcile failed or uncertain creation
+
+A nonzero exit can occur after GitHub has created the issue, for example while applying metadata. Treat every failed creation as potentially published.
+
+1. Inspect any returned issue number or URL directly. Fetch the recent issue list above without `--search` and compare exact titles and prepared bodies; inspect relevant candidates individually. Paginate with `gh api` if necessary to cover the entire attempt window. An empty search result does not establish that creation failed.
+2. If a matching issue exists, reuse it and repair only missing or incorrect authorized metadata on that issue. Verify it normally; do not create another issue. If multiple matches exist, report them and stop publication rather than guessing which to retain.
+3. If the result remains uncertain, stop and report the uncertainty, retaining the prepared body for recovery. Authentication, permission, service, or incomplete-listing failures are blockers, not evidence that no issue exists.
+4. Retry creation only after reliable direct inspection establishes that no matching issue was created and the original failure has been resolved. If the failure may still have an in-flight server operation, keep the result uncertain and stop. Reconcile any failed retry through this same procedure.
 
 ## Completion
 
