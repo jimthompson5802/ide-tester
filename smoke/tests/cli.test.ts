@@ -1,9 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { executeCLI } from '../src/cli.js';
+import { checkoutRoot, executeCLI } from '../src/cli.js';
+
+test('default checkout is the canonical directory path required by preservation checks', async () => {
+    assert.equal(checkoutRoot, await realpath(checkoutRoot));
+});
 
 test('CLI reports invalid arguments and missing installed apps as nonzero without GUI execution', async (t) => {
     const checkout = await mkdtemp(join(tmpdir(), 'smoke-cli-test-'));

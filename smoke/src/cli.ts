@@ -6,8 +6,8 @@ import { parseArguments } from './arguments.js';
 import { createRun, finishRun } from './resources.js';
 import { runFoundation, runSmoke } from './runner.js';
 
-export const checkoutRoot = fileURLToPath(
-    new URL('../../../', import.meta.url),
+export const checkoutRoot = resolve(
+    fileURLToPath(new URL('../../../', import.meta.url)),
 );
 
 export async function executeCLI(
