@@ -12,9 +12,17 @@ import { realProfile, backendLaunch, requireClosedProfile, ProfilePrerequisite }
 import { ChatFailure, chatTurns, type ChatOutcome, type ChatEvidence } from './chat.js';
 import { rendererLogs, readLocalSession } from './session.js';
 import { checkEditing } from './editing.js';
+import { gitProfile } from './git-profile.js';
+import { prepareGit, gitExtensionLogs, requireGitExtension, type GitRepository } from './git-repository.js';
+import { checkGit, GitFailure, newGitEvidence } from './git.js';
+
+interface RunnerServices {
+  startMock: typeof startMock; prepareGit: typeof prepareGit;
+  workbench: (page: Page) => Workbench; editing: typeof checkEditing; git: typeof checkGit;
+}
 
 interface CheckResult {
-  suite: 'editing' | 'chat'; outcome: 'not_run' | 'passed' | ChatOutcome;
+  suite: 'editing' | 'git' | 'chat'; outcome: 'not_run' | 'passed' | ChatOutcome;
   durationMs?: number; evidence?: unknown; error?: string;
 }
 
@@ -22,14 +30,19 @@ export async function runFoundation(options: Options, checkout: string, launch: 
   return runSelected(options, checkout, true, launch);
 }
 
-export async function runSmoke(options: Options, checkout: string, launch: typeof _electron.launch = _electron.launch.bind(_electron)) {
-  return runSelected(options, checkout, false, launch);
+export async function runSmoke(options: Options, checkout: string, launch: typeof _electron.launch = _electron.launch.bind(_electron), services: Partial<RunnerServices> = {}) {
+  return runSelected(options, checkout, false, launch, services);
 }
 
-async function runSelected(options: Options, checkout: string, foundation: boolean, launch: typeof _electron.launch) {
+async function runSelected(options: Options, checkout: string, foundation: boolean, launch: typeof _electron.launch, injected: Partial<RunnerServices> = {}) {
+  const services: RunnerServices = { startMock, prepareGit, workbench: page => new Workbench(page), editing: checkEditing, git: checkGit, ...injected };
   const started = Date.now();
   const run = await createRun(checkout);
   const chatBackend = options.chatBackend ?? 'mock';
+  const gitSelected = !foundation && (options.suite === 'git' || options.suite === 'all');
+  const chatSelected = options.suite !== 'git' && (foundation || options.suite === 'chat' || options.suite === 'all');
+  const mockApplicable = chatBackend === 'mock' && options.suite !== 'git';
+  let repository: GitRepository | undefined;
   let persistentProfilePath: string | undefined;
   let versions: InstalledApp | undefined;
   let error: string | undefined;
@@ -42,8 +55,8 @@ async function runSelected(options: Options, checkout: string, foundation: boole
   let stage = 'preflight';
   const timings: Record<string, number> = {};
   const diagnostics: string[] = [];
-  const checks: CheckResult[] = (foundation ? ['chat'] : options.suite === 'all' ? ['editing', 'chat'] : [options.suite])
-    .map(suite => ({ suite: suite as 'editing' | 'chat', outcome: 'not_run' }));
+  const checks: CheckResult[] = (foundation ? ['chat'] : options.suite === 'all' ? ['editing', 'git', 'chat'] : [options.suite])
+    .map(suite => ({ suite: suite as 'editing' | 'git' | 'chat', outcome: 'not_run', ...(suite === 'git' ? { evidence: newGitEvidence() } : {}) }));
   try {
     validateBackend(options, foundation);
     versions = await resolveApp(options.build);
@@ -56,7 +69,11 @@ async function runSelected(options: Options, checkout: string, foundation: boole
     if (foundation && options.suite === 'editing') throw new Error('Foundation qualification covers one Chat exchange; use smoke for the editing suite');
     // runner is compiled to smoke/dist/src; helper lives at smoke/helper.
     const helperPath = fileURLToPath(new URL('../../helper/', import.meta.url));
-    await access(join(helperPath, 'dist/extension.js'));
+    if (chatSelected) await access(join(helperPath, 'dist/extension.js'));
+    if (gitSelected) {
+      stage = 'git-preflight';repository = await services.prepareGit(run);await repository.requireUninitialized();
+      const evidence = checks.find(check => check.suite === 'git')!.evidence as ReturnType<typeof newGitEvidence>;evidence.version = repository.version;
+    }
     const turns = chatTurns(chatBackend, foundation);
     let env: Record<string, string>;
     let backendArgs: string[];
@@ -74,25 +91,35 @@ async function runSelected(options: Options, checkout: string, foundation: boole
       env = config.env;
       backendArgs = config.args;
     } else {
-      mock = await startMock(Object.fromEntries(turns.map(turn => [turn.marker, turn.reply])));
-      const automation = await prepareProfile(run, mock.url);
+      if (mockApplicable) mock = await services.startMock(Object.fromEntries(turns.map(turn => [turn.marker, turn.reply])));
+      let automation: Record<string, string> = {};
+      if (gitSelected) {
+        const prepared = await gitProfile(checkout, mock?.url);Object.assign(run, prepared.profile);
+        persistentProfilePath = prepared.profile.userData;automation = prepared.automation;
+      } else automation = await prepareProfile(run, mock!.url);
       const home = join(run.resources, 'home');
       await mkdir(home);
       env = { ...automation, HOME: home,
         PATH: process.env.PATH ?? '/usr/bin:/bin', TMPDIR: join(run.resources, 'tmp'),
-        LANG: 'en_US.UTF-8', HTTP_PROXY: mock.url, HTTPS_PROXY: mock.url,
+        LANG: 'en_US.UTF-8', XDG_STATE_HOME: run.state, ...(mock ? { HTTP_PROXY: mock.url, HTTPS_PROXY: mock.url } : {}),
         NO_PROXY: '127.0.0.1,localhost', ELECTRON_ENABLE_LOGGING: '1',
       };
       await mkdir(env.TMPDIR);
       backendArgs = backendLaunch('mock', run, {}).args;
     }
-    const previousLogs = await rendererLogs(run.userData);
+    if (repository) {
+      // Config isolation applies to the extension as well as verifier subprocesses.
+      Object.assign(env, repository.env, { HOME: env.HOME, TMPDIR: env.TMPDIR, PATH: '/usr/bin:/bin:/usr/sbin:/sbin' });
+      if (!chatSelected) backendArgs.push('--disable-extension', 'github.copilot-chat');
+    }
+    const previousLogs = chatSelected ? await rendererLogs(run.userData) : [];
+    const previousGitLogs = repository ? await gitExtensionLogs(run.userData) : [];
     stage = 'launch';
     const launchStart = Date.now();
     launchAttempted = true;
     app = await launch({ executablePath: versions.executable, timeout: 60_000, env,
       args: [run.workspace, '--new-window', ...backendArgs,
-        `--extensionDevelopmentPath=${helperPath}`, '--enable-smoke-test-driver',
+        ...(chatSelected ? [`--extensionDevelopmentPath=${helperPath}`] : []), '--enable-smoke-test-driver',
         '--skip-welcome', '--skip-release-notes', '--disable-telemetry', '--disable-experiments', '--locale=en'],
     });
     app.process().stdout?.on('data', () => {});
@@ -107,9 +134,13 @@ async function runSelected(options: Options, checkout: string, foundation: boole
       tracing = true;
     }
     stage = 'driver';
-    const workbench = new Workbench(page);
+    const workbench = services.workbench(page);
     await workbench.ready(Math.max(1, 60_000 - (Date.now() - launchStart)));
     timings.launchMs = Date.now() - launchStart;
+    if (repository) {
+      stage = 'git-tool';
+      await requireGitExtension(run.userData, repository, previousGitLogs);
+    }
     for (const check of checks) {
       stage = check.suite;
       const checkStart = Date.now();
@@ -117,24 +148,26 @@ async function runSelected(options: Options, checkout: string, foundation: boole
       if (check.suite === 'chat') check.evidence = chatEvidence;
       try {
         const deadline = check.suite === 'chat' && chatBackend === 'real' ? 300_000 : 120_000;
-        check.evidence = await bounded<unknown>(check.suite === 'editing' ? checkEditing(workbench, run.workspace) :
-          workbench.qualifyChat(turns, chatBackend, () => mock?.requests() ?? [],
-            () => readLocalSession(run.userData, previousLogs), 120_000, run.workspace, chatEvidence),
-        deadline, `${check.suite} test`);
+        let operation: Promise<unknown>;
+        if (check.suite === 'editing') operation = services.editing(workbench, run.workspace);
+        else if (check.suite === 'git') operation = services.git(workbench, repository!, run.workspace, check.evidence as ReturnType<typeof newGitEvidence>);
+        else operation = workbench.qualifyChat(turns, chatBackend, () => mock?.requests() ?? [],
+          () => readLocalSession(run.userData, previousLogs), 120_000, run.workspace, chatEvidence);
+        check.evidence = await bounded(operation, deadline, `${check.suite} test`);
         check.outcome = 'passed';
       } catch (cause) {
-        check.outcome = cause instanceof ChatFailure ? cause.outcome : chatBackend === 'real' && check.suite === 'chat' && !String(cause).includes('test timed out') ? 'harness_error' : 'failed';
-        if (cause instanceof ChatFailure && cause.evidence) check.evidence = cause.evidence;
-        check.error = cause instanceof ChatFailure || chatBackend === 'mock' ? String(cause) : `${check.suite} test failed or timed out`;
-        if (chatBackend === 'real' && !(cause instanceof ChatFailure)) throw new ChatFailure(check.outcome as ChatOutcome, check.error);
+        check.outcome = cause instanceof ChatFailure || cause instanceof GitFailure ? cause.outcome : chatBackend === 'real' && check.suite === 'chat' && !String(cause).includes('test timed out') ? 'harness_error' : 'failed';
+        if ((cause instanceof ChatFailure || cause instanceof GitFailure) && cause.evidence) check.evidence = cause.evidence;
+        check.error = cause instanceof ChatFailure || cause instanceof GitFailure || chatBackend === 'mock' ? String(cause) : `${check.suite} test failed or timed out`;
+        if (chatBackend === 'real' && check.suite === 'chat' && !(cause instanceof ChatFailure)) throw new ChatFailure(check.outcome as ChatOutcome, check.error);
         throw cause;
       }
       finally { check.durationMs = Date.now() - checkStart; timings[`${check.suite}Ms`] = check.durationMs; }
     }
     outcome = 'passed';
   } catch (cause) {
-    error = chatBackend === 'real' && launchAttempted && !(cause instanceof ChatFailure) ? 'Real test application launch or driver contract failed' : String(cause);
-    outcome = cause instanceof ChatFailure ? cause.outcome : ['preflight', 'launch', 'driver'].includes(stage) ? 'blocked' : 'failed';
+    error = chatBackend === 'real' && launchAttempted && !(cause instanceof ChatFailure) && !(cause instanceof GitFailure) ? 'Real test application launch or driver contract failed' : String(cause);
+    outcome = cause instanceof ChatFailure || cause instanceof GitFailure ? cause.outcome : stage === 'git-preflight' ? 'harness_error' : ['preflight', 'launch', 'driver'].includes(stage) ? 'blocked' : 'failed';
     if (page && chatBackend === 'mock') {
       try { await bounded(page.screenshot({ path: join(run.report, 'failure.png'), timeout: 5000 }), 5000, 'Failure screenshot'); }
       catch (capture) { diagnostics.push(`Screenshot: ${String(capture)}`); }
@@ -159,13 +192,13 @@ async function runSelected(options: Options, checkout: string, foundation: boole
   ]);
   if (cleanup.errors.length) outcome = 'harness_error';
   const result = {
-    runId: run.id, scope: foundation ? 'foundation' : 'selected-suites', suites: options.suite, chatBackend, outcome, error, stage,
+    runId: run.id, scope: foundation ? 'foundation' : 'selected-suites', suites: options.suite, chatBackend, chatSelected, outcome, error, stage,
     execution: { workers: 1, retries: 0 },
     versions: { node: process.version, architecture: process.arch, platform: process.platform,
       typescript: '6.0.2', playwright: '1.61.1', vscode: versions?.vscode, copilot: versions?.copilot },
     startedAt: new Date(started).toISOString(), durationMs: Date.now() - started,
-    mockRequestEvidence: chatBackend === 'mock' ? 'applicable' : 'inapplicable',
-    mockRequestCount: chatBackend === 'mock' ? requests.length : null, requests: chatBackend === 'mock' ? requests : null, checks, timings, diagnostics, cleanup, resourcesPath: run.resources, ...(persistentProfilePath ? { persistentProfilePath } : {}), resultPath: join(run.report, 'result.json'),
+    mockRequestEvidence: mockApplicable ? 'applicable' : 'inapplicable',
+    mockRequestCount: mockApplicable ? requests.length : null, requests: mockApplicable ? requests : null, checks, timings, diagnostics, cleanup, resourcesPath: run.resources, ...(persistentProfilePath ? { persistentProfilePath } : {}), resultPath: join(run.report, 'result.json'),
   };
   await writeFile(result.resultPath, JSON.stringify(result, null, 2));
   return result;

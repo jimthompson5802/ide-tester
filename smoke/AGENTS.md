@@ -39,6 +39,7 @@ Paths below are relative to `smoke/`:
 | --- | --- |
 | `src/cli.ts`, `src/arguments.ts`, `src/qualify.ts` | CLI execution, option validation, and foundation qualification entry point. |
 | `src/runner.ts`, `src/app.ts`, `src/workbench.ts` | Suite orchestration, installed VS Code discovery, and Playwright workbench interactions. |
+| `src/git.ts`, `src/git-repository.ts`, `src/git-profile.ts` | Git UI scenario, independent bounded Git verification and owned persistent Git/mock-combined profile lifecycle. |
 | `src/editing.ts`, `src/files.ts` | Editing scenarios and independent saved-file verification. |
 | `src/chat.ts`, `src/turn.ts`, `src/session.ts` | Chat prompts and evidence validation, turn completion, and session discovery from renderer logs. |
 | `src/mock.ts`, `src/profile.ts` | Mock Chat service and mock profile preparation. |
@@ -58,6 +59,12 @@ Test non-GUI logic independently. For authorized GUI checks, verify saved edits 
 
 Keep [README.md](README.md) consistent with verified tester behavior. Preserve the distinction between mocked Chat, real service results, and pending qualification.
 
+## Git suite maintenance
+
+`all` dispatches editing → Git → Chat and stops on the first failure; Git-only selects no Chat or mock server. Preserve `profiles/smoke-git` on every outcome. Before changing its settings, state, Graph reset or Git launch isolation, read the [Git profile contract](README.md#git-suite-and-persistent-profile) and [issue #38 plan](../docs/implementation-plans/issue-38-git-smoke-test.md); maintain only the listed owned keys/state and visible Graph reset operations. Real combined must preserve persistent real settings. Source Control Graph must show the unique message, supplemented by independent full hash/blob verification. Git-only and expanded mocked/real combined runs require phase-3 qualification; non-GUI tests and phase-1 feasibility do not establish production UI behavior.
+
 ## Current gates
 
 The foundation and selected suites are developer accepted. Real-backend slice 2 awaits explicit developer validation; signed-out blocking remains unverified. Issue #36 is developer validated. See the [backend execution record](../docs/implementation-plans/real-chat-backend.md) for evidence and remaining checks. Obtain explicit developer validation before advancing through the pending slice gate.
+
+Issue #38 phase 1 is developer validated. Phase 2 implementation and all 74 non-GUI tests are developer validated. Phase 3 is authorized; its GUI qualification and P3-DV remain pending. Do not treat the historical editing/Chat combined acceptance as qualification of expanded `all`.

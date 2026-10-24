@@ -1,6 +1,6 @@
 # VS Code Smoke Tester
 
-This branch contains the standalone TypeScript VS Code smoke tester under [`smoke/`](smoke/README.md). Compilation and 48 non-GUI tests pass. Editing-only, two-turn mocked Chat-only and combined GUI commands were verified against VS Code 1.135.0 / Copilot Chat 0.63.0 on macOS arm64. The developer accepted the foundation, selected suites and final handoff. The [completed plan and execution record](docs/vscode-smoke-tester-plan.md) preserve verification and compatibility limits.
+This branch contains the standalone TypeScript VS Code smoke tester under [`smoke/`](smoke/README.md). Compilation and all 74 non-GUI tests pass with Git-suite implementation. The [Git plan](docs/implementation-plans/issue-38-git-smoke-test.md) records developer-validated feasibility and developer-validated phase-2 implementation; production Git and expanded combined GUI qualification are pending. Before Git was added to `all`, editing-only, two-turn mocked Chat-only and editing/Chat combined GUI commands were verified against VS Code 1.135.0 / Copilot Chat 0.63.0 on macOS arm64. The developer accepted the foundation, selected suites and final handoff. The [completed plan and execution record](docs/vscode-smoke-tester-plan.md) preserve verification and compatibility limits.
 
 The optional [real Copilot backend](docs/implementation-plans/real-chat-backend.md) supports `--chat-backend real` for Chat and combined runs, with a dedicated persistent profile and manual sign-in setup. Slice 1 is developer validated; slice 2 implementation and non-GUI verification are complete, pending developer validation. Authorized real Chat-only and combined editing/real Chat runs passed on 2026-10-23. The developer validated the issue #36 sign-in fix on 2026-10-23; signed-out blocking remains unverified. See [setup and real-mode usage](smoke/README.md#optional-real-copilot-backend).
 
@@ -61,7 +61,7 @@ npm --prefix smoke run test:unit
 npm --prefix smoke run smoke -- --build "/Applications/Visual Studio Code.app" --suite all
 ```
 
-GUI execution needs authorization and an unlocked reserved desktop. Select `editing`, `chat`, or `all` (default). See [usage and recovery](smoke/README.md) for results, isolation and version requirements.
+GUI execution needs authorization and an unlocked reserved desktop. Select `editing`, `git`, `chat`, or `all` (default, editing → Git → Chat). Git-only starts no mock Chat server and preserves its dedicated `profiles/smoke-git`; expanded combined runs stop before Chat on a Git failure. Git-only and expanded mocked/real combined GUI qualification remain pending. See [usage and recovery](smoke/README.md) for results, isolation and version requirements.
 
 The retained Python environment is preserved separately from the TypeScript tester. Its metadata and installed entry points may reference removed source. Before proposing or performing authorized Python environment changes, follow the [preservation guide](docs/preserved-python-environment.md) for interpreter constraints, dependency procedures, and historical limitations.
 

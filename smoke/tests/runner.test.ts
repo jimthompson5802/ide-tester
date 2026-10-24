@@ -99,11 +99,85 @@ test('real runs block missing setup and launch only with persistent storage and 
   assert.equal(result.mockRequestEvidence, 'inapplicable');
   assert.equal(result.requests, null);
   assert.equal(result.mockRequestCount, null);
-  assert.deepEqual(result.checks.map(check => check.outcome), ['not_run', 'not_run']);
+  assert.deepEqual(result.checks.map(check => check.outcome), ['not_run', 'not_run', 'not_run']);
   assert.equal(result.cleanup.reservationRetained, true);
   await access(profile.userData);
   const saved = JSON.parse(await readFile(result.resultPath, 'utf8'));
   assert.equal(saved.chatBackend, 'real');
   assert.equal(saved.persistentProfilePath, profile.userData);
   assert.equal(saved.requests, null);
+});
+
+test('Git-only launches with no mock/Chat initialization and preserves its dedicated profile',async t=>{
+  const checkout=await mkdtemp(join(tmpdir(),'git-only-runner-'));t.after(()=>rm(checkout,{recursive:true,force:true}));
+  const build=await fixtureApp(checkout);let called=false;
+  const result=await runSmoke({build,suite:'git'},checkout,async options=>{
+    called=true;const env=options!.env!;const args=options!.args!;
+    assert.equal(env.VSCODE_COPILOT_CHAT_TOKEN,undefined);assert.equal(env.GITHUB_PAT,undefined);
+    assert.equal(env.HTTP_PROXY,undefined);assert.equal(env.COPILOT_HOME,undefined);
+    assert.ok(args.includes('--use-inmemory-secretstorage'));
+    assert.ok(args.includes('--disable-extension'));assert.ok(args.includes('github.copilot-chat'));
+    assert.ok(!args.some(x=>x.startsWith('--extensionDevelopmentPath')));
+    const userData=args[args.indexOf('--user-data-dir')+1];
+    await assert.rejects(access(join(userData,'User/globalStorage/state.vscdb')));
+    assert.match(userData,/profiles\/smoke-git\/user-data$/);
+    throw new Error('Simulated uncertain launch');
+  },{startMock:async()=>assert.fail('Git-only must never start mock Chat')});
+  t.after(()=>rm(result.resourcesPath,{recursive:true,force:true}));
+  assert.ok(called);assert.equal(result.mockRequestEvidence,'inapplicable');assert.equal(result.mockRequestCount,null);assert.equal(result.requests,null);
+  assert.deepEqual(result.checks.map(c=>c.suite),['git']);await access(result.persistentProfilePath!);
+});
+
+async function applicationFixture(options?: {args?: string[]}, closeFails=false) {
+  if (options?.args) {
+    const userData=options.args[options.args.indexOf('--user-data-dir')+1];
+    const dir=join(userData,'logs/fixture/window1/exthost/vscode.git');await mkdir(dir,{recursive:true});
+    const {promisify}=await import('node:util');const {execFile}=await import('node:child_process');
+    const version=(await promisify(execFile)('/usr/bin/git',['--version'])).stdout.trim().replace('git version ','');
+    await writeFile(join(dir,'Git.log'),`Using git "${version}" from "/usr/bin/git"\n`);
+  }
+  const page={setDefaultTimeout(){},setDefaultNavigationTimeout(){},async screenshot(){}};
+  const app={firstWindow:async()=>page,process:()=>({exitCode:0,signalCode:null}),
+    context:()=>({tracing:{async start(){},async stop(){}}}),
+    async close(){if(closeFails)throw new Error('Owned shutdown uncertain');}};
+  return app as never;
+}
+
+test('all dispatches editing/Git/Chat in order and a Git failure leaves Chat not_run',async t=>{
+  const {GitFailure}=await import('../src/git.js');
+  for (const backend of ['mock','real'] as const) for (const failure of [undefined,'failed','blocked','harness_error'] as const) {
+    const checkout=await mkdtemp(join(tmpdir(),'git-order-runner-'));t.after(()=>rm(checkout,{recursive:true,force:true}));
+    const build=await fixtureApp(checkout);if(backend==='real')await realProfile(checkout,true);
+    const order:string[]=[];let mockStarted=0;let mockClosed=0;
+    const result=await runSmoke({build,suite:'all',chatBackend:backend},checkout,async options=>applicationFixture(options),{
+      startMock:async()=>{mockStarted++;return {url:'http://127.0.0.1:12345',requests:()=>[],close:async()=>{mockClosed++;}};},
+      workbench:()=>({ready:async()=>{},qualifyChat:async()=>{order.push('chat');return {session:'test',turns:[]};}} as never),
+      editing:async()=>{order.push('editing');return {files:[],createdInitiallyAbsent:true};},
+      git:async(_wb,_repo,_workspace,evidence)=>{order.push('git');evidence!.stage='graph';if(failure)throw new GitFailure(failure,'Injected Git outcome',evidence);return evidence!;},
+    });
+    t.after(()=>rm(result.resourcesPath,{recursive:true,force:true}));
+    assert.deepEqual(order,failure?['editing','git']:['editing','git','chat']);
+    assert.equal(result.outcome,failure??'passed');
+    assert.deepEqual(result.checks.map(c=>c.outcome),failure?['passed',failure,'not_run']:['passed','passed','passed']);
+    assert.equal(mockStarted,backend==='mock'?1:0);assert.equal(mockClosed,mockStarted);
+    if(failure){assert.match(result.error!,/Injected Git outcome/);assert.equal((result.checks[1].evidence as any).stage,'graph');}
+    assert.equal(result.cleanup.reservationRetained,false);await access(result.persistentProfilePath!);
+  }
+});
+
+test('missing Git blocks before launcher or mock and cleanup uncertainty dominates Git outcome',async t=>{
+  const {prepareGit}=await import('../src/git-repository.js');const {GitFailure}=await import('../src/git.js');
+  const root=await mkdtemp(join(tmpdir(),'git-preflight-runner-'));t.after(()=>rm(root,{recursive:true,force:true}));const build=await fixtureApp(root);
+  const blocked=await runSmoke({build,suite:'git'},root,async()=>assert.fail('Must not launch'),{
+    prepareGit:run=>prepareGit(run,join(run.resources,'missing-git')),startMock:async()=>assert.fail('Must not start mock'),
+  });
+  t.after(()=>rm(blocked.resourcesPath,{recursive:true,force:true}));
+  assert.equal(blocked.outcome,'blocked');assert.equal(blocked.mockRequestCount,null);
+  assert.equal((blocked.checks[0].evidence as any).hash,undefined);
+  const failed=await runSmoke({build,suite:'git'},root,async options=>applicationFixture(options,true),{
+    startMock:async()=>assert.fail('Must not start mock'),workbench:()=>({ready:async()=>{}} as never),
+    git:async(_wb,_repo,_workspace,evidence)=>{throw new GitFailure('failed','Git functional mismatch',evidence);},
+  });
+  t.after(()=>rm(failed.resourcesPath,{recursive:true,force:true}));
+  assert.equal(failed.checks[0].outcome,'failed');assert.equal(failed.outcome,'harness_error');assert.equal(failed.cleanup.reservationRetained,true);
 });
