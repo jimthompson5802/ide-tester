@@ -48,6 +48,10 @@ Paths below are relative to `smoke/`:
 | `src/chat.ts`, `src/turn.ts`, `src/session.ts` | Chat prompts and evidence validation, turn completion, and session discovery from renderer logs. |
 | `src/mock.ts`, `src/profile.ts` | Mock Chat service and mock profile preparation. |
 | `src/real-profile.ts`, `src/setup-real-chat.ts` | Persistent real-backend profile checks and setup for manual authentication. |
+| `scripts/test-gui.mjs` | Uncompiled aggregate bootstrap: validates syntax, persists/builds, then loads compiled orchestration. |
+| `scripts/gui-arguments.mjs`, `src/gui-arguments.ts` | Shared prebuild syntax parser and typed adapter, preserving original invocation-directory semantics. |
+| `scripts/gui-bootstrap-report.mjs`, `src/gui-report.ts` | Single aggregate persistence/summary implementation and typed adapter. |
+| `src/gui-command.ts` | Sequential real basic/Git/Python subprocess routing, result validation and cancellation. |
 | `src/resources.ts`, `src/report.ts` | Owned run resources, cleanup, and result reporting. |
 | `helper/extension.ts`, `helper/package.json` | VS Code helper extension implementation and manifest. |
 | `tests/` | Non-GUI tests for tester behavior. |

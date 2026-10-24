@@ -12,10 +12,11 @@
         "smoke": "node dist/src/cli.js",
         "qualify": "node dist/src/qualify.js",
         "setup:real-chat": "node dist/src/setup-real-chat.js",
-        "lint": "eslint src tests helper/extension.ts --max-warnings=0",
-        "format:check": "prettier --check \"{src,tests,gui}/**/*.ts\" helper/extension.ts \"*.{json,mjs}\" helper/*.json",
-        "format": "prettier --write \"{src,tests,gui}/**/*.ts\" helper/extension.ts \"*.{json,mjs}\" helper/*.json",
-        "build": "npm run lint && npm run format:check && npm run compile"
+        "lint": "eslint scripts src tests helper/extension.ts --max-warnings=0",
+        "format:check": "prettier --check \"{src,tests,gui}/**/*.ts\" \"scripts/**/*.mjs\" helper/extension.ts \"*.{json,mjs}\" helper/*.json",
+        "format": "prettier --write \"{src,tests,gui}/**/*.ts\" \"scripts/**/*.mjs\" helper/extension.ts \"*.{json,mjs}\" helper/*.json",
+        "build": "npm run lint && npm run format:check && npm run compile",
+        "test:gui": "node scripts/test-gui.mjs"
     },
     "devDependencies": {
         "@eslint/js": "10.0.1",

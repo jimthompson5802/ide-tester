@@ -171,6 +171,30 @@ The mock advertises one Chat Completions model under `data` and an empty proxy i
 
 The installed build has no DOM session-binding attribute. Session tracking instead reads the local conversation URI from `ChatModelSelection` workbench-view events in the owned renderer log. The latest event must identify a local session; missing/unbound/non-local events fail closed. Before submission, the tester requires a new URI and an empty response transcript. After submission, it requires the same URI, the current unique prompt marker visible in the UI, exactly one new completed assistant bubble, exact reply text, and a newer completed matching mock request. The driver targets Monaco's native edit-context element for text entry. These log, UI and driver contracts remain version-dependent.
 
+## Sequential real basic, Git and Python command
+
+The aggregate command builds once, checks interpreter presence, then runs real `basic`, standalone `git` and standalone `python` sequentially:
+
+```sh
+npm --prefix smoke run test:gui -- \
+  --build "/Applications/Visual Studio Code.app" \
+  --python-interpreter "/absolute/path/to/python"
+```
+
+Only `--build` and `--python-interpreter` are accepted, each exactly once. Build must be an absolute `.app` path. Quote paths containing spaces. Relative interpreter paths resolve against npm's original invocation directory (`INIT_CWD`), falling back to the current working directory for direct Node execution. The absolute invocation spelling, including symlinks, is preserved for Python selection; filesystem preflight resolves its canonical executable without running it.
+
+Syntax validation precedes the build. A failed or interrupted build prevents compiled code from loading. Interpreter preflight follows a successful build and precedes every GUI launch; an unavailable interpreter blocks the batch with all suites `not_run`. The wrapper does not check authentication or inspect profiles in advance. It stops at the first unsuccessful suite, cleanup uncertainty or reporting failure, with no retry. Brief progress and the final summary show backend, outcome, duration and available individual report paths. Raw child JSON and stderr are suppressed.
+
+GUI execution requires separate authorization, an unlocked exclusively reserved desktop, compatible VS Code and Node, Git, the selected interpreter and applicable network/Marketplace access. Prepare and sign in to the dedicated real Chat profile manually using [real-backend setup](#optional-real-copilot-backend) before an authorized run. Authentication expiry is blocked. The command reuses the existing real Chat, Git and Python profile/lifecycle contracts and the [secret-storage policy](AGENTS.md#secret-storage): real Chat may reuse permitted saved authentication; Git and Python use in-memory secret storage. Persistent profiles remain preserved.
+
+Aggregate `result.json` and `result.txt` live under `reports/smoke-batches/<batch-id>/`, separately from [individual suite artifacts](#results-and-recovery). Initial records exist before the build; a running stage is persisted before each subprocess starts. Updates replace each file atomically, with no transaction across the pair. An incomplete record, stale running stage or disagreement between files never proves success or shutdown. Aggregate storage failure prevents the next launch and returns nonzero. An observed child reporting error remains in the aggregate even if its individual JSON says passed.
+
+Ctrl-C or SIGTERM requests orderly cancellation. Further suites stop; the owned active child receives one cancellation request while the wrapper waits for its cleanup/result. Repeated interrupts print shutdown-pending status and do not bypass cleanup. The commitment cutoff is the successful final JSON/text save followed by a synchronous cancellation check before summary output; cancellation observed during that save is persisted again. Cancellation before this cutoff returns nonzero even if every suite row already passed; completed rows and cleanup evidence remain intact. A completed report can describe cancellation, whereas missing final lifecycle evidence leaves the record incomplete. SIGKILL, process loss and detached application descendants remain outside orderly-cleanup guarantees.
+
+Zero exit requires all three suites passed, confirmed disposable cleanup and reservation release, and successful aggregate reporting. Child exit alone cannot establish application shutdown. The wrapper owns no desktop reservation and never deletes locks or recovers uncertain runs. Follow [recovery](#results-and-recovery) deliberately when shutdown or pending-work settlement is uncertain. Existing safety deadlines bound cleanup admission and settlement; admitted filesystem deletion can outlast that budget and must actually finish before success is emitted.
+
+The aggregate's non-GUI implementation and signal-chain checks belong to [issue #50 Phase 2](../docs/implementation-plans/issue-50-gui-suite-command.md). Complete-command GUI behavior, interruption cleanup and Python invocation paths containing spaces remain pending separately authorized Phase 3 qualification. Earlier individual-suite GUI passes do not establish those results.
+
 ## Results and recovery
 
 Both `smoke` and `qualify` print a plain-text summary by default and save the same text as `result.txt` beside the unchanged `result.json`. For example (durations and run ID are illustrative):
