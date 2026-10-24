@@ -285,3 +285,109 @@ test('Python text and reservation errors retain inapplicable Chat evidence', asy
     assert.equal(result.mockRequestCount, null);
     assert.equal(result.requests, null);
 });
+
+test('pre-requested CLI cancellation starts no run and preserves a single JSON result', async (t) => {
+    const { Cancellation } = await import('../src/cancellation.js');
+    const { access } = await import('node:fs/promises');
+    const checkout = await mkdtemp(join(tmpdir(), 'smoke-cli-cancel-'));
+    t.after(() => rm(checkout, { recursive: true, force: true }));
+    const cancellation = new Cancellation();
+    cancellation.request();
+    const messages: string[] = [];
+    const code = await executeCLI(
+        ['--build', '/missing.app', '--suite', 'git', '--output', 'json'],
+        checkout,
+        false,
+        (value: string) => messages.push(value),
+        cancellation,
+    );
+    assert.equal(code, 1);
+    assert.equal(messages.length, 1);
+    const result = JSON.parse(messages[0]);
+    if (result.resourcesPath)
+        t.after(() =>
+            rm(result.resourcesPath, { recursive: true, force: true }),
+        );
+    assert.equal(result.outcome, 'harness_error');
+    assert.equal(result.cancellation.reason, 'Cancelled by user');
+    assert.equal(result.runId, undefined);
+    assert.equal(result.cleanup, undefined);
+    assert.equal(result.chatSelected, false);
+    await assert.rejects(access(join(checkout, 'reports/smoke/.reservation')));
+});
+
+test('a disposable executable handles real repeated signals without contaminating JSON or leaking listeners', async (t) => {
+    const { spawn } = await import('node:child_process');
+    const checkout = await mkdtemp(join(tmpdir(), 'smoke-cli-signals-'));
+    t.after(() => rm(checkout, { recursive: true, force: true }));
+    const script = `
+        import { executeCLI } from ${JSON.stringify(new URL('../src/cli.js', import.meta.url).href)};
+        import { Cancellation, installCancellationHandlers } from ${JSON.stringify(new URL('../src/cancellation.js', import.meta.url).href)};
+        import { setTimeout } from 'node:timers/promises';
+        const cancellation = new Cancellation();
+        const baseline = ['SIGINT', 'SIGTERM'].map(signal => process.listenerCount(signal));
+        const dispose = installCancellationHandlers(cancellation, message => process.stderr.write(message + '\\n'));
+        const keepAlive = globalThis.setInterval(() => {}, 1000);
+        process.stderr.write('READY\\n');
+        try {
+            await cancellation.perform(() => new Promise(() => {}));
+        } catch {
+            await setTimeout(100);
+            process.exitCode = await executeCLI(['--output', 'json'], process.argv[1], false, console.log, cancellation);
+        } finally {
+            globalThis.clearInterval(keepAlive);
+            dispose();
+            const counts = ['SIGINT', 'SIGTERM'].map(signal => process.listenerCount(signal));
+            if (JSON.stringify(counts) !== JSON.stringify(baseline)) throw new Error('Signal listeners leaked');
+        }
+    `;
+    const child = spawn(
+        process.execPath,
+        ['--input-type=module', '-e', script, checkout],
+        { stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+    const exited = new Promise<{
+        code: number | null;
+        signal: NodeJS.Signals | null;
+    }>((resolve, reject) => {
+        child.once('error', reject);
+        child.once('exit', (code, signal) => resolve({ code, signal }));
+    });
+    t.after(async () => {
+        if (child.exitCode === null && child.signalCode === null)
+            child.kill('SIGKILL');
+        await exited;
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout!.on('data', (chunk: Buffer) => {
+        stdout += chunk.toString();
+    });
+    child.stderr!.on('data', (chunk: Buffer) => {
+        stderr += chunk.toString();
+    });
+    const until = async (pattern: RegExp): Promise<void> => {
+        const deadline = Date.now() + 2000;
+        while (!pattern.test(stderr)) {
+            if (
+                Date.now() >= deadline ||
+                child.exitCode !== null ||
+                child.signalCode !== null
+            )
+                assert.fail(
+                    `Disposable signal fixture did not reach ${pattern}: ${stderr}`,
+                );
+            await new Promise((resolve) => setTimeout(resolve, 5));
+        }
+    };
+    await until(/READY/);
+    child.kill('SIGINT');
+    await until(/Cancellation requested/);
+    child.kill('SIGTERM');
+    await until(/Owned shutdown is pending/);
+    assert.deepEqual(await exited, { code: 1, signal: null });
+    const result = JSON.parse(stdout.trim());
+    assert.equal(result.outcome, 'harness_error');
+    assert.equal(result.cancellation.reason, 'Cancelled by user');
+    assert.doesNotMatch(stdout, /pending|READY/);
+});

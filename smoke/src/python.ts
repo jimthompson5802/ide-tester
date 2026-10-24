@@ -1,3 +1,4 @@
+import { CancellationError, ScenarioStoppedError } from './cancellation.js';
 import { randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -371,6 +372,11 @@ export async function checkPython(
         evidence.stage = 'complete';
         return evidence;
     } catch (cause) {
+        if (
+            cause instanceof CancellationError ||
+            cause instanceof ScenarioStoppedError
+        )
+            throw cause;
         const stage = evidence.stage;
         const functional =
             deadline.expired ||

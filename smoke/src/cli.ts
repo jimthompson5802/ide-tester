@@ -3,7 +3,12 @@ import { resolve, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { reportResult } from './report.js';
 import { parseArguments } from './arguments.js';
-import { createRun, finishRun } from './resources.js';
+import { createRun, finishRun, type Run } from './resources.js';
+import {
+    Cancellation,
+    CancellationError,
+    installCancellationHandlers,
+} from './cancellation.js';
 import { runFoundation, runSmoke } from './runner.js';
 
 export const checkoutRoot = resolve(
@@ -15,6 +20,7 @@ export async function executeCLI(
     checkout = checkoutRoot,
     qualify = false,
     output: (message: string) => void = console.log,
+    cancellation = new Cancellation(),
 ): Promise<number> {
     const started = Date.now();
     const suiteIndex = args.indexOf('--suite');
@@ -37,6 +43,7 @@ export async function executeCLI(
     const mode =
         outputIndex >= 0 && args[outputIndex + 1] === 'json' ? 'json' : 'text';
     try {
+        cancellation.check();
         let options;
         let prerequisite: string | undefined;
         try {
@@ -45,8 +52,28 @@ export async function executeCLI(
             prerequisite = String(error);
         }
         if (prerequisite || !options) {
-            const run = await createRun(checkout);
-            const cleanup = await finishRun(run, false, []);
+            let acquired: Run | undefined;
+            let cleanupDeadline: number | undefined;
+            try {
+                await cancellation.perform(async () => {
+                    acquired = await createRun(checkout);
+                });
+            } catch (cause) {
+                if (!(cause instanceof CancellationError)) throw cause;
+                // A cancelled wait does not abandon reservation acquisition.
+                cleanupDeadline = Date.now() + 120_000;
+                await cancellation.settle(
+                    Math.max(1, cleanupDeadline - Date.now()),
+                );
+            }
+            if (!acquired)
+                throw new Error(
+                    'Run acquisition did not return owned resources',
+                );
+            const run = acquired;
+            const cleanup = await finishRun(run, false, [], {
+                deadline: cleanupDeadline ?? Date.now() + 120_000,
+            });
             const resultPath = join(run.report, 'result.json');
             const result = {
                 runId: run.id,
@@ -73,13 +100,18 @@ export async function executeCLI(
                 resultPath,
             };
             await writeFile(resultPath, JSON.stringify(result, null, 2));
-            return await reportResult(result, mode, output);
+            return await reportResult(result, mode, output, cancellation);
         }
-        const result = await (qualify ? runFoundation : runSmoke)(
-            options,
-            checkout,
-        );
-        return await reportResult(result, mode, output);
+        const result = qualify
+            ? await runFoundation(options, checkout, undefined, cancellation)
+            : await runSmoke(
+                  options,
+                  checkout,
+                  undefined,
+                  undefined,
+                  cancellation,
+              );
+        return await reportResult(result, mode, output, cancellation);
     } catch (error) {
         // An existing or uncertain reservation must never be removed on this path.
         return await reportResult(
@@ -92,10 +124,26 @@ export async function executeCLI(
                 mockRequestCount: mockApplicable ? 0 : null,
                 requests: mockApplicable ? [] : null,
                 outcome: 'harness_error',
-                error: String(error),
+                error: cancellation.requested
+                    ? 'Cancelled by user'
+                    : String(error),
+                ...(cancellation.requested
+                    ? {
+                          cancellation: { reason: 'Cancelled by user' },
+                          ...(!(error instanceof CancellationError)
+                              ? {
+                                    originating: {
+                                        outcome: 'harness_error',
+                                        error: String(error),
+                                    },
+                                }
+                              : {}),
+                      }
+                    : {}),
             },
             mode,
             output,
+            cancellation,
         );
     }
 }
@@ -104,5 +152,19 @@ if (
     process.argv[1] &&
     import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 ) {
-    process.exitCode = await executeCLI(process.argv.slice(2));
+    const cancellation = new Cancellation();
+    const dispose = installCancellationHandlers(cancellation, (message) => {
+        process.stderr.write(message + '\n');
+    });
+    try {
+        process.exitCode = await executeCLI(
+            process.argv.slice(2),
+            undefined,
+            false,
+            undefined,
+            cancellation,
+        );
+    } finally {
+        dispose();
+    }
 }

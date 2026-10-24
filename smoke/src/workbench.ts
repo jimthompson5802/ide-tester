@@ -15,6 +15,11 @@ import { basename } from 'node:path';
 
 import { PythonFailure, pythonUiIssue } from './python.js';
 import { GitFailure } from './git-repository.js';
+import {
+    Cancellation,
+    CancellationError,
+    ScenarioStoppedError,
+} from './cancellation.js';
 
 const mainEditor = '.part.editor .monaco-editor[role="code"]';
 
@@ -52,123 +57,162 @@ export async function bounded<T>(
 }
 
 export class Workbench {
-    constructor(readonly page: Page) {}
+    constructor(
+        readonly page: Page,
+        readonly cancellation = new Cancellation(),
+    ) {}
+
+    protected action<T>(operation: () => Promise<T>): Promise<T> {
+        return this.cancellation.perform(operation);
+    }
 
     async ready(timeout: number): Promise<void> {
         const deadline = Date.now() + timeout;
-        await this.page.waitForFunction(
-            () => {
-                const driver = window.driver;
-                return (
-                    typeof driver?.whenWorkbenchRestored === 'function' &&
-                    typeof driver?.typeInEditor === 'function'
-                );
-            },
-            undefined,
-            { timeout },
+        await this.action(() =>
+            this.page.waitForFunction(
+                () => {
+                    const driver = window.driver;
+                    return (
+                        typeof driver?.whenWorkbenchRestored === 'function' &&
+                        typeof driver?.typeInEditor === 'function'
+                    );
+                },
+                undefined,
+                { timeout },
+            ),
         );
-        await bounded(
-            this.page.evaluate(() => window.driver.whenWorkbenchRestored()),
-            deadline - Date.now(),
-            'Workbench restoration',
+        await this.action(() =>
+            bounded(
+                this.cancellation.track(
+                    this.page.evaluate(() =>
+                        window.driver.whenWorkbenchRestored(),
+                    ),
+                ),
+                deadline - Date.now(),
+                'Workbench restoration',
+            ),
         );
-        await expect(this.page.locator('.monaco-workbench')).toBeVisible({
-            timeout: Math.max(1, deadline - Date.now()),
-        });
+        await this.action(() =>
+            expect(this.page.locator('.monaco-workbench')).toBeVisible({
+                timeout: Math.max(1, deadline - Date.now()),
+            }),
+        );
     }
 
     async typeInEditor(selector: string, text: string): Promise<void> {
         const input = `${selector} .native-edit-context`;
-        await this.page.locator(input).focus();
-        await this.page.evaluate(
-            ({ selector, text }) => window.driver.typeInEditor(selector, text),
-            { selector: input, text },
+        await this.action(() => this.page.locator(input).focus());
+        await this.action(() =>
+            this.page.evaluate(
+                ({ selector, text }) =>
+                    window.driver.typeInEditor(selector, text),
+                { selector: input, text },
+            ),
         );
     }
 
     async command(title: string, followedByPicker = false): Promise<void> {
-        await this.page.keyboard.press('Meta+Shift+P');
+        await this.action(() => this.page.keyboard.press('Meta+Shift+P'));
         const input = this.page.locator(
             '.quick-input-widget .quick-input-box input',
         );
-        await input.fill(`>${title}`);
+        await this.action(() => input.fill(`>${title}`));
         const item = this.page
             .locator('.quick-input-widget .monaco-list-row')
             .filter({ hasText: title });
-        await expect(item).toHaveCount(1);
-        await item.click();
-        if (!followedByPicker) await expect(input).toBeHidden();
+        await this.action(() => expect(item).toHaveCount(1));
+        await this.action(() => item.click());
+        if (!followedByPicker)
+            await this.action(() => expect(input).toBeHidden());
     }
 
     async openFile(path: string): Promise<void> {
-        await this.page.keyboard.press('Meta+P');
+        await this.action(() => this.page.keyboard.press('Meta+P'));
         const input = this.page.locator(
             '.quick-input-widget .quick-input-box input',
         );
-        await input.fill(path);
+        await this.action(() => input.fill(path));
         const row = this.page
             .locator('.quick-input-widget .monaco-list-row')
             .filter({ hasText: basename(path) });
-        await expect(row).toHaveCount(1);
-        await input.press('Enter');
-        await expect(input).toBeHidden();
-        await expect(
-            this.page.locator('.part.editor .tab.active .label-name'),
-        ).toHaveText(basename(path));
-        await expect(this.page.locator(mainEditor)).toBeVisible();
+        await this.action(() => expect(row).toHaveCount(1));
+        await this.action(() => input.press('Enter'));
+        await this.action(() => expect(input).toBeHidden());
+        await this.action(() =>
+            expect(
+                this.page.locator('.part.editor .tab.active .label-name'),
+            ).toHaveText(basename(path)),
+        );
+        await this.action(() =>
+            expect(this.page.locator(mainEditor)).toBeVisible(),
+        );
     }
 
     async replaceEditorText(text: string): Promise<void> {
-        await this.page.locator(`${mainEditor} .native-edit-context`).focus();
-        await this.page.keyboard.press('Meta+A');
-        await this.typeInEditor(mainEditor, text);
+        await this.action(() =>
+            this.page.locator(`${mainEditor} .native-edit-context`).focus(),
+        );
+        await this.action(() => this.page.keyboard.press('Meta+A'));
+        await this.action(() => this.typeInEditor(mainEditor, text));
     }
 
     async saveEditor(): Promise<void> {
-        await this.page.keyboard.press('Meta+S');
+        await this.action(() => this.page.keyboard.press('Meta+S'));
     }
 
     async newTextFile(): Promise<void> {
-        await this.page.keyboard.press('Meta+N');
-        await expect(
-            this.page.locator('.part.editor .tab.active .label-name'),
-        ).toHaveText(/^Untitled-/);
-        await expect(this.page.locator(mainEditor)).toBeVisible();
+        await this.action(() => this.page.keyboard.press('Meta+N'));
+        await this.action(() =>
+            expect(
+                this.page.locator('.part.editor .tab.active .label-name'),
+            ).toHaveText(/^Untitled-/),
+        );
+        await this.action(() =>
+            expect(this.page.locator(mainEditor)).toBeVisible(),
+        );
     }
 
     async saveAs(path: string): Promise<void> {
-        await this.page.keyboard.press('Meta+Shift+S');
+        await this.action(() => this.page.keyboard.press('Meta+Shift+S'));
         const input = this.page.locator(
             '.quick-input-widget .quick-input-box input',
         );
-        await input.fill(path);
-        await input.press('Enter');
-        await expect(input).toBeHidden();
-        await expect(
-            this.page.locator('.part.editor .tab.active .label-name'),
-        ).toHaveText(basename(path));
+        await this.action(() => input.fill(path));
+        await this.action(() => input.press('Enter'));
+        await this.action(() => expect(input).toBeHidden());
+        await this.action(() =>
+            expect(
+                this.page.locator('.part.editor .tab.active .label-name'),
+            ).toHaveText(basename(path)),
+        );
     }
 
     async closeEditors(): Promise<void> {
-        await this.page.locator(`${mainEditor} .native-edit-context`).focus();
-        await this.page.keyboard.press('Meta+K');
-        await this.page.keyboard.press('Meta+W');
-        await expect(
-            this.page.locator('.part.editor .tabs-container .tab'),
-        ).toHaveCount(0);
+        await this.action(() =>
+            this.page.locator(`${mainEditor} .native-edit-context`).focus(),
+        );
+        await this.action(() => this.page.keyboard.press('Meta+K'));
+        await this.action(() => this.page.keyboard.press('Meta+W'));
+        await this.action(() =>
+            expect(
+                this.page.locator('.part.editor .tabs-container .tab'),
+            ).toHaveCount(0),
+        );
     }
 
     async expectEditorText(text: string): Promise<string[]> {
         const lines = this.page.locator(`${mainEditor} .view-lines .view-line`);
         const readLines = async () =>
-            (await lines.allTextContents()).map((line) =>
+            (await this.action(() => lines.allTextContents())).map((line) =>
                 line.replaceAll('\u00a0', ' ').trimEnd(),
             );
-        await expect
-            .poll(readLines, {
-                message: 'Reopened editor must display the saved contents',
-            })
-            .toEqual(text.split('\n'));
+        await this.action(() =>
+            expect
+                .poll(readLines, {
+                    message: 'Reopened editor must display the saved contents',
+                })
+                .toEqual(text.split('\n')),
+        );
         return readLines();
     }
 
@@ -177,10 +221,19 @@ export class Workbench {
         action: () => Promise<void>,
     ): Promise<void> {
         try {
-            if (await this.page.locator('.monaco-dialog-box').isVisible())
+            if (
+                await this.action(() =>
+                    this.page.locator('.monaco-dialog-box').isVisible(),
+                )
+            )
                 throw new Error('Unexpected dialog');
-            await action();
+            await this.action(() => action());
         } catch (cause) {
+            if (
+                cause instanceof CancellationError ||
+                cause instanceof ScenarioStoppedError
+            )
+                throw cause;
             if (cause instanceof GitFailure) throw cause;
             throw new GitFailure(
                 'harness_error',
@@ -190,39 +243,61 @@ export class Workbench {
     }
 
     async initializeGit(workspace: string): Promise<void> {
-        await this.gitContract('initialization picker', async () => {
-            await this.command('Git: Initialize Repository', true);
-            const input = this.page.locator(
-                '.quick-input-widget .quick-input-box input',
-            );
-            await expect(input).toHaveAttribute(
-                'placeholder',
-                'Pick workspace folder to initialize git repo in',
-                { timeout: 15_000 },
-            );
-            const folder = this.page
-                .locator('.quick-input-widget .monaco-list-row')
-                .filter({ hasText: workspace });
-            await expect(folder).toHaveCount(1, { timeout: 15_000 });
-            await folder.click();
-            await expect(input).toBeHidden();
-        });
+        await this.action(() =>
+            this.gitContract('initialization picker', async () => {
+                await this.action(() =>
+                    this.command('Git: Initialize Repository', true),
+                );
+                const input = this.page.locator(
+                    '.quick-input-widget .quick-input-box input',
+                );
+                await this.action(() =>
+                    expect(input).toHaveAttribute(
+                        'placeholder',
+                        'Pick workspace folder to initialize git repo in',
+                        { timeout: 15_000 },
+                    ),
+                );
+                const folder = this.page
+                    .locator('.quick-input-widget .monaco-list-row')
+                    .filter({ hasText: workspace });
+                await this.action(() =>
+                    expect(folder).toHaveCount(1, { timeout: 15_000 }),
+                );
+                await this.action(() => folder.click());
+                await this.action(() => expect(input).toBeHidden());
+            }),
+        );
         try {
-            await expect
-                .poll(
-                    async () => {
-                        try {
-                            return (
-                                await lstat(join(workspace, '.git'))
-                            ).isDirectory();
-                        } catch {
-                            return false;
-                        }
-                    },
-                    { timeout: 15_000 },
-                )
-                .toBe(true);
-        } catch {
+            await this.action(() =>
+                expect
+                    .poll(
+                        async () => {
+                            try {
+                                return (
+                                    await this.action(() =>
+                                        lstat(join(workspace, '.git')),
+                                    )
+                                ).isDirectory();
+                            } catch (cause) {
+                                if (
+                                    cause instanceof CancellationError ||
+                                    cause instanceof ScenarioStoppedError
+                                )
+                                    throw cause;
+                                return false;
+                            }
+                        },
+                        { timeout: 15_000 },
+                    )
+                    .toBe(true),
+            );
+        } catch (cause) {
+            if (
+                cause instanceof CancellationError ||
+                cause instanceof ScenarioStoppedError
+            )
+                throw cause;
             throw new GitFailure(
                 'failed',
                 'Git initialization did not create a repository',
@@ -242,26 +317,43 @@ export class Workbench {
 
     async stageGitFile(): Promise<void> {
         const row = this.gitResource();
-        await this.gitContract('target staging action', async () => {
-            await this.command('Source Control: Focus on Changes View');
-            await expect(row).toHaveCount(1, { timeout: 15_000 });
-            await expect(row.locator('.resource')).toHaveAttribute(
-                'data-tooltip',
-                'Untracked',
-                { timeout: 15_000 },
-            );
-            await row.hover();
-            await row
-                .locator('.action-label[aria-label="Stage Changes"]')
-                .click();
-        });
+        await this.action(() =>
+            this.gitContract('target staging action', async () => {
+                await this.action(() =>
+                    this.command('Source Control: Focus on Changes View'),
+                );
+                await this.action(() =>
+                    expect(row).toHaveCount(1, { timeout: 15_000 }),
+                );
+                await this.action(() =>
+                    expect(row.locator('.resource')).toHaveAttribute(
+                        'data-tooltip',
+                        'Untracked',
+                        { timeout: 15_000 },
+                    ),
+                );
+                await this.action(() => row.hover());
+                await this.action(() =>
+                    row
+                        .locator('.action-label[aria-label="Stage Changes"]')
+                        .click(),
+                );
+            }),
+        );
         try {
-            await expect(row.locator('.resource')).toHaveAttribute(
-                'data-tooltip',
-                'Index Added',
-                { timeout: 15_000 },
+            await this.action(() =>
+                expect(row.locator('.resource')).toHaveAttribute(
+                    'data-tooltip',
+                    'Index Added',
+                    { timeout: 15_000 },
+                ),
             );
-        } catch {
+        } catch (cause) {
+            if (
+                cause instanceof CancellationError ||
+                cause instanceof ScenarioStoppedError
+            )
+                throw cause;
             throw new GitFailure(
                 'failed',
                 'Git target did not become Index Added after staging',
@@ -270,22 +362,35 @@ export class Workbench {
     }
 
     async commitGit(message: string): Promise<void> {
-        await this.gitContract('commit input/button', async () => {
-            await this.typeInEditor(
-                'div[id="workbench.view.scm"] .scm-editor',
-                message,
-            );
-            const commit = this.page
-                .locator('div[id="workbench.view.scm"] .monaco-button')
-                .filter({ hasText: /^Commit$/ });
-            await expect(commit).toBeVisible({ timeout: 15_000 });
-            await commit.click();
-        });
+        await this.action(() =>
+            this.gitContract('commit input/button', async () => {
+                await this.action(() =>
+                    this.typeInEditor(
+                        'div[id="workbench.view.scm"] .scm-editor',
+                        message,
+                    ),
+                );
+                const commit = this.page
+                    .locator('div[id="workbench.view.scm"] .monaco-button')
+                    .filter({ hasText: /^Commit$/ });
+                await this.action(() =>
+                    expect(commit).toBeVisible({ timeout: 15_000 }),
+                );
+                await this.action(() => commit.click());
+            }),
+        );
         try {
-            await expect(this.gitResource()).toHaveCount(0, {
-                timeout: 15_000,
-            });
-        } catch {
+            await this.action(() =>
+                expect(this.gitResource()).toHaveCount(0, {
+                    timeout: 15_000,
+                }),
+            );
+        } catch (cause) {
+            if (
+                cause instanceof CancellationError ||
+                cause instanceof ScenarioStoppedError
+            )
+                throw cause;
             throw new GitFailure(
                 'failed',
                 'Git commit did not remove the staged target',
@@ -296,45 +401,64 @@ export class Workbench {
     async showGitGraph(message: string): Promise<string> {
         const scm = this.page.locator('div[id="workbench.view.scm"]');
         const graph = this.page.locator('.scm-history-view');
-        await this.gitContract('Graph view/reference filter', async () => {
-            await this.command('Source Control: Focus on Graph View');
-            await expect(graph).toBeVisible({ timeout: 15_000 });
-            // Fresh single-root workspace: installed build selects the sole provider and hides this picker.
-            await expect(
-                scm.locator('.scm-graph-repository-picker'),
-            ).toHaveCount(0, {
-                timeout: 15_000,
-            });
-            const picker = scm.locator('.scm-graph-history-item-picker');
-            await picker.click();
-            const input = this.page.locator(
-                '.quick-input-widget .quick-input-box input',
-            );
-            await expect(input).toHaveAttribute(
-                'placeholder',
-                'Select one/more history item references to view, type to filter',
-                { timeout: 15_000 },
-            );
-            const all = this.page
-                .locator('.quick-input-widget .monaco-list-row')
-                .filter({
-                    has: this.page
-                        .locator('.label-name')
-                        .getByText('All', { exact: true }),
-                });
-            await expect(all).toHaveCount(1, { timeout: 15_000 });
-            await all.click();
-            await input.press('Enter');
-            await expect(input).toBeHidden();
-            await expect(picker).toHaveText('All');
-        });
+        await this.action(() =>
+            this.gitContract('Graph view/reference filter', async () => {
+                await this.action(() =>
+                    this.command('Source Control: Focus on Graph View'),
+                );
+                await this.action(() =>
+                    expect(graph).toBeVisible({ timeout: 15_000 }),
+                );
+                // Fresh single-root workspace: installed build selects the sole provider and hides this picker.
+                await this.action(() =>
+                    expect(
+                        scm.locator('.scm-graph-repository-picker'),
+                    ).toHaveCount(0, {
+                        timeout: 15_000,
+                    }),
+                );
+                const picker = scm.locator('.scm-graph-history-item-picker');
+                await this.action(() => picker.click());
+                const input = this.page.locator(
+                    '.quick-input-widget .quick-input-box input',
+                );
+                await this.action(() =>
+                    expect(input).toHaveAttribute(
+                        'placeholder',
+                        'Select one/more history item references to view, type to filter',
+                        { timeout: 15_000 },
+                    ),
+                );
+                const all = this.page
+                    .locator('.quick-input-widget .monaco-list-row')
+                    .filter({
+                        has: this.page
+                            .locator('.label-name')
+                            .getByText('All', { exact: true }),
+                    });
+                await this.action(() =>
+                    expect(all).toHaveCount(1, { timeout: 15_000 }),
+                );
+                await this.action(() => all.click());
+                await this.action(() => input.press('Enter'));
+                await this.action(() => expect(input).toBeHidden());
+                await this.action(() => expect(picker).toHaveText('All'));
+            }),
+        );
         const label = graph
             .locator('.history-item .label-name')
             .getByText(message, { exact: true });
         try {
-            await expect(label).toBeVisible({ timeout: 15_000 });
-            return (await label.textContent()) ?? '';
-        } catch {
+            await this.action(() =>
+                expect(label).toBeVisible({ timeout: 15_000 }),
+            );
+            return (await this.action(() => label.textContent())) ?? '';
+        } catch (cause) {
+            if (
+                cause instanceof CancellationError ||
+                cause instanceof ScenarioStoppedError
+            )
+                throw cause;
             throw new GitFailure(
                 'failed',
                 'Expected unique commit message missing from Source Control Graph',
@@ -342,7 +466,7 @@ export class Workbench {
         }
     }
 
-    private chat() {
+    private chat(): Locator {
         return this.page.locator('div[id="workbench.panel.chat"]');
     }
 
@@ -359,22 +483,30 @@ export class Workbench {
                         .map((element) => element.textContent ?? ''),
                 );
         if (
-            await this.chat()
-                .locator('.chat-quota-error-widget')
-                .first()
-                .isVisible()
+            await this.action(() =>
+                this.chat()
+                    .locator('.chat-quota-error-widget')
+                    .first()
+                    .isVisible(),
+            )
         )
             return uiIssue(['quota exceeded']);
-        const messages = await visibleText(
-            'div[id="workbench.panel.chat"] .chat-notification-widget, div[id="workbench.panel.chat"] .chat-error-confirmation, div[id="workbench.panel.chat"] .chat-quota-error-widget, .notifications-toasts .notification-list-item:has(.notification-list-item-icon.codicon-error), .notifications-toasts .notification-list-item:has(.notification-list-item-icon.codicon-warning), .monaco-dialog-box',
+        const messages = await this.action(() =>
+            visibleText(
+                'div[id="workbench.panel.chat"] .chat-notification-widget, div[id="workbench.panel.chat"] .chat-error-confirmation, div[id="workbench.panel.chat"] .chat-quota-error-widget, .notifications-toasts .notification-list-item:has(.notification-list-item-icon.codicon-error), .notifications-toasts .notification-list-item:has(.notification-list-item-icon.codicon-warning), .monaco-dialog-box',
+            ),
         );
-        const welcome = await visibleText(
-            'div[id="workbench.panel.chat"] .chat-welcome-view, div[id="workbench.panel.chat"] .chat-view-welcome',
+        const welcome = await this.action(() =>
+            visibleText(
+                'div[id="workbench.panel.chat"] .chat-welcome-view, div[id="workbench.panel.chat"] .chat-view-welcome',
+            ),
         );
-        const signIn = await this.page
-            .getByRole('button', { name: /^Sign In$/i })
-            .first()
-            .isVisible();
+        const signIn = await this.action(() =>
+            this.page
+                .getByRole('button', { name: /^Sign In$/i })
+                .first()
+                .isVisible(),
+        );
         const prerequisite = uiIssue([
             ...welcome,
             ...(signIn ? ['Sign in to use GitHub Copilot'] : []),
@@ -386,34 +518,46 @@ export class Workbench {
     private async exportChat(path: string): Promise<unknown> {
         // Export only the active test conversation through the shipped UI command.
         // It goes to disposable resources, never the persistent profile or raw report.
-        await this.page.keyboard.press('Meta+Shift+P');
+        await this.action(() => this.page.keyboard.press('Meta+Shift+P'));
         const input = this.page.locator(
             '.quick-input-widget .quick-input-box input',
         );
-        await input.fill('>Chat: Export Chat...');
+        await this.action(() => input.fill('>Chat: Export Chat...'));
         const item = this.page
             .locator('.quick-input-widget .monaco-list-row')
             .filter({ hasText: 'Chat: Export Chat...' });
-        await expect(item).toHaveCount(1);
-        await item.click();
-        await expect(input).toHaveValue(/chat\.json$/);
-        await input.fill(path);
-        await input.press('Enter');
-        await expect(input).toBeHidden();
-        await expect
-            .poll(
-                async () => {
-                    try {
-                        JSON.parse(await readFile(path, 'utf8'));
-                        return true;
-                    } catch {
-                        return false;
-                    }
-                },
-                { timeout: 5000, message: 'Expected test-owned Chat export' },
-            )
-            .toBe(true);
-        return JSON.parse(await readFile(path, 'utf8'));
+        await this.action(() => expect(item).toHaveCount(1));
+        await this.action(() => item.click());
+        await this.action(() => expect(input).toHaveValue(/chat\.json$/));
+        await this.action(() => input.fill(path));
+        await this.action(() => input.press('Enter'));
+        await this.action(() => expect(input).toBeHidden());
+        await this.action(() =>
+            expect
+                .poll(
+                    async () => {
+                        try {
+                            JSON.parse(
+                                await this.action(() => readFile(path, 'utf8')),
+                            );
+                            return true;
+                        } catch (cause) {
+                            if (
+                                cause instanceof CancellationError ||
+                                cause instanceof ScenarioStoppedError
+                            )
+                                throw cause;
+                            return false;
+                        }
+                    },
+                    {
+                        timeout: 5000,
+                        message: 'Expected test-owned Chat export',
+                    },
+                )
+                .toBe(true),
+        );
+        return JSON.parse(await this.action(() => readFile(path, 'utf8')));
     }
 
     async qualifyChat(
@@ -424,26 +568,32 @@ export class Workbench {
         timeout: number,
         exportRoot: string,
         evidence: ChatEvidence = { session: '', turns: [] },
-    ) {
+    ): Promise<ChatEvidence> {
         const chat = this.chat();
         let diagnosticStage = 'open-session';
         try {
             if (backend === 'real') {
-                const issue = await this.chatIssue();
+                const issue = await this.action(() => this.chatIssue());
                 if (issue) throw issue;
             }
-            const previousSession = await session();
-            await this.command('Smoke Tester: Open Local Chat');
+            const previousSession = await this.action(() => session());
+            await this.action(() =>
+                this.command('Smoke Tester: Open Local Chat'),
+            );
             if (backend === 'real') {
                 // Signed-out/setup UI must block before we try to select a mode or send.
                 const readyBy = Date.now() + 15_000;
                 while (true) {
-                    const issue = await this.chatIssue();
+                    const issue = await this.action(() => this.chatIssue());
                     if (issue) throw issue;
                     if (
-                        await chat
-                            .locator('.chat-mode-picker-item [role="button"]')
-                            .isVisible()
+                        await this.action(() =>
+                            chat
+                                .locator(
+                                    '.chat-mode-picker-item [role="button"]',
+                                )
+                                .isVisible(),
+                        )
                     )
                         break;
                     if (Date.now() >= readyBy)
@@ -451,59 +601,71 @@ export class Workbench {
                             'harness_error',
                             'Chat input readiness contract unavailable',
                         );
-                    await this.page.waitForTimeout(100);
+                    await this.action(() => this.page.waitForTimeout(100));
                 }
             }
             diagnosticStage = 'new-session-identity';
-            await expect
-                .poll(
-                    async () => {
-                        const current = await session();
-                        return !!current && current !== previousSession;
-                    },
-                    {
-                        timeout: 15_000,
-                        message:
-                            'Expected a new local sidebar session identity',
-                    },
-                )
-                .toBe(true);
+            await this.action(() =>
+                expect
+                    .poll(
+                        async () => {
+                            const current = await this.action(() => session());
+                            return !!current && current !== previousSession;
+                        },
+                        {
+                            timeout: 15_000,
+                            message:
+                                'Expected a new local sidebar session identity',
+                        },
+                    )
+                    .toBe(true),
+            );
             diagnosticStage = 'select-ask';
             if (backend === 'real') {
                 // The authenticated build can hide legacy Ask from the mode menu.
                 // Its built-in command still selects Ask through the visible command palette.
-                await this.command('Chat: Open Chat (Ask)');
+                await this.action(() => this.command('Chat: Open Chat (Ask)'));
             } else {
-                await chat
-                    .locator('.chat-mode-picker-item [role="button"]')
-                    .click();
+                await this.action(() =>
+                    chat
+                        .locator('.chat-mode-picker-item [role="button"]')
+                        .click(),
+                );
                 diagnosticStage = 'ask-menu-item';
                 const ask = this.page
                     .locator('.action-widget')
                     .getByRole('menuitemcheckbox', { name: /^Ask,/ });
-                await expect(ask).toBeVisible();
-                const position = Number(await ask.getAttribute('data-index'));
+                await this.action(() => expect(ask).toBeVisible());
+                const position = Number(
+                    await this.action(() => ask.getAttribute('data-index')),
+                );
                 if (
                     !Number.isSafeInteger(position) ||
                     position < 0 ||
                     position > 10
                 )
                     throw new Error('Invalid Ask picker position');
-                await this.page.keyboard.press('Home');
+                await this.action(() => this.page.keyboard.press('Home'));
                 for (let i = 0; i < position; i++)
-                    await this.page.keyboard.press('ArrowDown');
-                await this.page.keyboard.press('Enter');
+                    await this.action(() =>
+                        this.page.keyboard.press('ArrowDown'),
+                    );
+                await this.action(() => this.page.keyboard.press('Enter'));
             }
             diagnosticStage = 'ask-selected-label';
-            await expect(
-                chat.locator('.chat-mode-picker-item .chat-input-picker-label'),
-            ).toHaveText('Ask');
+            await this.action(() =>
+                expect(
+                    chat.locator(
+                        '.chat-mode-picker-item .chat-input-picker-label',
+                    ),
+                ).toHaveText('Ask'),
+            );
             const responses = chat.locator(
                 '.interactive-item-container.interactive-response',
             );
             diagnosticStage = 'empty-session';
-            await expect(responses).toHaveCount(0);
-            const sessionId = await session();
+            await this.action(() => expect(responses).toHaveCount(0));
+            const sessionId = await this.action(() => session());
             expect(sessionId).toMatch(/^vscode-chat-session:\/\/local\//);
             evidence.session = sessionId;
             const selector =
@@ -519,142 +681,193 @@ export class Workbench {
                 };
                 evidence.turns.push(item);
                 try {
-                    await bounded(
-                        (async () => {
-                            expect(await session()).toBe(sessionId);
-                            await expect(responses).toHaveCount(index);
-                            if (backend === 'real') {
-                                const issue = await this.chatIssue();
-                                if (issue) throw issue;
-                            }
-                            const before = {
-                                session: sessionId,
-                                responseCount: index,
-                                requestSequence:
-                                    requests().at(-1)?.sequence ?? 0,
-                                priorTurns: turns.slice(0, index),
-                            };
-                            await this.typeInEditor(selector, turn.prompt);
-                            const send = chat.locator(
-                                '.chat-execute-toolbar .action-item:not(.disabled) .action-label.codicon-arrow-up-compact',
-                            );
-                            await expect(send).toBeVisible();
-                            await send.click();
-                            while (true) {
-                                if (backend === 'real') {
-                                    const issue = await this.chatIssue();
-                                    if (issue) throw issue;
-                                }
-                                const bubbles = await responses.evaluateAll(
-                                    (elements) =>
-                                        elements.map((element) => ({
-                                            text: Array.from(
-                                                element.querySelectorAll(
-                                                    '.rendered-markdown',
-                                                ),
-                                            )
-                                                .map(
-                                                    (part) =>
-                                                        part.textContent ?? '',
+                    await this.action(() =>
+                        bounded(
+                            this.cancellation.track(
+                                (async () => {
+                                    expect(
+                                        await this.action(() => session()),
+                                    ).toBe(sessionId);
+                                    await this.action(() =>
+                                        expect(responses).toHaveCount(index),
+                                    );
+                                    if (backend === 'real') {
+                                        const issue = await this.action(() =>
+                                            this.chatIssue(),
+                                        );
+                                        if (issue) throw issue;
+                                    }
+                                    const before = {
+                                        session: sessionId,
+                                        responseCount: index,
+                                        requestSequence:
+                                            requests().at(-1)?.sequence ?? 0,
+                                        priorTurns: turns.slice(0, index),
+                                    };
+                                    await this.action(() =>
+                                        this.typeInEditor(
+                                            selector,
+                                            turn.prompt,
+                                        ),
+                                    );
+                                    const send = chat.locator(
+                                        '.chat-execute-toolbar .action-item:not(.disabled) .action-label.codicon-arrow-up-compact',
+                                    );
+                                    await this.action(() =>
+                                        expect(send).toBeVisible(),
+                                    );
+                                    await this.action(() => send.click());
+                                    while (true) {
+                                        if (backend === 'real') {
+                                            const issue = await this.action(
+                                                () => this.chatIssue(),
+                                            );
+                                            if (issue) throw issue;
+                                        }
+                                        const bubbles = await this.action(() =>
+                                            responses.evaluateAll((elements) =>
+                                                elements.map((element) => ({
+                                                    text: Array.from(
+                                                        element.querySelectorAll(
+                                                            '.rendered-markdown',
+                                                        ),
+                                                    )
+                                                        .map(
+                                                            (part) =>
+                                                                part.textContent ??
+                                                                '',
+                                                        )
+                                                        .join(''),
+                                                    completed:
+                                                        !element.classList.contains(
+                                                            'chat-response-loading',
+                                                        ) &&
+                                                        element.getAttribute(
+                                                            'aria-busy',
+                                                        ) !== 'true',
+                                                })),
+                                            ),
+                                        );
+                                        const current = {
+                                            session: await this.action(() =>
+                                                session(),
+                                            ),
+                                            prompts: await this.action(() =>
+                                                chat
+                                                    .locator(
+                                                        '.interactive-item-container.interactive-request',
+                                                    )
+                                                    .allTextContents(),
+                                            ),
+                                            responses: bubbles,
+                                            requests: requests(),
+                                        };
+                                        item.responseCount = bubbles.length;
+                                        // Do not report content from a replaced session or an unrelated prompt.
+                                        if (
+                                            current.session === sessionId &&
+                                            current.prompts
+                                                .at(-1)
+                                                ?.includes(
+                                                    `[smoke:${turn.marker}]`,
                                                 )
-                                                .join(''),
-                                            completed:
-                                                !element.classList.contains(
-                                                    'chat-response-loading',
-                                                ) &&
-                                                element.getAttribute(
-                                                    'aria-busy',
-                                                ) !== 'true',
-                                        })),
-                                );
-                                const current = {
-                                    session: await session(),
-                                    prompts: await chat
-                                        .locator(
-                                            '.interactive-item-container.interactive-request',
+                                        ) {
+                                            item.observedReply =
+                                                bubbles.at(-1)?.text;
+                                        }
+                                        if (
+                                            turnCompleted(
+                                                before,
+                                                current,
+                                                turn.marker,
+                                                turn.reply,
+                                                backend,
+                                            ) &&
+                                            !(await this.action(() =>
+                                                chat
+                                                    .locator(
+                                                        '.chat-execute-toolbar .codicon-stop-circle',
+                                                    )
+                                                    .isVisible(),
+                                            ))
                                         )
-                                        .allTextContents(),
-                                    responses: bubbles,
-                                    requests: requests(),
-                                };
-                                item.responseCount = bubbles.length;
-                                // Do not report content from a replaced session or an unrelated prompt.
-                                if (
-                                    current.session === sessionId &&
-                                    current.prompts
-                                        .at(-1)
-                                        ?.includes(`[smoke:${turn.marker}]`)
-                                ) {
-                                    item.observedReply = bubbles.at(-1)?.text;
-                                }
-                                if (
-                                    turnCompleted(
-                                        before,
-                                        current,
-                                        turn.marker,
-                                        turn.reply,
-                                        backend,
-                                    ) &&
-                                    !(await chat
-                                        .locator(
-                                            '.chat-execute-toolbar .codicon-stop-circle',
-                                        )
-                                        .isVisible())
-                                )
-                                    break;
-                                if (
-                                    backend === 'real' &&
-                                    bubbles.length === index + 1 &&
-                                    bubbles.at(-1)!.completed &&
-                                    !(await chat
-                                        .locator(
-                                            '.chat-execute-toolbar .codicon-stop-circle',
-                                        )
-                                        .isVisible())
-                                ) {
-                                    throw new ChatFailure(
-                                        'failed',
-                                        'Completed Chat response or transcript did not match the exact expected exchange',
-                                    );
-                                }
-                                if (Date.now() - started >= timeout)
-                                    throw new ChatFailure(
-                                        'failed',
-                                        'Chat response timed out',
-                                    );
-                                await this.page.waitForTimeout(100);
-                            }
-                            if (backend === 'real') {
-                                let exported: unknown;
-                                const path = join(
-                                    exportRoot,
-                                    `chat-turn-${index + 1}.json`,
-                                );
-                                try {
-                                    exported = await this.exportChat(path);
-                                } catch {
-                                    throw new ChatFailure(
-                                        'harness_error',
-                                        'Could not export the test-owned Chat response for completion verification',
-                                    );
-                                } finally {
-                                    await rm(path, { force: true });
-                                }
-                                const observed = verifyExport(
-                                    exported,
-                                    turns.slice(0, index + 1),
-                                );
-                                item.observedReply = observed.at(-1);
-                                expect(await session()).toBe(sessionId);
-                                const issue = await this.chatIssue();
-                                if (issue) throw issue;
-                            } else
-                                item.requestSequence =
-                                    requests().at(-1)!.sequence;
-                            item.completed = true;
-                        })(),
-                        timeout,
-                        'Chat turn',
+                                            break;
+                                        if (
+                                            backend === 'real' &&
+                                            bubbles.length === index + 1 &&
+                                            bubbles.at(-1)!.completed &&
+                                            !(await this.action(() =>
+                                                chat
+                                                    .locator(
+                                                        '.chat-execute-toolbar .codicon-stop-circle',
+                                                    )
+                                                    .isVisible(),
+                                            ))
+                                        ) {
+                                            throw new ChatFailure(
+                                                'failed',
+                                                'Completed Chat response or transcript did not match the exact expected exchange',
+                                            );
+                                        }
+                                        if (Date.now() - started >= timeout)
+                                            throw new ChatFailure(
+                                                'failed',
+                                                'Chat response timed out',
+                                            );
+                                        await this.action(() =>
+                                            this.page.waitForTimeout(100),
+                                        );
+                                    }
+                                    if (backend === 'real') {
+                                        let exported: unknown;
+                                        const path = join(
+                                            exportRoot,
+                                            `chat-turn-${index + 1}.json`,
+                                        );
+                                        try {
+                                            exported = await this.action(() =>
+                                                this.exportChat(path),
+                                            );
+                                        } catch (cause) {
+                                            if (
+                                                cause instanceof
+                                                    CancellationError ||
+                                                cause instanceof
+                                                    ScenarioStoppedError
+                                            )
+                                                throw cause;
+                                            throw new ChatFailure(
+                                                'harness_error',
+                                                'Could not export the test-owned Chat response for completion verification',
+                                            );
+                                        } finally {
+                                            await this.cancellation.track(
+                                                rm(path, { force: true }),
+                                            );
+                                        }
+                                        this.cancellation.check();
+                                        const observed = verifyExport(
+                                            exported,
+                                            turns.slice(0, index + 1),
+                                        );
+                                        item.observedReply = observed.at(-1);
+                                        expect(
+                                            await this.action(() => session()),
+                                        ).toBe(sessionId);
+                                        const issue = await this.action(() =>
+                                            this.chatIssue(),
+                                        );
+                                        if (issue) throw issue;
+                                    } else
+                                        item.requestSequence =
+                                            requests().at(-1)!.sequence;
+                                    this.cancellation.check();
+                                    item.completed = true;
+                                })(),
+                            ),
+                            timeout,
+                            'Chat turn',
+                        ),
                     );
                 } finally {
                     item.durationMs = Date.now() - started;
@@ -662,11 +875,14 @@ export class Workbench {
             }
             return evidence;
         } catch (cause) {
+            if (
+                cause instanceof CancellationError ||
+                cause instanceof ScenarioStoppedError
+            )
+                throw cause;
             if (backend === 'real') {
-                const issue = await this.chatIssue().catch(() => undefined);
-                const failure =
-                    issue ??
-                    (cause instanceof ChatFailure
+                const originalFailure =
+                    cause instanceof ChatFailure
                         ? cause
                         : new ChatFailure(
                               String(cause).includes('Chat turn timed out')
@@ -675,7 +891,22 @@ export class Workbench {
                               String(cause).includes('Chat turn timed out')
                                   ? 'Chat turn timed out'
                                   : `Chat UI/session contract failed (${diagnosticStage})`,
-                          ));
+                          );
+                // Publish sanitized failure evidence before awaiting diagnostics so
+                // cancellation cannot discard an already-observed failure.
+                evidence.originatingFailure = {
+                    outcome: originalFailure.outcome,
+                    error: originalFailure.message,
+                };
+                // An already-observed failure is authoritative; a fresh diagnostic
+                // read could overwrite it or lose it to cancellation while awaiting.
+                const issue =
+                    cause instanceof ChatFailure
+                        ? undefined
+                        : await this.action(() =>
+                              this.chatIssue().catch(() => undefined),
+                          );
+                const failure = issue ?? originalFailure;
                 if (failure.observedReplies)
                     for (const [
                         index,
@@ -706,6 +937,7 @@ export class PythonDeadline {
     constructor(
         timeoutMs: number,
         private readonly now: () => number = Date.now,
+        readonly cancellation = new Cancellation(),
     ) {
         this.end = now() + timeoutMs;
         this.stageEnd = this.end;
@@ -716,6 +948,7 @@ export class PythonDeadline {
     }
 
     remaining(limit = 15_000): number {
+        this.cancellation.check();
         if (this.now() >= Math.min(this.end, this.stageEnd)) {
             this.timedOut = true;
             this.stopped = true;
@@ -738,12 +971,14 @@ export class PythonDeadline {
 
     async perform<T>(operation: () => Promise<T>): Promise<T> {
         const timeoutMs = this.remaining(Number.MAX_SAFE_INTEGER);
-        const work = Promise.resolve().then(async () => {
-            this.remaining();
-            const result = await operation();
-            this.remaining();
-            return result;
-        });
+        const work = this.cancellation.track(
+            Promise.resolve().then(async () => {
+                this.remaining();
+                const result = await operation();
+                this.remaining();
+                return result;
+            }),
+        );
         this.pending.add(work);
         // Both handlers consume completion, including after the caller timed out.
         void work.then(
@@ -752,20 +987,22 @@ export class PythonDeadline {
         );
         let timer: ReturnType<typeof setTimeout> | undefined;
         try {
-            return await Promise.race([
-                work,
-                new Promise<never>((_, reject) => {
-                    timer = setTimeout(() => {
-                        this.timedOut = true;
-                        this.stopped = true;
-                        reject(
-                            new Error(
-                                `Python scenario expired at ${this.label}`,
-                            ),
-                        );
-                    }, timeoutMs);
-                }),
-            ]);
+            return await this.cancellation.perform(() =>
+                Promise.race([
+                    work,
+                    new Promise<never>((_, reject) => {
+                        timer = setTimeout(() => {
+                            this.timedOut = true;
+                            this.stopped = true;
+                            reject(
+                                new Error(
+                                    `Python scenario expired at ${this.label}`,
+                                ),
+                            );
+                        }, timeoutMs);
+                    }),
+                ]),
+            );
         } finally {
             clearTimeout(timer);
         }
@@ -790,7 +1027,7 @@ export class PythonWorkbench extends Workbench {
         page: Page,
         private readonly deadline: PythonDeadline,
     ) {
-        super(page);
+        super(page, deadline.cancellation);
     }
 
     private step<T>(operation: () => Promise<T>): Promise<T> {
@@ -1097,7 +1334,12 @@ export class PythonWorkbench extends Workbench {
                 throw new Error('Invalid terminal observation contract');
             return result;
         } catch (cause) {
-            if (this.deadline.expired) throw cause;
+            if (
+                cause instanceof CancellationError ||
+                cause instanceof ScenarioStoppedError ||
+                this.deadline.expired
+            )
+                throw cause;
             throw new PythonFailure(
                 'harness_error',
                 'Python terminal observation contract unavailable',

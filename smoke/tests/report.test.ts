@@ -261,3 +261,88 @@ test('Python text includes observed stage, installation and runtime while leavin
     assert.match(partial, /Python stage: extension-install/);
     assert.doesNotMatch(partial, /Python runtime:/);
 });
+
+test('cancellation during report persistence reconciles JSON and text while retaining originating evidence', async (t) => {
+    const { mkdtemp, writeFile, readFile, rm } =
+        await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { Cancellation } = await import('../src/cancellation.js');
+    const { reportResult } = await import('../src/report.js');
+    const root = await mkdtemp(join(tmpdir(), 'smoke-cancel-report-'));
+    t.after(() => rm(root, { recursive: true, force: true }));
+    const cancellation = new Cancellation();
+    const result = {
+        outcome: 'failed',
+        error: 'Graph message missing',
+        resultPath: join(root, 'result.json'),
+        checks: [
+            { suite: 'git', outcome: 'failed', evidence: { hash: 'owned' } },
+        ],
+        cleanup: {
+            disposition: 'retained',
+            reservationRetained: false,
+            errors: [],
+        },
+    };
+    await writeFile(result.resultPath, JSON.stringify(result));
+    let message = '';
+    const reporting = reportResult(
+        result,
+        'json',
+        (value: string) => {
+            message = value;
+        },
+        cancellation,
+    );
+    cancellation.request();
+    assert.equal(await reporting, 1);
+    const emitted = JSON.parse(message);
+    assert.equal(emitted.outcome, 'harness_error');
+    assert.equal(emitted.cancellation.reason, 'Cancelled by user');
+    assert.deepEqual(emitted.originating, {
+        outcome: 'failed',
+        error: 'Graph message missing',
+    });
+    assert.deepEqual(emitted.checks, result.checks);
+    assert.deepEqual(
+        JSON.parse(await readFile(result.resultPath, 'utf8')),
+        emitted,
+    );
+    const text = await readFile(join(root, 'result.txt'), 'utf8');
+    assert.match(text, /Cancellation: Cancelled by user/);
+    assert.match(text, /Originating disposition: FAILED/);
+    assert.match(text, /Originating reason: Graph message missing/);
+});
+
+test('cancellation during a failed text write preserves cancellation in JSON and reports the write failure', async (t) => {
+    const { mkdtemp, mkdir, writeFile, readFile, rm } =
+        await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { Cancellation } = await import('../src/cancellation.js');
+    const { reportResult } = await import('../src/report.js');
+    const root = await mkdtemp(join(tmpdir(), 'smoke-cancel-report-error-'));
+    t.after(() => rm(root, { recursive: true, force: true }));
+    const result = { outcome: 'passed', resultPath: join(root, 'result.json') };
+    await writeFile(result.resultPath, JSON.stringify(result));
+    await mkdir(join(root, 'result.txt'));
+    const cancellation = new Cancellation();
+    let message = '';
+    const reporting = reportResult(
+        result,
+        'json',
+        (value) => {
+            message = value;
+        },
+        cancellation,
+    );
+    cancellation.request();
+    assert.equal(await reporting, 1);
+    assert.match(JSON.parse(message).reportingError, /result.txt/);
+    assert.equal(
+        JSON.parse(await readFile(result.resultPath, 'utf8')).cancellation
+            .reason,
+        'Cancelled by user',
+    );
+});

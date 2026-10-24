@@ -61,7 +61,7 @@ test('uncertain Electron launch retains the reservation and closes the owned moc
         },
     );
     t.after(() => rm(result.resourcesPath, { recursive: true, force: true }));
-    assert.equal(result.outcome, 'harness_error');
+    assert.equal(result.outcome, 'harness_error', JSON.stringify(result));
     assert.equal(result.cleanup.reservationRetained, true);
     assert.match(result.error ?? '', /Electron launch interrupted/);
     await access(join(checkout, 'reports/smoke/.reservation'));
@@ -413,4 +413,376 @@ test('Python foundation rejects before launch with standalone metadata', async (
     assert.equal(result.mockRequestCount, null);
     assert.equal(result.requests, null);
     assert.match(result.error ?? '', /Python.*foundation|foundation.*Python/i);
+});
+
+test('cancellation before a run acquires no reservation or disposable resources', async (t) => {
+    const { Cancellation } = await import('../src/cancellation.js');
+    const checkout = await mkdtemp(join(tmpdir(), 'cancel-before-run-'));
+    t.after(() => rm(checkout, { recursive: true, force: true }));
+    const cancellation = new Cancellation();
+    cancellation.request();
+    // Exercise the proposed optional API before its implementation exists.
+    const invoke = runSmoke as (...args: any[]) => ReturnType<typeof runSmoke>;
+    await assert.rejects(
+        invoke(
+            { build: join(checkout, 'Missing.app'), suite: 'editing' },
+            checkout,
+            async () => assert.fail('Cancelled run must not launch'),
+            {},
+            cancellation,
+        ),
+        /Cancelled by user/,
+    );
+    await assert.rejects(access(join(checkout, 'reports')));
+});
+
+test('cancellation during pending launch owns the late handle and prevents readiness or scenarios', async (t) => {
+    const { Cancellation } = await import('../src/cancellation.js');
+    const checkout = await mkdtemp(join(tmpdir(), 'cancel-late-launch-'));
+    t.after(() => rm(checkout, { recursive: true, force: true }));
+    const build = await fixtureApp(checkout);
+    const cancellation = new Cancellation();
+    let closed = false;
+    let nextActions = 0;
+    let mockClosed = false;
+    const result = await runSmoke(
+        { build, suite: 'editing' },
+        checkout,
+        async () => {
+            cancellation.request();
+            await new Promise<void>((resolve) => setTimeout(resolve, 10));
+            return {
+                process: () => ({ exitCode: 0, signalCode: null }),
+                firstWindow: async () => {
+                    nextActions++;
+                    throw new Error('Must not discover a window');
+                },
+                close: async () => {
+                    closed = true;
+                },
+            } as never;
+        },
+        {
+            startMock: async () => ({
+                url: 'http://127.0.0.1:12345',
+                requests: () => [],
+                close: async () => {
+                    mockClosed = true;
+                },
+            }),
+            editing: async () => {
+                nextActions++;
+                return { files: [], createdInitiallyAbsent: true };
+            },
+        },
+        cancellation,
+    );
+    t.after(() => rm(result.resourcesPath, { recursive: true, force: true }));
+    assert.equal(result.outcome, 'harness_error');
+    assert.match(result.error ?? '', /Cancelled by user/);
+    assert.equal(nextActions, 0);
+    assert.equal(closed, true);
+    assert.equal(mockClosed, true);
+    assert.equal(result.checks[0].outcome, 'not_run');
+    assert.equal(result.cleanup.reservationRetained, false);
+    assert.equal(result.cleanup.disposition, 'retained');
+    await access(result.resourcesPath);
+});
+
+test('active cancellation stops basic scheduling and settles scenario work before releasing the reservation', async (t) => {
+    const { Cancellation } = await import('../src/cancellation.js');
+    const checkout = await mkdtemp(join(tmpdir(), 'cancel-active-run-'));
+    t.after(() => rm(checkout, { recursive: true, force: true }));
+    const build = await fixtureApp(checkout);
+    const cancellation = new Cancellation();
+    let chatCalls = 0;
+    let settled = false;
+    const result = await runSmoke(
+        { build, suite: 'basic' },
+        checkout,
+        async () => applicationFixture(),
+        {
+            startMock: async () => ({
+                url: 'http://127.0.0.1:12345',
+                requests: () => [],
+                close: async () => {},
+            }),
+            workbench: () =>
+                ({
+                    ready: async () => {},
+                    qualifyChat: async () => {
+                        chatCalls++;
+                        return { session: 'unused', turns: [] };
+                    },
+                }) as never,
+            editing: async () => {
+                cancellation.request();
+                await new Promise<void>((resolve) => setTimeout(resolve, 15));
+                settled = true;
+                return { files: [], createdInitiallyAbsent: true };
+            },
+        },
+        cancellation,
+    );
+    t.after(() => rm(result.resourcesPath, { recursive: true, force: true }));
+    assert.equal(result.outcome, 'harness_error');
+    assert.equal(chatCalls, 0);
+    assert.equal(settled, true);
+    assert.deepEqual(
+        result.checks.map((check) => check.outcome),
+        ['harness_error', 'not_run'],
+    );
+    assert.equal(result.cleanup.reservationRetained, false);
+    assert.equal(result.cleanup.disposition, 'retained');
+});
+
+test('cancellation during successful cleanup retains evidence instead of using the earlier pass decision', async (t) => {
+    const { Cancellation } = await import('../src/cancellation.js');
+    const checkout = await mkdtemp(join(tmpdir(), 'cancel-cleanup-run-'));
+    t.after(() => rm(checkout, { recursive: true, force: true }));
+    const build = await fixtureApp(checkout);
+    const cancellation = new Cancellation();
+    const result = await runSmoke(
+        { build, suite: 'editing' },
+        checkout,
+        async () => {
+            const app = (await applicationFixture()) as any;
+            app.close = async () => {
+                cancellation.request();
+                cancellation.request();
+            };
+            return app;
+        },
+        {
+            startMock: async () => ({
+                url: 'http://127.0.0.1:12345',
+                requests: () => [],
+                close: async () => {},
+            }),
+            workbench: () => ({ ready: async () => {} }) as never,
+            editing: async () => ({ files: [], createdInitiallyAbsent: true }),
+        },
+        cancellation,
+    );
+    t.after(() => rm(result.resourcesPath, { recursive: true, force: true }));
+    assert.equal(result.outcome, 'harness_error');
+    assert.equal(result.checks[0].outcome, 'passed');
+    assert.equal(result.cleanup.disposition, 'retained');
+    assert.equal(result.cleanup.reservationRetained, false);
+    await access(result.resourcesPath);
+});
+
+test('cancellation during failed cleanup preserves the originating scenario failure', async (t) => {
+    const { Cancellation } = await import('../src/cancellation.js');
+    const checkout = await mkdtemp(join(tmpdir(), 'cancel-originating-run-'));
+    t.after(() => rm(checkout, { recursive: true, force: true }));
+    const build = await fixtureApp(checkout);
+    const cancellation = new Cancellation();
+    const result = await runSmoke(
+        { build, suite: 'editing' },
+        checkout,
+        async () => {
+            const app = (await applicationFixture()) as any;
+            app.close = async () => {
+                cancellation.request();
+                throw new Error('Owned close failed');
+            };
+            return app;
+        },
+        {
+            startMock: async () => ({
+                url: 'http://127.0.0.1:12345',
+                requests: () => [],
+                close: async () => {},
+            }),
+            workbench: () => ({ ready: async () => {} }) as never,
+            editing: async () => {
+                throw new Error('Original file mismatch');
+            },
+        },
+        cancellation,
+    );
+    t.after(() => rm(result.resourcesPath, { recursive: true, force: true }));
+    assert.equal(result.outcome, 'harness_error');
+    assert.match(result.checks[0].error ?? '', /Original file mismatch/);
+    const saved = JSON.parse(await readFile(result.resultPath, 'utf8'));
+    assert.equal(saved.originating.outcome, 'failed');
+    assert.match(saved.originating.error, /Original file mismatch/);
+    assert.equal(saved.cancellation.reason, 'Cancelled by user');
+    assert.equal(result.cleanup.reservationRetained, true);
+    assert.match(result.cleanup.errors.join(' '), /Owned close failed/);
+});
+
+test('a launch handle arriving after cleanup expiry is closed without releasing the uncertain reservation', async (t) => {
+    const { Cancellation } = await import('../src/cancellation.js');
+    const { EventEmitter } = await import('node:events');
+    const checkout = await mkdtemp(join(tmpdir(), 'cancel-expired-launch-'));
+    t.after(() => rm(checkout, { recursive: true, force: true }));
+    const build = await fixtureApp(checkout);
+    const cancellation = new Cancellation();
+    const child = Object.assign(new EventEmitter(), {
+        exitCode: null as number | null,
+        signalCode: null,
+    });
+    let observeClose!: () => void;
+    const closed = new Promise<void>((resolve) => {
+        observeClose = resolve;
+    });
+    const result = await runSmoke(
+        { build, suite: 'editing' },
+        checkout,
+        async () => {
+            cancellation.request();
+            await new Promise<void>((resolve) => setTimeout(resolve, 60));
+            return {
+                process: () => child,
+                close: async () => {
+                    child.exitCode = 0;
+                    child.emit('exit');
+                    observeClose();
+                },
+                firstWindow: async () =>
+                    assert.fail('Late launch must never discover a window'),
+            } as never;
+        },
+        {
+            cleanupTimeoutMs: 15,
+            startMock: async () => ({
+                url: 'http://127.0.0.1:12345',
+                requests: () => [],
+                close: async () => {},
+            }),
+        },
+        cancellation,
+    );
+    t.after(() => rm(result.resourcesPath, { recursive: true, force: true }));
+    assert.equal(result.outcome, 'harness_error');
+    assert.equal(result.cleanup.reservationRetained, true);
+    const reservation = await readFile(
+        join(checkout, 'reports/smoke/.reservation'),
+    );
+    await closed;
+    assert.deepEqual(
+        await readFile(join(checkout, 'reports/smoke/.reservation')),
+        reservation,
+    );
+    assert.equal(child.exitCode, 0);
+    assert.equal(child.listenerCount('exit'), 0);
+    await access(result.resourcesPath);
+});
+
+test('repeated cancellation during cleanup does not extend its deadline or release unsettled work', async (t) => {
+    const { Cancellation } = await import('../src/cancellation.js');
+    const checkout = await mkdtemp(join(tmpdir(), 'cancel-expired-cleanup-'));
+    t.after(() => rm(checkout, { recursive: true, force: true }));
+    const build = await fixtureApp(checkout);
+    const cancellation = new Cancellation();
+    let closeFinished = false;
+    let start = 0;
+    const result = await runSmoke(
+        { build, suite: 'editing' },
+        checkout,
+        async () => {
+            const app = (await applicationFixture()) as any;
+            app.close = async () => {
+                start = Date.now();
+                cancellation.request();
+                await new Promise<void>((resolve) => setTimeout(resolve, 10));
+                cancellation.request();
+                await new Promise<void>((resolve) => setTimeout(resolve, 70));
+                closeFinished = true;
+            };
+            return app;
+        },
+        {
+            cleanupTimeoutMs: 25,
+            startMock: async () => ({
+                url: 'http://127.0.0.1:12345',
+                requests: () => [],
+                close: async () => {},
+            }),
+            workbench: () => ({ ready: async () => {} }) as never,
+            editing: async () => ({ files: [], createdInitiallyAbsent: true }),
+        },
+        cancellation,
+    );
+    t.after(() => rm(result.resourcesPath, { recursive: true, force: true }));
+    assert.equal(result.outcome, 'harness_error');
+    assert.equal(result.cleanup.reservationRetained, true);
+    assert.equal(closeFinished, false);
+    assert.ok(
+        Date.now() - start < 75,
+        'Cleanup must return before the unresolved close completes',
+    );
+    assert.match(result.cleanup.errors.join(' '), /timed out|deadline expired/);
+    await new Promise<void>((resolve) => setTimeout(resolve, 90));
+    assert.equal(closeFinished, true);
+    await access(join(checkout, 'reports/smoke/.reservation'));
+});
+
+test('cancellation during resource acquisition settles the owned run before releasing its reservation', async (t) => {
+    const { Cancellation } = await import('../src/cancellation.js');
+    const { createRun } = await import('../src/resources.js');
+    const checkout = await mkdtemp(join(tmpdir(), 'cancel-acquisition-'));
+    t.after(() => rm(checkout, { recursive: true, force: true }));
+    const cancellation = new Cancellation();
+    let acquired = false;
+    const result = await runSmoke(
+        { build: join(checkout, 'Missing.app'), suite: 'editing' },
+        checkout,
+        async () => assert.fail('Cancelled acquisition must not launch'),
+        {
+            createRun: async (root: string) => {
+                const run = await createRun(root);
+                cancellation.request();
+                await new Promise<void>((resolve) => setTimeout(resolve, 10));
+                await access(run.reservation);
+                acquired = true;
+                return run;
+            },
+        } as any,
+        cancellation,
+    );
+    t.after(() => rm(result.resourcesPath, { recursive: true, force: true }));
+    assert.equal(acquired, true);
+    assert.equal(result.outcome, 'harness_error');
+    assert.equal(result.cleanup.reservationRetained, false);
+    assert.equal(result.cleanup.disposition, 'retained');
+});
+
+test('real Chat cancellation retains a sanitized failure observed before pending diagnostics', async (t) => {
+    const { Cancellation, CancellationError } =
+        await import('../src/cancellation.js');
+    const checkout = await mkdtemp(join(tmpdir(), 'cancel-chat-origin-'));
+    t.after(() => rm(checkout, { recursive: true, force: true }));
+    const build = await fixtureApp(checkout);
+    await realProfile(checkout, true);
+    const cancellation = new Cancellation();
+    const result = await runSmoke(
+        { build, suite: 'chat', chatBackend: 'real' },
+        checkout,
+        async () => applicationFixture(),
+        {
+            workbench: () =>
+                ({
+                    ready: async () => {},
+                    qualifyChat: async (...args: any[]) => {
+                        const evidence = args[6];
+                        evidence.originatingFailure = {
+                            outcome: 'harness_error',
+                            error: 'Chat UI/session contract failed (open-session)',
+                        };
+                        cancellation.request();
+                        throw new CancellationError();
+                    },
+                }) as never,
+        },
+        cancellation,
+    );
+    t.after(() => rm(result.resourcesPath, { recursive: true, force: true }));
+    assert.equal(result.outcome, 'harness_error');
+    assert.deepEqual(result.originating, {
+        outcome: 'harness_error',
+        error: 'Chat UI/session contract failed (open-session)',
+    });
 });
