@@ -80,3 +80,20 @@ test('reports identify real and mock backends including blocked Chat prerequisit
     assert.match(text, /Rerun setup:real-chat/);
   }
 });
+
+test('Git confirmation shows the full independent hash/message/log and Git-only Chat selection truthfully',()=>{
+  const hash='0123456789abcdef0123456789abcdef01234567';
+  const result={outcome:'passed',chatBackend:'mock' as const,chatSelected:false,mockRequestEvidence:'inapplicable',mockRequestCount:null,requests:null,
+    checks:[{suite:'git',outcome:'passed',evidence:{stage:'complete',hash,message:'Smoke Git unique',log:`${hash} Smoke Git unique`,graphVisible:true}}]};
+  const text=formatResult(result);
+  assert.match(text,/Chat: Not selected/);assert.match(text,/Mock request evidence: Inapplicable/);
+  assert.match(text,new RegExp(`Git commit: ${hash} Smoke Git unique`));assert.match(text,new RegExp(`Git log: ${hash} Smoke Git unique`));
+  assert.doesNotMatch(text,/Chat backend: mock/);
+  const blocked=formatResult({outcome:'blocked',checks:[{suite:'git',outcome:'not_run',evidence:{stage:'preflight'}}]});
+  assert.match(blocked,/Git stage: preflight/);assert.doesNotMatch(blocked,/Git commit:|Git log:/);
+});
+
+test('partial Graph failure retains independent Git confirmation without claiming a passing suite',()=>{
+  const text=formatResult({outcome:'failed',checks:[{suite:'git',outcome:'failed',error:'Graph message missing',evidence:{stage:'graph',hash:'0123456789abcdef0123456789abcdef01234567',message:'Smoke Git partial',log:'owned commit evidence'}}]});
+  assert.match(text,/Git\s+FAILED/);assert.match(text,/Git stage: graph/);assert.match(text,/Git commit: 0123456789abcdef0123456789abcdef01234567 Smoke Git partial/);assert.match(text,/Reason: Graph message missing/);
+});

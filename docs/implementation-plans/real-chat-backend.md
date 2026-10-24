@@ -27,7 +27,7 @@ At the slice 1 checkpoint, real smoke runs explicitly returned blocked before la
 
 ## Slice 2 — Chat integration and reporting
 
-Status: implementation verified; developer validation pending.
+Status: developer validated on 2026-10-23 local / 2026-10-24 UTC. All listed GUI qualification checks are verified, including signed-out blocking and authenticated recovery.
 
 Tests use the approved plan’s public boundaries: turn/transcript validation (exactness and freshness), backend/profile configuration and cleanup, runner outcomes, and JSON/text reporting. UI and sign-in behavior remain subject to the separate GUI checks below.
 
@@ -39,14 +39,14 @@ Tests use the approved plan’s public boundaries: turn/transcript validation (e
 - [x] Report backend, prompts, expected/observed replies, session identity and timings in JSON and backend in text. Mock request evidence is inapplicable in real mode.
 - [x] Classify response mismatches, service errors and response timeouts as failed; harness/cleanup errors as harness_error. Capture only authenticated test-owned Chat diagnostics; exclude credentials and authentication screens.
 - [x] TDD for reply matching, freshness, classification and reporting; compilation and full non-GUI suite; update docs and links.
-- [ ] Developer validation of slice 2.
+- [x] Developer validation of slice 2 — “I validate the two items”, explicitly accepting real-backend slice 2 and the PR #39 P2 cleanup after the GUI runs recorded below.
 
 ## Separately authorized GUI qualification
 
-- [ ] Default mocked Chat on VS Code 1.135.0 / Copilot Chat 0.63.0, macOS arm64.
+- [x] Default mocked Chat on VS Code 1.135.0 / Copilot Chat 0.63.0, macOS arm64 — editing and both Chat turns passed through `basic --chat-backend mock` after the P2 cleanup; evidence below.
 - [x] Real two-turn Chat — authorized reproduction and fixes, 2026-10-22; evidence below.
 - [x] Combined editing and real Chat — developer-authorized run passed on 2026-10-23; evidence below.
-- [ ] Signed-out real Chat blocks with setup instructions.
+- [x] Signed-out real Chat blocks with setup instructions — authorized manual sign-out verification and authenticated recovery passed; evidence below.
 
 ## Slice 2 verification — 2026-10-22
 
@@ -100,3 +100,41 @@ After the issue #36 preference fix, the developer requested setup, then real Cha
 - Combined: the same command with `--suite all --chat-backend real` passed editing (0.395 seconds), real Chat (14.250 seconds), and cleanup. Total: 16.123 seconds. [Local result](../../reports/smoke/2026-10-23T15-27-28-468Z-dc8e291b-edda-4d52-b71f-c2de12267dbb/result.json).
 
 Both runs used the pinned compatibility gate (macOS arm64, Node 26.3.1, VS Code 1.135.0 / Copilot Chat 0.63.0), removed disposable resources, released the reservation, and preserved the authenticated profile. Real runs suppress screenshots and traces. These results verify authenticated profile reuse across launches and combined real mode. The developer explicitly accepted the issue #36 fix on 2026-10-23: “i validate that fix for issue 36 works”. Signed-out blocking and the separate slice 2 developer-validation gate remain pending.
+
+## Real Chat-only rerun — 2026-10-23 local / 2026-10-24 UTC
+
+The developer requested the real backend after a passing mocked Chat-only run, with the desktop still reserved and unlocked. `npm --prefix smoke run smoke -- --build "/Applications/Visual Studio Code.app" --suite chat --chat-backend real` returned **harness_error**, `Chat UI/session contract failed (select-ask)`, before prompt submission. Chat took 5.142 seconds; total 6.439 seconds. The run used VS Code 1.135.0 / Copilot Chat 0.63.0, Node 26.3.1 on macOS arm64, with the authorized dedicated real profile and persistent secret storage. No completed turn was recorded, so this does not establish real-service response behavior or current authentication readiness.
+
+Owned shutdown succeeded with no cleanup errors; the reservation was released, the dedicated profile preserved, and failed disposable resources `/private/tmp/ide-smoke-a0GWhf` retained. No screenshots or traces were captured. No fixes or retries were attempted. [Local result](../../reports/smoke/2026-10-24T02-28-59-939Z-a54b61ec-30f3-41b4-baa9-508082a975df/result.json). The earlier passing runs above remain historical evidence; slice 2 developer validation and signed-out blocking remain pending.
+
+The developer subsequently requested restoring the previously passing Chat behavior. `Workbench.qualifyChat` now exactly matches `b9a4cc4`, including waiting for fresh session identity before Ask selection; duplicate-title first-match handling was removed, while Git-specific command-picker support remains. Compilation and all 75 non-GUI checks pass. No GUI check of this restored version has been performed; the failed real run above predates the restoration. See the [restoration record](issue-38-git-smoke-test.md#developer-directed-restoration-of-previously-passing-chat-behavior).
+
+### Restored real all-suite GUI verification — 2026-10-23 local / 2026-10-24 UTC
+
+The developer requested GUI `all --chat-backend real` on the still-reserved desktop. `npm --prefix smoke run smoke -- --build "/Applications/Visual Studio Code.app" --suite all --chat-backend real` **passed**: editing 0.357 seconds, real Chat 4.433 seconds, total 6.332 seconds. Only editing and Chat were selected. Independent saved-file/reopened-editor checks and both fresh exact-token Chat turns, preserved first exchange and raw export completion checks passed on VS Code 1.135.0 / Copilot Chat 0.63.0, Node 26.3.1 macOS arm64. The run reused the authorized dedicated real profile's saved authentication, started no mock, and captured no screenshots or traces. Owned shutdown succeeded, disposable resources were removed, the reservation was released and the dedicated profile preserved. No fixes or retries were needed. [Result](../../reports/smoke/2026-10-24T02-36-39-285Z-b19b9834-4aec-4b7b-b710-c423ec428a26/result.json). Both restored mocked and real editing/Chat combined flows now have passing GUI evidence. Final issue acceptance, real-backend slice 2 developer validation and signed-out blocking remain pending.
+
+## Renamed basic real-backend GUI run — 2026-10-23 local / 2026-10-24 UTC
+
+After the suite rename, the developer requested sequential mocked `basic`, real `basic` and standalone Git. Mocked `basic` and Git passed. Real `basic` **failed**: editing passed (0.336 seconds), Chat displayed an error/warning (4.594 seconds), total 6.483 seconds. The report does not establish the underlying error/warning cause. This differs from the earlier Ask-selection harness failure. The run used the same pinned versions and dedicated real profile; no screenshots/traces were captured. Owned shutdown succeeded with no cleanup errors, the reservation was released, the profile preserved and failed resources retained at `/private/tmp/ide-smoke-EutFpa`. No fixes or retries were attempted. [Result](../../reports/smoke/2026-10-24T02-39-39-813Z-3788d88d-77b4-4646-9bd7-5020997abe6b/result.json). Earlier real combined passes remain historical evidence; the latest renamed real run did not pass.
+
+### Renamed real basic rerun — 2026-10-23 local / 2026-10-24 UTC
+
+At the developer's explicit request, reran `npm --prefix smoke run smoke -- --build "/Applications/Visual Studio Code.app" --suite basic --chat-backend real` on the still-reserved desktop. **Passed**: editing 0.478 seconds, both real Chat turns 4.509 seconds, total 6.560 seconds. Independent file/reopen verification, fresh exact-token replies, preserved first exchange and raw export completion checks passed on VS Code 1.135.0 / Copilot Chat 0.63.0, Node 26.3.1 macOS arm64. The dedicated profile was preserved; owned shutdown succeeded, disposable resources were removed and the reservation released. No screenshots/traces were captured. No source changes or fixes preceded this rerun. [Result](../../reports/smoke/2026-10-24T02-41-10-830Z-d02790fd-3271-4c33-aca7-b3743a8b4432/result.json). The previous error/warning remains an observed failure with unconfirmed underlying cause; this rerun does not establish its cause or a fix. Final developer acceptance and separate real-backend validation gates remain pending.
+
+Developer-requested repeat real `basic` GUI run: **passed**, editing 0.362 seconds, both real Chat turns 4.894 seconds, total 6.737 seconds. Run `2026-10-24T02-43-15-262Z-ee3e3f54-5d0a-469d-a8a3-3c1bec33f9ec` used the same pinned versions and dedicated profile on the still-reserved desktop, with no source changes. Owned shutdown and disposable cleanup succeeded, the reservation was released and the profile preserved. No screenshots/traces were captured. This is the second consecutive developer-requested passing renamed real `basic` run; it does not establish the cause of the earlier warning. [Result](../../reports/smoke/2026-10-24T02-43-15-262Z-ee3e3f54-5d0a-469d-a8a3-3c1bec33f9ec/result.json).
+
+## Developer acceptance after PR #39 P2 regression runs
+
+After being told the P2 cleanup acceptance and real-backend slice 2 acceptance were pending, the developer stated: “I validate the two items”. Both acceptance gates are now satisfied. The separately listed signed-out blocking check remains unverified; authenticated passes and developer acceptance do not establish that behavior. No sign-out or additional GUI work was performed or authorized by this acceptance.
+
+The preceding sequential regression runs used VS Code 1.135.0 / Copilot Chat 0.63.0, Node 26.3.1 macOS arm64. Mocked `basic` passed editing and both Chat turns in 4.821 seconds total ([local result](../../reports/smoke/2026-10-24T03-08-27-610Z-ab85089b-8ecd-4cf6-bee9-da1f046a2f88/result.json)); real `basic` passed editing and both exact same-session replies plus raw-export completion checks in 6.018 seconds total ([local result](../../reports/smoke/2026-10-24T03-09-14-436Z-8833e580-adb6-47cd-9159-9577c6a3a1fa/result.json)). Both confirmed owned shutdown, disposable cleanup and reservation release; the real profile was preserved. Historical pending-gate statements above describe their earlier checkpoints.
+
+## Signed-out blocking and authenticated recovery — 2026-10-23 local / 2026-10-24 UTC
+
+The developer authorized the proposed manual sign-out, signed-out test, manual sign-in and authenticated recovery sequence (“let's do this”) on the reserved desktop. Compilation passed. The setup command opened only the dedicated `profiles/smoke-real-chat` profile; the developer confirmed manual sign-out and window closure. Setup confirmed owned shutdown, profile preservation and reservation release. No credentials were inspected or authentication actions automated.
+
+The subsequent `--suite chat --chat-backend real` run returned the expected **BLOCKED** outcome and exit code 1 with `setup:real-chat` instructions: Chat 0.019 seconds, total 1.777 seconds. No session or turns were recorded; mock evidence was inapplicable and diagnostics were empty (no screenshots/traces). Owned shutdown succeeded with no cleanup errors and the reservation was released. The profile was preserved; disposable resources `/private/tmp/ide-smoke-zkBUEk` were retained under the normal blocked-run evidence policy. The closed profile and absent reservation were independently checked. [Signed-out result](../../reports/smoke/2026-10-24T03-14-28-019Z-5e96e3fe-4bf4-4176-b5b5-8f5ada914279/result.json). The blocked outcome is the successful observation for this qualification; it is not a functional failure.
+
+Setup was reopened and the developer confirmed manual sign-in and window closure. The recovery `--suite chat --chat-backend real` run **passed both turns**: Chat 9.198 seconds, total 10.692 seconds. Fresh exact same-session responses and raw-export completion checks passed. Owned shutdown, disposable cleanup and reservation release succeeded with no errors; the dedicated authenticated profile was preserved and closed. No screenshots/traces were captured. [Recovery result](../../reports/smoke/2026-10-24T03-16-40-663Z-3d1736d3-d13e-411c-a115-cf25c0d36685/result.json). Both runs used VS Code 1.135.0 / Copilot Chat 0.63.0, Node 26.3.1 macOS arm64, with no retries or implementation changes.
+
+The signed-out GUI qualification item is complete. Earlier statements that it was unverified describe historical checkpoints. No outstanding real-backend slice validation gate remains; slice 2 was already developer accepted.

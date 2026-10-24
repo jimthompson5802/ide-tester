@@ -1,9 +1,11 @@
 import { writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import type { GitEvidence } from './git-repository.js';
 
 export interface ReportResult {
+  chatSelected?: boolean; mockRequestEvidence?: string; mockRequestCount?: number | null; requests?: unknown;
   runId?: string; scope?: string; chatBackend?: 'mock' | 'real'; outcome: string; error?: string; durationMs?: number;
-  checks?: { suite: string; outcome: string; durationMs?: number; error?: string }[];
+  checks?: { suite: string; outcome: string; durationMs?: number; error?: string; evidence?: unknown }[];
   cleanup?: { disposition?: string; reservationRetained?: boolean; errors?: string[] };
   resourcesPath?: string; resultPath?: string;
 }
@@ -16,12 +18,18 @@ const duration = (ms?: number) => ms === undefined ? 'Unavailable' : `${(ms / 10
 
 export function formatResult(result: ReportResult): string {
   const lines = [`Smoke test: ${status(result.outcome)}`, `Run ID: ${result.runId ?? 'Unavailable'}`,
-    `Scope: ${result.scope === 'foundation' ? 'Foundation' : result.scope === 'selected-suites' ? 'Selected suites' : 'Unavailable'}`, ...(result.chatBackend ? [`Chat backend: ${result.chatBackend}`] : []), '',
+    `Scope: ${result.scope === 'foundation' ? 'Foundation' : result.scope === 'selected-suites' ? 'Selected suites' : 'Unavailable'}`, ...(result.chatSelected === false ? ['Chat: Not selected'] : result.chatBackend ? [`Chat backend: ${result.chatBackend}`] : []), ...(result.mockRequestEvidence === 'inapplicable' && result.chatSelected === false ? ['Mock request evidence: Inapplicable'] : []), '',
     'Suite       Result        Duration'];
   if (!result.checks?.length) lines.push('Suite information: Unavailable');
   for (const check of result.checks ?? []) {
     const name = check.suite.charAt(0).toUpperCase() + check.suite.slice(1);
     lines.push(`${name.padEnd(12)}${status(check.outcome).padEnd(14)}${duration(check.durationMs)}`);
+    if (check.suite === 'git' && check.evidence && typeof check.evidence === 'object') {
+      const git = check.evidence as Partial<GitEvidence>;
+      if (git.stage) lines.push(`  Git stage: ${git.stage}`);
+      if (git.hash && git.message) lines.push(`  Git commit: ${git.hash} ${git.message}`);
+      if (git.log) lines.push(`  Git log: ${git.log}`);
+    }
     if (check.error) lines.push(`  Reason: ${check.error}`);
   }
   lines.push('', `Harness disposition: ${status(result.outcome)}`,

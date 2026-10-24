@@ -1,8 +1,8 @@
 # VS Code Smoke Tester
 
-This branch contains the standalone TypeScript VS Code smoke tester under [`smoke/`](smoke/README.md). Compilation and 48 non-GUI tests pass. Editing-only, two-turn mocked Chat-only and combined GUI commands were verified against VS Code 1.135.0 / Copilot Chat 0.63.0 on macOS arm64. The developer accepted the foundation, selected suites and final handoff. The [completed plan and execution record](docs/vscode-smoke-tester-plan.md) preserve verification and compatibility limits.
+This branch contains the standalone TypeScript VS Code smoke tester under [`smoke/`](smoke/README.md). `basic` runs editing → Chat; Git is a standalone suite selected with `--suite git`. After the PR #39 P2 cleanup removed unused Git/Chat integration support, compilation and all 74 non-GUI tests pass. The [Git plan](docs/implementation-plans/issue-38-git-smoke-test.md) records developer-validated phases 1 and 2, passing production Git-only GUI runs, and the later decision to remove Git from combined runs. After Ask-selection failures, Chat startup was restored from the previously passing `b9a4cc4` implementation; the restored mocked editing/Chat `basic` GUI run passed both suites. Before the rename, restored real combined passed. After the rename, mocked `basic` passed; real `basic` initially failed on a Copilot error/warning, then passed a developer-requested rerun without code changes. Standalone Git passed its latest GUI run. Phase 3 is complete and developer accepted for the revised scope. Earlier editing-only, two-turn mocked Chat-only and editing/Chat combined GUI commands were verified against VS Code 1.135.0 / Copilot Chat 0.63.0 on macOS arm64. The developer accepted the foundation, selected suites and final handoff. The [completed plan and execution record](docs/vscode-smoke-tester-plan.md) preserve verification and compatibility limits.
 
-The optional [real Copilot backend](docs/implementation-plans/real-chat-backend.md) supports `--chat-backend real` for Chat and combined runs, with a dedicated persistent profile and manual sign-in setup. Slice 1 is developer validated; slice 2 implementation and non-GUI verification are complete, pending developer validation. Authorized real Chat-only and combined editing/real Chat runs passed on 2026-10-23. The developer validated the issue #36 sign-in fix on 2026-10-23; signed-out blocking remains unverified. See [setup and real-mode usage](smoke/README.md#optional-real-copilot-backend).
+The optional [real Copilot backend](docs/implementation-plans/real-chat-backend.md) supports `--chat-backend real` for Chat and combined runs, with a dedicated persistent profile and manual sign-in setup. Slices 1 and 2 are developer validated; the PR #39 P2 cleanup is also developer accepted after passing standalone Git, mocked `basic` and real `basic` GUI runs. Authorized real Chat-only and combined editing/real Chat runs passed on 2026-10-23. The developer validated the issue #36 sign-in fix on 2026-10-23; signed-out blocking is GUI verified, and authenticated Chat passed after manual sign-in restoration. See [setup and real-mode usage](smoke/README.md#optional-real-copilot-backend).
 
 
 ```mermaid
@@ -58,10 +58,10 @@ Historical documents retain their original decisions and completion records. Tho
 npm --prefix smoke ci
 npm --prefix smoke run compile
 npm --prefix smoke run test:unit
-npm --prefix smoke run smoke -- --build "/Applications/Visual Studio Code.app" --suite all
+npm --prefix smoke run smoke -- --build "/Applications/Visual Studio Code.app" --suite basic
 ```
 
-GUI execution needs authorization and an unlocked reserved desktop. Select `editing`, `chat`, or `all` (default). See [usage and recovery](smoke/README.md) for results, isolation and version requirements.
+GUI execution needs authorization and an unlocked reserved desktop. Select `editing`, `git`, `chat`, or `basic` (default, editing → Chat). Git runs only through `--suite git`, starts no mock Chat server and preserves its dedicated `profiles/smoke-git`. Renamed mocked `basic` passed GUI verification; real `basic` passed a developer-requested rerun after an earlier Copilot error/warning failure. See [usage and recovery](smoke/README.md) for results, isolation and version requirements.
 
 The retained Python environment is preserved separately from the TypeScript tester. Its metadata and installed entry points may reference removed source. Before proposing or performing authorized Python environment changes, follow the [preservation guide](docs/preserved-python-environment.md) for interpreter constraints, dependency procedures, and historical limitations.
 

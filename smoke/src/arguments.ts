@@ -1,6 +1,6 @@
 import { isAbsolute } from 'node:path';
 
-export type Suite = 'editing' | 'chat' | 'all';
+export type Suite = 'editing' | 'git' | 'chat' | 'basic';
 export type ChatBackend = 'mock' | 'real';
 export interface Options { chatBackend?: ChatBackend; build: string; suite: Suite; output?: 'text' | 'json' }
 
@@ -16,12 +16,12 @@ export function parseArguments(args: string[], platform: string = process.platfo
     values.set(key, value);
   }
   const build = values.get('--build');
-  const suite = values.get('--suite') ?? 'all';
+  const suite = values.get('--suite') ?? 'basic';
   if (!build || !isAbsolute(build) || !build.endsWith('.app')) {
     throw new Error('--build requires an absolute installed .app path');
   }
-  if (suite !== 'editing' && suite !== 'chat' && suite !== 'all') {
-    throw new Error('--suite must be editing, chat, or all');
+  if (suite !== 'editing' && suite !== 'git' && suite !== 'chat' && suite !== 'basic') {
+    throw new Error('--suite must be editing, git, chat, or basic');
   }
   const output = values.get('--output');
   if (output !== undefined && output !== 'text' && output !== 'json') {
@@ -35,6 +35,8 @@ export function parseArguments(args: string[], platform: string = process.platfo
 }
 
 export function validateBackend(options: Options, foundation = false): void {
+  if (foundation && options.suite === 'git') throw new Error('Foundation qualification does not cover Git; use smoke');
+  if (options.suite === 'git' && options.chatBackend === 'real') throw new Error('Git-only runs do not select Chat; real backend is unsupported');
   if (options.chatBackend === 'real' && foundation) throw new Error('Real backend is unavailable for foundation qualification');
   if (options.chatBackend === 'real' && options.suite === 'editing') throw new Error('Real backend requires Chat; editing-only runs are unsupported');
 }

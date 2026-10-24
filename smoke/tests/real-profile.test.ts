@@ -9,7 +9,7 @@ import { parseArguments, validateBackend } from '../src/arguments.js';
 
 test('backend selection defaults to mock and rejects unsupported combinations', () => {
   assert.equal(parseArguments(['--build', '/a.app'], 'darwin').chatBackend, 'mock');
-  for (const suite of ['chat', 'all']) {
+  for (const suite of ['chat', 'basic']) {
     const options = parseArguments(['--build', '/a.app', '--suite', suite, '--chat-backend', 'real'], 'darwin');
     assert.equal(options.chatBackend, 'real');
     assert.throws(() => validateBackend(options, true), /qualification/);

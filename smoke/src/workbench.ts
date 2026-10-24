@@ -1,11 +1,13 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Page, type Locator } from '@playwright/test';
 import type { MockRequest } from './mock.js';
 import { turnCompleted } from './turn.js';
 import type { ChatBackend } from './arguments.js';
 import { ChatFailure, uiIssue, verifyExport, type SubmittedTurn, type ChatEvidence } from './chat.js';
-import { readFile, rm } from 'node:fs/promises';
+import { readFile, rm, lstat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { basename } from 'node:path';
+
+import { GitFailure } from './git-repository.js';
 
 const mainEditor = '.part.editor .monaco-editor[role="code"]';
 
@@ -44,14 +46,14 @@ export class Workbench {
     await this.page.evaluate(({ selector, text }) => window.driver.typeInEditor(selector, text), { selector: input, text });
   }
 
-  async command(title: string): Promise<void> {
+  async command(title: string, followedByPicker = false): Promise<void> {
     await this.page.keyboard.press('Meta+Shift+P');
     const input = this.page.locator('.quick-input-widget .quick-input-box input');
     await input.fill(`>${title}`);
     const item = this.page.locator('.quick-input-widget .monaco-list-row').filter({ hasText: title });
     await expect(item).toHaveCount(1);
     await item.click();
-    await expect(input).toBeHidden();
+    if (!followedByPicker) await expect(input).toBeHidden();
   }
 
   async openFile(path: string): Promise<void> {
@@ -101,6 +103,78 @@ export class Workbench {
     const readLines = async () => (await lines.allTextContents()).map(line => line.replaceAll('\u00a0', ' ').trimEnd());
     await expect.poll(readLines, { message: 'Reopened editor must display the saved contents' }).toEqual(text.split('\n'));
     return readLines();
+  }
+
+  private async gitContract(label: string, action: () => Promise<void>): Promise<void> {
+    try {
+      if (await this.page.locator('.monaco-dialog-box').isVisible()) throw new Error('Unexpected dialog');
+      await action();
+    } catch (cause) {
+      if (cause instanceof GitFailure) throw cause;
+      throw new GitFailure('harness_error', `Git UI contract unavailable (${label})`);
+    }
+  }
+
+  async initializeGit(workspace: string): Promise<void> {
+    await this.gitContract('initialization picker', async () => {
+      await this.command('Git: Initialize Repository', true);
+      const input = this.page.locator('.quick-input-widget .quick-input-box input');
+      await expect(input).toHaveAttribute('placeholder', 'Pick workspace folder to initialize git repo in', { timeout: 15_000 });
+      const folder = this.page.locator('.quick-input-widget .monaco-list-row').filter({ hasText: workspace });
+      await expect(folder).toHaveCount(1, { timeout: 15_000 });await folder.click();await expect(input).toBeHidden();
+    });
+    try {
+      await expect.poll(async () => {
+        try { return (await lstat(join(workspace, '.git'))).isDirectory(); } catch { return false; }
+      }, { timeout: 15_000 }).toBe(true);
+    } catch { throw new GitFailure('failed', 'Git initialization did not create a repository'); }
+  }
+
+  private gitResource(): Locator {
+    return this.page.locator('div[id="workbench.view.scm"] .monaco-list-row')
+      .filter({ has: this.page.locator('.resource .label-name').getByText('git-smoke.txt', { exact: true }) });
+  }
+
+  async stageGitFile(): Promise<void> {
+    const row = this.gitResource();
+    await this.gitContract('target staging action', async () => {
+      await this.command('Source Control: Focus on Changes View');
+      await expect(row).toHaveCount(1, { timeout: 15_000 });
+      await expect(row.locator('.resource')).toHaveAttribute('data-tooltip', 'Untracked', { timeout: 15_000 });
+      await row.hover();await row.locator('.action-label[aria-label="Stage Changes"]').click();
+    });
+    try { await expect(row.locator('.resource')).toHaveAttribute('data-tooltip', 'Index Added', { timeout: 15_000 }); }
+    catch { throw new GitFailure('failed', 'Git target did not become Index Added after staging'); }
+  }
+
+  async commitGit(message: string): Promise<void> {
+    await this.gitContract('commit input/button', async () => {
+      await this.typeInEditor('div[id="workbench.view.scm"] .scm-editor', message);
+      const commit = this.page.locator('div[id="workbench.view.scm"] .monaco-button').filter({ hasText: /^Commit$/ });
+      await expect(commit).toBeVisible({ timeout: 15_000 });await commit.click();
+    });
+    try { await expect(this.gitResource()).toHaveCount(0, { timeout: 15_000 }); }
+    catch { throw new GitFailure('failed', 'Git commit did not remove the staged target'); }
+  }
+
+  async showGitGraph(message: string): Promise<string> {
+    const scm = this.page.locator('div[id="workbench.view.scm"]');
+    const graph = this.page.locator('.scm-history-view');
+    await this.gitContract('Graph view/reference filter', async () => {
+      await this.command('Source Control: Focus on Graph View');await expect(graph).toBeVisible({ timeout: 15_000 });
+      // Fresh single-root workspace: installed build selects the sole provider and hides this picker.
+      await expect(scm.locator('.scm-graph-repository-picker')).toHaveCount(0, { timeout: 15_000 });
+      const picker = scm.locator('.scm-graph-history-item-picker');await picker.click();
+      const input = this.page.locator('.quick-input-widget .quick-input-box input');
+      await expect(input).toHaveAttribute('placeholder', 'Select one/more history item references to view, type to filter', { timeout: 15_000 });
+      const all = this.page.locator('.quick-input-widget .monaco-list-row')
+        .filter({ has: this.page.locator('.label-name').getByText('All', { exact: true }) });
+      await expect(all).toHaveCount(1, { timeout: 15_000 });await all.click();await input.press('Enter');
+      await expect(input).toBeHidden();await expect(picker).toHaveText('All');
+    });
+    const label = graph.locator('.history-item .label-name').getByText(message, { exact: true });
+    try { await expect(label).toBeVisible({ timeout: 15_000 });return (await label.textContent()) ?? ''; }
+    catch { throw new GitFailure('failed', 'Expected unique commit message missing from Source Control Graph'); }
   }
 
   private chat() { return this.page.locator('div[id="workbench.panel.chat"]'); }

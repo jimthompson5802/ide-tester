@@ -12,14 +12,12 @@ export const commonSettings = {
     'telemetry.telemetryLevel': 'off', 'chat.disableAIFeatures': false,
 };
 
-export async function prepareProfile(run: Run, mockUrl: string): Promise<Record<string, string>> {
+export function mockProfileSettings(mockUrl: string) {
   const endpoint = new URL(mockUrl);
   if (endpoint.protocol !== 'http:' || endpoint.hostname !== '127.0.0.1' || !endpoint.port || endpoint.origin !== mockUrl) {
     throw new Error('Mock URL must be a loopback HTTP origin with an explicit port');
   }
-  const storage = join(run.userData, 'User/globalStorage');
-  await mkdir(storage, { recursive: true });
-  await writeFile(join(run.userData, 'User/settings.json'), JSON.stringify({
+  return {
     ...commonSettings,
     'chat.allowAnonymousAccess': true,
     'github.copilot.advanced.debug.overrideProxyUrl': mockUrl,
@@ -29,7 +27,21 @@ export async function prepareProfile(run: Run, mockUrl: string): Promise<Record<
     'chat.mcp.discovery.enabled': false, 'chat.mcp.enabled': false,
     'github.copilot.chat.backgroundAgent.enabled': false,
     'chat.agentHost.enabled': false,
-  }, null, 2), { flag: 'wx' });
+  };
+}
+
+export async function prepareProfile(run: Run, mockUrl: string): Promise<Record<string, string>> {
+  const settings = mockProfileSettings(mockUrl);
+  await mkdir(join(run.userData, 'User/globalStorage'), { recursive: true });
+  await writeFile(join(run.userData, 'User/settings.json'), JSON.stringify(settings, null, 2), { flag: 'wx' });
+  return prepareMockState(run, mockUrl);
+}
+
+// Call only after the caller has established ownership and closed-profile state.
+export async function prepareMockState(run: Pick<Run, 'userData' | 'state'>, mockUrl: string): Promise<Record<string, string>> {
+  mockProfileSettings(mockUrl);
+  const storage = join(run.userData, 'User/globalStorage');
+  await mkdir(storage, { recursive: true });
   const db = new DatabaseSync(join(storage, 'state.vscdb'));
   try {
     db.exec('CREATE TABLE IF NOT EXISTS ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)');
