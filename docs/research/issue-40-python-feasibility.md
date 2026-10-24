@@ -1,6 +1,6 @@
 # Issue #40 Python feasibility procedure and review record
 
-Prepared 2026-10-24 for [phase 1 of the implementation plan](../implementation-plans/issue-40-python-smoke-test.md). **P1-T01 partial: disposable-fixture guard checks pass; the developer now accepts confirmed owned VS Code main-process exit as sufficient termination evidence.** Complete descendant shutdown is an accepted unverified limitation, no longer a blocker. Remaining work includes actual protected Electron launch/inheritance and the full probe controller. GUI execution remains separately gated. P1-T02/P1-T03 have not started. The full walkthrough below is not implemented or ready for execution.
+Prepared 2026-10-24 for [phase 1 of the implementation plan](../implementation-plans/issue-40-python-smoke-test.md). **The three requested positive checks now pass:** explicit interpreter selection, the editor/save/reopen/Run Python File in Terminal journey, and combined saved-source/fresh-terminal/program-JSON evidence. Runtime was Python 3.12.15 arm64 from the supplied retained venv path, with matching canonical executable. The developer-approved launch uses `--no-sandbox` for Chromium while retaining the outer preservation guard; Electron main and terminal sentinel writes were denied. All 2,643 preserved entries matched after clean owned main-process exit; successful resources and reservation were removed. Remaining phase-1 failure/cancellation/update qualification and phase acceptance are pending. Independent descendant termination remains an accepted limitation. No phase-2 work occurred.
 
 ## Sources inspected
 
@@ -14,11 +14,11 @@ Prepared 2026-10-24 for [phase 1 of the implementation plan](../implementation-p
 - External checkout `src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts`: boolean update settings migrate to `on`/`off`; individual opt-ins can still update with `off`. Verify the installed build's effective controls rather than assuming a global setting alone freezes every extension.
 - [Earlier source review](issue-40-python-feasibility-review.md) remains background. Its proposed independent success-decoration requirement is superseded by the developer-confirmed completion-marker contract.
 
-During initial preparation, no interpreter, extension, profile or preserved workspace was used. At that point `/usr/bin/sandbox-exec` had only been found by filesystem metadata inspection. Its subsequent disposable-fixture verification is recorded below; Electron compatibility remains untested.
+During initial preparation, no interpreter, extension, profile or preserved workspace was used. At that point `/usr/bin/sandbox-exec` had only been found by filesystem metadata inspection. Subsequent disposable-fixture and approved Electron/Python verification are recorded below; initial source-review limitations are historical observations, not current status.
 
 ## Review boundary and prerequisites
 
-The original preparation stopped for probe-specification review. The resumed instruction authorized work on its non-GUI prerequisites. Added only the [probe](../../smoke/gui/issue-40-python-feasibility.ts) and [observable fixture tests](../../smoke/tests/python-feasibility.test.ts), alongside this record and the plan. No production module, public flag, dependency or general profile override changed. The full GUI controller remains unimplemented because its process-ownership prerequisite is unresolved.
+The original preparation stopped for probe-specification review. The resumed instruction authorized non-GUI prerequisites; the terminal-only instruction and confirmation then authorized the focused terminal experiment. At that checkpoint only the [probe](../../smoke/gui/issue-40-python-feasibility.ts), [fixture tests](../../smoke/tests/python-feasibility.test.ts), this record and plan changed; the full Python controller was still unavailable. The later explicitly authorized Python continuation added the walkthrough/preservation/evidence helpers and tests. No production module, production CLI flag, dependency or general profile override changed. The original proposed procedure below is retained as the review baseline; the final continuation records its approved revisions and actual results.
 
 Before execution, require explicit authorization for the probe, GUI walkthrough, feasibility profile and supplied interpreter. Proposed interpreter: `/Users/jim/Desktop/genai/ide-tester/.venv/bin/python`; its invocation requires authorization for this walkthrough, and must not be inferred from historical approvals. Presence/absolute/canonical path resolution uses filesystem operations only, without version, permission, usability or environment-identity probes.
 
@@ -84,7 +84,7 @@ No pip/uv/conda/package/bootstrap/environment-create command or corresponding UI
 
 ## Exact proposed probe artifact for validation
 
-Specified file: `smoke/gui/issue-40-python-feasibility.ts`, compiled by the existing tsconfig to `smoke/dist/gui/issue-40-python-feasibility.js`. Only its non-GUI guard check is implemented. The following original full-walkthrough invocation is **not available**; the probe rejects it without launching anything:
+Specified file: `smoke/gui/issue-40-python-feasibility.ts`, compiled by the existing tsconfig to `smoke/dist/gui/issue-40-python-feasibility.js`. Initially only its guard check and terminal experiment were available. The later explicitly authorized continuation implemented the following invocation, but its first protected GUI launch failed before Python work; see the final execution record:
 
 ```sh
 node smoke/dist/gui/issue-40-python-feasibility.js \
@@ -108,7 +108,7 @@ The full artifact specification above originally required validation before addi
 
 ## Resumed P1-T01: actual verification and remaining blocker
 
-The new probe supports only this non-GUI command:
+At the initial non-GUI checkpoint the probe supported only this command; the later focused observation entry point is recorded below:
 
 ```sh
 node smoke/dist/gui/issue-40-python-feasibility.js --self-check
@@ -141,7 +141,7 @@ A delegated read-only investigation examined three alternatives for complete des
 2. **launchd job containment:** installed `/usr/share/man/man5/launchd.plist.5:609–613` documents remaining-process cleanup within the job's process group. That documented guarantee does not close the separate-session gap. `launchctl procinfo` is diagnostic and requires root; no launchd job was created or removed.
 3. **Kernel/EndpointSecurity tracking:** the delegated review found that [Apple XNU's process filter](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/kern_event.c) rejects recursive `NOTE_TRACK`/`NOTE_TRACKERR`/`NOTE_CHILD` support, and [Apple's descendants client](https://developer.apple.com/documentation/endpointsecurity/es_new_descendants_client(_:_:)) requires a restricted entitlement. These do not provide a demonstrated available tracker in the current dependency/privilege scope. No native helper, entitlement, service or infrastructure was installed.
 
-**Historical finding before the subsequent developer decision:** no complete descendant-tracking/containment mechanism was demonstrated within the reviewed scope. Process snapshots leave gaps for short-lived/reparented descendants. The implemented probe therefore refused every GUI invocation; no profile, desktop reservation or application process was created. This was not a process leak observed during execution. The decision below removes that proof requirement; the existing probe still supports only `--self-check`, and its old containment-specific refusal message has not yet been updated. The full controller remains unimplemented.
+**Historical finding before the subsequent developer decision:** no complete descendant-tracking/containment mechanism was demonstrated within the reviewed scope. Process snapshots leave gaps for short-lived/reparented descendants. At that checkpoint the probe refused every GUI invocation; no profile, desktop reservation or application process had been created. This was not a process leak observed during execution. The decision below removed that proof requirement. The later terminal-only implementation replaced the stale refusal message and added the explicitly authorized focused experiment; the full Python controller remains unimplemented.
 
 ## Developer-accepted termination evidence and edge cases
 
@@ -158,15 +158,156 @@ These are accepted limitations of main-process-only termination evidence. A matc
 
 ## Observations and execution status
 
+### Focused terminal observation attempt specification
+
+The developer subsequently directed focus on terminal observation, with at most three attempts. This is a narrower experiment than the full Python walkthrough; a pass establishes actual terminal-driver observation only.
+
+Proposed extension of the already specified `smoke/gui/issue-40-python-feasibility.ts`: add `--observe-terminal --build <app>` and matching non-GUI acceptance tests in `smoke/tests/python-feasibility.test.ts`. Before GUI use, obtain validation of this focused specification and confirmation of an unlocked, exclusively reserved desktop. Each attempt is manually invoked, sequential, with a 60-second launch limit, 60-second observation limit and separate 30-second application cleanup limit. No automatic retries. Stop on a pass; otherwise inspect the failure before making a focused correction and invoking another attempt, at most three total.
+
+Use the existing shared reservation and disposable resource/workspace helpers. Prepare/reuse only the owned, closed `profiles/smoke-python-feasibility` profile with its established marker; preserve it on every outcome, and leave `profiles/smoke-python` and all other existing profiles untouched. Launch installed VS Code with in-memory secret storage, all extensions disabled, no helper/mock/authentication, a fresh owned HOME/TMP, and a minimal explicit environment. Python, environment discovery and Marketplace activity are outside this experiment. No retained-environment interpreter is invoked and no retained data is opened.
+
+For this terminal-observation-only experiment, the default terminal profile runs the existing Node executable with a small probe-owned script inside disposable resources. Its source is generated by the probe and contains a unique run ID; do not pass expected output markers as terminal command text or inject output through the driver. The fixture waits for a probe-owned trigger file, emits two separately triggered batches of greeting/identity/completion lines through its real process stdout, and exits on a hard safety deadline. This verifies fresh buffer changes rather than a static string or command echo; it does not establish a bash/Python profile or the Python extension Run action. The fixture has no package imports beyond Node built-ins and reads/writes only probe-owned fixture paths.
+
+Open a new terminal through the command palette. Require the installed `window.driver.getTerminalBuffer` capability and exactly one owned visible `#terminal .terminal-wrapper`. Read/validate a bounded baseline (at most 2,000 lines / 256 KiB), then trigger batch one and require its exact lines, independently reported run ID and fixture PID. Re-read the same terminal and ensure batch two is absent, trigger batch two, and require its new exact lines while retaining batch one. Record actual returned lines, capability/type, selector/uniqueness, fixture PID, application/version, timings and outcomes only in the ignored owned report. No `writeInTerminal`, terminal typing, screenshots, broad DOM dumps, personal terminal history or direct shell command entry.
+
+Close only the owned VS Code application and verify its main-process exit under the developer-accepted termination contract. The fixture's hard deadline additionally limits survival without claiming independent descendant shutdown. On uncertain application shutdown, retain resources/reservation; on a confirmed failed attempt retain disposable evidence and release the reservation. Preserve the persistent feasibility profile on success and failure. The standalone probe must explicitly report that Python output, interpreter selection, extension installation, protected Electron-launch guard inheritance and arbitrary terminal behavior remain unverified.
+
+The specification was saved before implementation. The developer then replied **“I confirm”** to the request validating this exact experiment and confirming an unlocked, exclusively reserved desktop for at most three sequential attempts. This bounded terminal-only authorization does not accept P1-T01/P1-T02 or authorize the full Python workflow.
+
+Read-only review found no source-level blocker for a Node terminal profile. The implementation waits for the wrapper's xterm binding as well as visibility, uses exact command-palette label matching, disables shell integration, and emits short identity/marker lines because the driver returns physical lines without joining wraps. No code/profile change or GUI attempt occurred before the confirmation.
+
+### Focused terminal observation result — attempt 1 passed
+
+Executed once on 2026-10-24, with approved outside-tool-sandbox GUI execution:
+
+```sh
+node smoke/dist/gui/issue-40-python-feasibility.js --observe-terminal \
+  --build '/Applications/Visual Studio Code.app'
+```
+
+Local ignored evidence: `reports/smoke/2026-10-24T14-37-45-795Z-20a87618-dc9d-4ac6-a106-99d51170519c/terminal-observation.json`. The report records actual buffer arrays, process identity, timing, version, profile and cleanup observations. It contains only this synthetic terminal fixture's output; no screenshots, traces, personal terminal contents or authentication were captured.
+
+| Observation | Verified result |
+| --- | --- |
+| Installed build | VS Code 1.135.0, bundled Copilot metadata 0.63.0; macOS arm64 / Node 26.3.1; all extensions disabled |
+| Driver and target | Callable actual `window.driver.getTerminalBuffer`; exactly one visible xterm-bound `#terminal .terminal-wrapper` |
+| Baseline | Eighteen empty physical lines; no current token |
+| First trigger | Fresh exact `Hello, world!`, `OBS_ID` and `OBS_DONE` lines for token `574a6748dbea`, batch 1, actual fixture PID 92238 |
+| Second freshness check | First batch present; second batch absent before its separate trigger |
+| Second trigger | Fresh batch-2 lines for the same token/PID; final buffer retained both complete batches |
+| Timing | Launch/restoration 1,121 ms; terminal observation 741 ms; total 2,214 ms |
+| Cleanup | Owned VS Code PID 92215 exited with code 0; no cleanup errors; disposable resources removed and reservation released |
+| Profile preservation | Created only the previously absent feasibility profile with exact owner marker; profile retained afterward; production `profiles/smoke-python` remained absent |
+| Attempts | One of the permitted three used; stopped on success, with no automatic retries |
+
+TDD/quality checks: compilation first failed as intended for four missing observation exports. After implementation, seven focused non-GUI tests passed: bounded-buffer validation, exact/negative batch verification, a real two-trigger fixture process, invalid CLI refusal, and profile preservation/refusal. `npm --prefix smoke run build` and a direct ESLint check covering the probe passed. The full `npm --prefix smoke run test:unit` passed **all 82 tests with no skips**, including the earlier write-guard test, using approved host sandbox/loopback access. Post-run filesystem checks confirmed no shared reservation, the preserved feasibility owner marker, and an absent production profile.
+
+**Established:** real installed-driver terminal observation and current-run freshness for two short-line Node fixture batches. No driver terminal-write API or terminal command typing was used. **Still unverified:** Python extension installation/enablement, Python interpreter picker/Run action, Python-generated evidence and canonical identity, bash/Python terminal configuration, wrapped/long-line handling, actual protected Electron-launch guard inheritance, retained-environment comparison, and interrupted/timeout GUI cleanup. The persistent observation profile currently points to the removed disposable fixture script; a future authorized experiment must merge its own current-run terminal settings rather than reuse that old script path.
+
 | Check | Actual result on 2026-10-24 |
 | --- | --- |
 | Read repository/source/reference files and installed metadata | Completed read-only; revisions and findings above |
-| Write enforcement | Twelve OS-denial cases passed on disposable fixtures, including detached-grandchild inheritance; actual Electron tree/retained paths unverified |
+| Write enforcement | Twelve fixture denials plus actual Electron-main and terminal sentinel denials passed under the approved outer guard |
 | Descendant completeness | Unverified and explicitly accepted as a limitation; owned VS Code main-process exit is now sufficient termination evidence |
-| Probe implementation | Non-GUI guard check and GUI-invocation refusal only; full controller unavailable |
-| GUI/profile/extension/interpreter activity | None |
-| Protected-content baseline and comparison | Not run; must precede/follow authorized launch |
-| Fresh install/reuse, Python picker/Run, terminal driver | Unverified |
-| Production profile preservation comparison | Not run; no profile was accessed or prepared |
+| Probe implementation | Guard, terminal observation and focused Python controller implemented; positive Python walkthrough passed |
+| GUI/profile/extension/interpreter activity | Fresh Microsoft Python installation observed; final reused-profile run selected and executed the retained interpreter through UI |
+| Protected-content baseline and comparison | Passed for 2,643 retained entries before/after every diagnostic launch, including the final successful Python run |
+| Terminal driver | Verified operationally on attempt 1 with two independently triggered real stdout batches |
+| Fresh install/reuse, Python picker/Run | Fresh install observed separately; full positive picker/Run/evidence journey passed with reused installation; full fresh/reuse production qualification pending |
+| Production profile preservation | Absent before/after focused attempt; not created or used |
 
-P1-T01 remains unchecked because the actual protected launch procedure and full controller are not established. The descendant-proof blocker is removed by explicit developer direction. P1-T02 additionally needs separate GUI authorization and a reserved desktop. P1-T03 and phase-1 developer validation remain dependent on real observations; production implementation remains gated. No phase-2 work occurred.
+P1-T01/P1-T02 remain unchecked because their full procedure, cancellation/failure and effective update-control qualifications are not complete. Their requested positive Python UI and evidence checks now pass under the explicitly approved launch revision. P1-T03 and phase-1 developer validation remain pending; production implementation remains gated. No phase-2 work occurred. Earlier blocker and unverified statements below describe their historical checkpoints and are superseded by the final continuation record for these three checks.
+
+## Authorized Python journey verification: protected-launch blocker
+
+The developer requested verification of interpreter selection, the Python execution journey and combined execution evidence, then explicitly confirmed an unlocked exclusively reserved desktop, Microsoft Python extension installation in the feasibility profile and guarded use of `/Users/jim/Desktop/genai/ide-tester/.venv/bin/python`. This authorizes the following focused continuation, without accepting phase 1 or advancing to production implementation.
+
+The specified probe now delegates its original `--build <app> --python-interpreter <path>` invocation to `smoke/gui/python-walkthrough.ts`, with separately tested `python-preservation.ts` and `python-execution-evidence.ts` helpers. One sequential eight-minute scenario uses a separate 120-second cleanup budget and the shared reservation. It first tests the existing disposable write guard, records stable retained-resource manifests, launches Electron through a fixed-text sandbox wrapper, and requires denied writes to a disposable protected sentinel from Electron main and an actual terminal Node process. No write is attempted against preserved resources. The sandbox protects the retained environment, root metadata, editor settings, preserved workspaces and resolved Homebrew Python installation. External symlink targets except the supplied interpreter and unenumerated hardlink aliases block execution.
+
+Next, install/open Microsoft Python through Extensions UI, inspect installed extension schemas and versions, require supported suppression controls, create/save/reopen `hello.py` through editor UI, enter the absolute interpreter in Python's explicit path picker, create a fresh bash terminal and record a marker-free baseline, then invoke Python's Run Python File in Terminal once. Accept only exact saved bytes, fresh greeting/identity/completion output read through the actual driver, and matching bounded regular non-symlink program-written JSON with the supplied canonical executable and script identity. Compact ASCII identity JSON escapes spaces so physical wrapped lines can be concatenated and compared exactly with the file; duplicate, reordered, partial or mismatched output fails verification. The program derives its evidence path from `__file__`, writes an exclusive temporary file and atomically replaces the initially absent destination.
+
+On an essential unsupported UI/settings/protection contract, stop and retain the incomplete run rather than bypass it. No interpreter preflight, package/environment installation, terminal command typing, authentication automation, screenshots or broad DOM dumps are allowed. Close the owned app and confirm main-process exit before the preservation comparison and resource cleanup. No independent descendant termination or Python exit status is claimed. Timeout/cancellation qualification and production fresh/reuse behavior remain separate pending work.
+
+### Actual run and diagnosis
+
+The first invocation failed before GUI launch because a top-level dynamic import waited on a circular module dependency (Node exit 13). Moving CLI execution into a caught async entry point fixed that defect; a new non-GUI regression verifies that dispatch settles and refuses an unauthorized interpreter before reservation or launch. This was not a GUI attempt or Python invocation.
+
+The following invocation then made one real protected GUI attempt:
+
+```sh
+node smoke/dist/gui/issue-40-python-feasibility.js \
+  --build '/Applications/Visual Studio Code.app' \
+  --python-interpreter '/Users/jim/Desktop/genai/ide-tester/.venv/bin/python'
+```
+
+Local ignored evidence: `reports/smoke/2026-10-24T14-49-56-759Z-b93629c4-e938-4503-af36-7ec7be1664f9/python-walkthrough.json`, `preservation-before.json`, and sanitized `guard-launch-diagnosis.json` beside them. Disposable failed resources remain at `/private/tmp/ide-smoke-Pa9b6E`; the dedicated feasibility profile is preserved. The raw initial report says `outcome: incomplete`; this is a **protected-launch harness error**, not a Python functional failure. The controller now classifies unfinished probe runs as harness errors, without rewriting the historical report.
+
+| Check | Observed result |
+| --- | --- |
+| Disposable guard | All twelve mutation attempts denied; permitted write passed |
+| Stable retained baseline | 2,643 entries; canonical interpreter resolved read-only to Homebrew Python 3.12.15 binary; no version invocation |
+| Owned Electron launch | Main PID 3803; renderer crashed before workbench readiness; helpers 3804–3808 aborted |
+| Failure diagnosis | Owned helper crash stacks map to the binary's `Failed to initialize sandbox.` branch; exact OS errno unavailable |
+| Guard inheritance through actual Electron/terminal | Not reached; remains unverified |
+| Extension install, interpreter picker, editor/Run journey | Not reached; remain unverified |
+| Combined real Python execution evidence | Not reached; remains unverified |
+| Main-process shutdown | Confirmed `SIGABRT` exit; independent descendants not checked |
+| Preservation comparison | All 2,643 entries matched after confirmed main exit |
+| Resource disposition | Failed resources retained; reservation released; production Python profile absent |
+
+Conflict between the outer Seatbelt policy and Chromium's helper sandbox is an **inference**, not an established OS diagnosis. The launch is incompatible as tested. No policy was removed, no protected-path mutation was attempted and no second GUI session was started. Existing terminal-only success does not qualify the guarded launch.
+
+TDD and quality checks: missing helper/runner modules first failed compilation; terminal-error rejection first failed its intended assertion, then passed. Build and explicit ESLint including all four GUI modules passed. The full non-GUI suite passed **96 tests, zero failures/skips**, including fixture preservation, hardlink/external-link refusal, wrapped identity reconstruction, stale/wrong/echoed/partial/error evidence rejection, strict invocation and dispatch settlement. These tests do not establish Python syntax/runtime behavior or GUI success. Review tightened reopened editor comparison, explicit picker-entry observation, aggregate stage budgets and the bounded Electron guard evaluation; those GUI paths remain unexecuted. Per-extension update opt-ins, interruption/cancellation and fresh/reused Python behavior remain unqualified.
+
+### Concrete diagnostic proposal (subsequently approved and executed)
+
+Keep the same external write-denial policy, owned profile, disposable workspace, clean environment, deadlines and preservation comparisons. Add only `--no-sandbox` to the owned VS Code launch to disable Chromium's internal sandbox, then require successful denied-sentinel checks from Electron main and the real terminal before installing/selecting/running Python. This lowers Chromium's internal process isolation; it does not remove the outer preservation guard. Whether that configuration works remains unverified. This changes the reviewed protected-launch contract and requires developer direction before another GUI attempt. If declined, investigate a different preservation mechanism before continuing; never bypass preservation silently.
+
+### Approved diagnostic continuation
+
+The developer answered **“yes”** to the concrete diagnostic proposal above. This authorizes one continuation using `--no-sandbox` while retaining the outer write-denial guard and all ownership, sentinel, preservation and cleanup checks. The existing desktop reservation confirmation applies to this continuation. The diagnostic must establish denied sentinel writes through Electron and its real terminal before proceeding with the already authorized Python journey. This is not phase acceptance or authorization to remove the preservation guard.
+
+### Final positive verification: passed
+
+Local ignored report: `reports/smoke/2026-10-24T15-08-01-439Z-dd2b38d6-650e-47c0-b6af-6022ff4c1515/python-walkthrough.json`. The same original probe invocation above now includes the approved `--no-sandbox` application argument internally. This passes only with the external preservation policy and actual sentinel checks intact; the exception is limited to this feasibility procedure, not a production launch decision.
+
+| Requested check | Actual observed evidence |
+| --- | --- |
+| Explicit interpreter selection | Entered `/Users/jim/Desktop/genai/ide-tester/.venv/bin/python`; reopened Select Interpreter picker displayed exactly `Selected Interpreter: /Users/jim/Desktop/genai/ide-tester/.venv/bin/python` |
+| Python execution journey | Created untitled source through editor input; saved `hello.py`, compared all 1,128 UTF-8 bytes, closed/reopened and matched every displayed line, verified bytes again, invoked `Python: Run Python File in Terminal` once |
+| Combined execution evidence | Fresh `Hello, world!`, structured identity and `PYTHON_SMOKE_COMPLETE 61e2ef91faa0` read through installed `window.driver.getTerminalBuffer`; identity reconstructed from four physical wrapped lines matched raw program JSON exactly; script, token and canonical executable matched; saved bytes rechecked |
+| Actual Python identity | Version 3.12.15, architecture arm64, PID 20445, PPID 20436; invocation is the supplied `.venv/bin/python`; canonical executable `/opt/homebrew/Cellar/python@3.12/3.12.15/Frameworks/Python.framework/Versions/3.12/bin/python3.12` |
+| Source digest | `536af41694e74e6f1f5ffc41aecc32d8ee86bb6d77fe1cbe9a182f864398d4f4` |
+| Protection and preservation | Electron main and terminal denied sentinel writes; all 2,643 retained entries unchanged after confirmed main exit |
+| Cleanup | Main PID 20272 exited code 0; owned successful resources removed; reservation released; feasibility profile preserved; production profile absent |
+
+Microsoft Python `ms-python.python` 2026.10.0 was installed fresh through Extensions UI during the earlier `2026-10-24T14-59-27-028Z-4f7f21cd-1444-4175-8019-ea87b4442bdb` run. Its header then showed Disable and Uninstall, establishing installed/enabled state. Dependencies present: `ms-python.debugpy` 2026.6.0, `ms-python.vscode-pylance` 2026.4.1 and `ms-python.vscode-python-envs` 1.40.0. All proposed suppression keys were found in installed schemas. The final successful run reused this installation; it does not establish a full fresh-install-to-execution run or production qualification. No reload or authentication action was needed.
+
+Observed UI refinements: command-palette labels sometimes omit category prefixes; terminal/picker icons add leading whitespace; Extensions search is Monaco rather than an HTML input; Install must target the unique visible header action; editor auto-indentation must be disabled to preserve inserted source. The explicit-path input must display `Enter path to a Python interpreter.` before entry. Settings additionally used by this probe: editor font size 10, line height 12, word wrap off, minimap off, auto-indent none, format-on-type false, auto-closing brackets/quotes never, quick suggestions false and trigger-character suggestions false. These affect only the owned feasibility profile.
+
+The installed Python Environments extension owns the status item `ms-python.vscode-python-envs.python.interpreterDisplay`; it sometimes showed an unrelated Homebrew 3.15 interpreter or a loading spinner even while Python's picker and executed program agreed on the supplied 3.12 interpreter. The probe records that status without treating it as authoritative. Exact selected-picker path plus actual program identity establish the requested selection/execution; cross-extension status consistency remains unverified.
+
+`Python: Create Terminal` still permitted Run to create a second terminal. The verified selector is therefore **`#terminal .terminal-wrapper.active`**, requiring exactly one visible xterm-bound active target before each driver read. VS Code reference `terminalInstance.ts` sets `.active` in `setVisible`. The pre-dispatch baseline was token-free in the initial owned terminal; Run created a second owned terminal and activated it. The final report has two total terminals and one active terminal. The new terminal's complete current-token output, initially absent program file, exact source and matching identity together establish freshness; this is not a same-terminal-before/after claim. No terminal text was injected by the harness. Physical wrapped identity reconstruction now has actual Python GUI evidence; paths containing literal spaces remain non-GUI-test coverage only.
+
+The approved diagnostic exploration used **14 manually invoked sequential launches** between 14:54 and 15:08 UTC in the same reserved session: 13 incomplete probe runs, followed by the passing run. No automatic retry or later GUI run followed the pass. Each incomplete run retained its disposable resources and report; every launch confirmed main-process exit code 0, unchanged preservation inventory and reservation release. Routine probe corrections stayed within the revised guard/UI procedure. No error reached four unsuccessful fix rounds: hidden Install alternatives, unavailable status item and multiple-terminal targeting each needed at most two proposed corrections.
+
+| Launch UTC (report directory prefix) | Result and correction |
+| --- | --- |
+| 14:54:36 | Main-process dynamic import unsupported; used built-in filesystem access in evaluation |
+| 14:55:12 | Category-free terminal command label; exact optional-category matching added with TDD |
+| 14:56:26 | Icon-prefixed terminal profile label; matched surrounding whitespace |
+| 14:57:10 | Extensions search uses Monaco; used shipped editor-input driver |
+| 14:57:56 | Four Install action matches; narrowed to root extension header |
+| 14:58:39 | Hidden alternative Install actions still matched; required visible action |
+| 14:59:27 | Fresh installation passed; auto-indentation changed source; disabled it |
+| 15:00:08 | Icon-prefixed interpreter entry; matched actual label |
+| 15:02:07 | Picker transition cleared early input; waited for explicit-path placeholder |
+| 15:02:38 | Assumed old status-item ID absent; inspected installed source |
+| 15:03:55 | Legacy Python status item unavailable; required exact selected path in picker instead |
+| 15:05:47 | Python executed correctly, but second terminal prevented observation; tried Python-created terminal |
+| 15:06:44 | Python-created terminal still followed by a second; narrowed actual driver target to unique active terminal |
+| 15:08:01 | All three requested checks and cleanup passed; stopped |
+
+An independent read-only review replayed the verifier against the final report and filesystem-resolved canonical interpreter, regenerated the source digest/bytes and compared the complete reopened editor contents. No material false pass was found for these focused positive checks. Remaining limits: effective per-extension update opt-ins, failure/cancellation and timeout behavior, independent Python exit status, complete descendant shutdown, direct extension-host sentinel mutation, paths with spaces in real GUI output, full fresh/reused production qualification and phase-1 acceptance. No production Python suite exists and no phase-2 work occurred.
+
+Final validation after these corrections: `npm --prefix smoke run build` passed; explicit ESLint including all four GUI modules passed; `npm --prefix smoke run test:unit` passed **97 tests, zero failures/skips**, with approved sandbox/loopback access. No further GUI run was needed after the pass. Plan/research relative links, whitespace/final newlines and `git diff --check` were checked; all 17 full task/validation checkboxes remain unchecked because focused positive verification is not full phase acceptance.
