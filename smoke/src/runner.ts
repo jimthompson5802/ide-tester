@@ -94,8 +94,8 @@ async function runSelected(options: Options, checkout: string, foundation: boole
       if (mockApplicable) mock = await services.startMock(Object.fromEntries(turns.map(turn => [turn.marker, turn.reply])));
       let automation: Record<string, string> = {};
       if (gitSelected) {
-        const prepared = await gitProfile(checkout, mock?.url);Object.assign(run, prepared.profile);
-        persistentProfilePath = prepared.profile.userData;automation = prepared.automation;
+        const profile = await gitProfile(checkout);Object.assign(run, profile);
+        persistentProfilePath = profile.userData;
       } else automation = await prepareProfile(run, mock!.url);
       const home = join(run.resources, 'home');
       await mkdir(home);

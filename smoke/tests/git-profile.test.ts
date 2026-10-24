@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile, rm, access, symlink, rename } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, rm, access, symlink, rename, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -9,8 +9,7 @@ import { createRun, finishRun } from '../src/resources.js';
 
 test('fresh persistent Git-only profile has no Chat state, retains unrelated state and survives run cleanup', async t => {
   const root = await mkdtemp(join(tmpdir(), 'git-profile-test-'));t.after(() => rm(root,{recursive:true,force:true}));
-  const { profile, automation } = await gitProfile(root);
-  assert.deepEqual(automation, {});
+  const profile = await gitProfile(root);
   const path = join(profile.userData,'User/settings.json');
   const settings = JSON.parse(await readFile(path,'utf8'));
   assert.equal(settings['chat.disableAIFeatures'],true);
@@ -27,42 +26,46 @@ test('fresh persistent Git-only profile has no Chat state, retains unrelated sta
   assert.equal(JSON.parse(await readFile(path,'utf8'))['editor.fontSize'],17);
 });
 
-test('mock combined refreshes endpoints, preserves state and returns to mock-free Git-only', async t => {
-  const root = await mkdtemp(join(tmpdir(),'git-profile-transition-'));t.after(()=>rm(root,{recursive:true,force:true}));
-  const first=await gitProfile(root,'http://127.0.0.1:12345');
-  const path=join(first.profile.userData,'User/settings.json');
-  assert.ok(first.automation.VSCODE_COPILOT_CHAT_TOKEN);
-  const dbPath=join(first.profile.userData,'User/globalStorage/state.vscdb');
-  const db=new DatabaseSync(dbPath);
-  db.prepare('INSERT INTO ItemTable (key,value) VALUES (?,?)').run('unrelated-state','retained');db.close();
-  const gitOnly=await gitProfile(root);
-  assert.deepEqual(gitOnly.automation,{});
-  const settings=JSON.parse(await readFile(path,'utf8'));
-  assert.equal(settings['chat.disableAIFeatures'],true);
-  assert.ok(!Object.keys(settings).some(key=>key.includes('override')));
-  assert.equal(settings['chat.allowAnonymousAccess'],undefined);
-  const again=await gitProfile(root,'http://127.0.0.1:23456');
-  const refreshed=JSON.parse(await readFile(path,'utf8'));
-  assert.equal(refreshed['github.copilot.advanced.debug.overrideCapiUrl'],'http://127.0.0.1:23456');
-  assert.equal(refreshed['chat.disableAIFeatures'],false);
-  const token=JSON.parse(Buffer.from(again.automation.VSCODE_COPILOT_CHAT_TOKEN,'base64').toString());
-  assert.equal(token.endpoints.api,'http://127.0.0.1:23456');
-  const retained=new DatabaseSync(dbPath);
-  assert.equal(retained.prepare('SELECT value FROM ItemTable WHERE key=?').get('unrelated-state')?.value,'retained');
-  assert.equal(retained.prepare('SELECT value FROM ItemTable WHERE key=?').get('builtinChatExtensionEnablementMigration')?.value,'true');retained.close();
+test('standalone reuse removes stale mock settings and preserves existing Chat and extension state', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'git-profile-reuse-'));t.after(() => rm(root,{recursive:true,force:true}));
+  const profile = await gitProfile(root);
+  const path = join(profile.userData, 'User/settings.json');
+  const settings = JSON.parse(await readFile(path, 'utf8'));
+  const staleKeys = {
+    'chat.allowAnonymousAccess': true,
+    'github.copilot.advanced.debug.overrideProxyUrl': 'http://127.0.0.1:12345',
+    'github.copilot.advanced.debug.overrideCapiUrl': 'http://127.0.0.1:12345',
+    'github.copilot.advanced.debug.overrideAuthType': 'token',
+  };
+  await writeFile(path, JSON.stringify({...settings, ...staleKeys, 'chat.disableAIFeatures': false, 'editor.fontSize': 17}));
+  const storage = join(profile.userData, 'User/globalStorage');await mkdir(storage);
+  const dbPath = join(storage, 'state.vscdb');const db = new DatabaseSync(dbPath);
+  db.exec('CREATE TABLE ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)');
+  db.prepare('INSERT INTO ItemTable (key,value) VALUES (?,?)').run('extensionsIdentifiers/disabled', JSON.stringify([{id:'github.copilot-chat'}, {id:'test.unrelated-extension'}]));
+  db.prepare('INSERT INTO ItemTable (key,value) VALUES (?,?)').run('builtinChatExtensionEnablementMigration', 'true');
+  db.prepare('INSERT INTO ItemTable (key,value) VALUES (?,?)').run('unrelated-state', 'retained');db.close();
+  const before = await readFile(dbPath);
+  for (const dir of ['.copilot', '.codex']) {
+    await mkdir(join(profile.state, dir));await writeFile(join(profile.state, dir, 'retained'), 'existing state');
+  }
+  assert.deepEqual(await gitProfile(root), profile);
+  const after = JSON.parse(await readFile(path, 'utf8'));
+  for (const key of Object.keys(staleKeys)) assert.equal(after[key], undefined);
+  assert.equal(after['chat.disableAIFeatures'], true);
+  assert.equal(after['editor.fontSize'], 17);
+  assert.deepEqual(await readFile(dbPath), before);
+  for (const dir of ['.copilot', '.codex']) assert.equal(await readFile(join(profile.state, dir, 'retained'), 'utf8'), 'existing state');
 });
 
 test('open, unowned, symlinked or malformed profiles stop before settings/state mutation', async t => {
   const root=await mkdtemp(join(tmpdir(),'git-profile-refusal-'));t.after(()=>rm(root,{recursive:true,force:true}));
-  const {profile}=await gitProfile(root);const path=join(profile.userData,'User/settings.json');
+  const profile=await gitProfile(root);const path=join(profile.userData,'User/settings.json');
   const before=await readFile(path,'utf8');
   for (const marker of ['SingletonLock','SingletonSocket','SingletonCookie']) {
     await writeFile(join(profile.userData,marker),'active');
-    await assert.rejects(gitProfile(root,'http://127.0.0.1:12345'),/Close/);
+    await assert.rejects(gitProfile(root),/Close/);
     assert.equal(await readFile(path,'utf8'),before);await rm(join(profile.userData,marker));
   }
-  await assert.rejects(gitProfile(root,'https://example.com'),/loopback/);
-  assert.equal(await readFile(path,'utf8'),before);
   await rename(path,join(profile.state,'saved-settings'));await symlink(join(profile.state,'saved-settings'),path);
   await assert.rejects(gitProfile(root),/ownership/);assert.equal(await readFile(path,'utf8'),before);
   await rm(path);await writeFile(path,'{bad json');await assert.rejects(gitProfile(root));
@@ -75,33 +78,18 @@ test('open, unowned, symlinked or malformed profiles stop before settings/state 
   await assert.rejects(gitProfile(root),/ownership/);
 });
 
-test('mock refresh refuses redirected databases and preserves real and personal profile files', async t => {
+test('standalone preparation refuses redirected databases and preserves real and personal profile files', async t => {
   const root=await mkdtemp(join(tmpdir(),'git-profile-real-preserve-'));t.after(()=>rm(root,{recursive:true,force:true}));
   const { realProfile }=await import('../src/real-profile.js');
   const real=await realProfile(root,true);const realPath=join(real.userData,'User/settings.json');const realBefore=await readFile(realPath,'utf8');
-  const {profile}=await gitProfile(root,'http://127.0.0.1:12345');
+  const profile=await gitProfile(root);
   await writeFile(join(root,'personal-settings'),'personal state');
-  const db=join(profile.userData,'User/globalStorage/state.vscdb');await rename(db,join(profile.state,'saved-db'));await symlink(join(profile.state,'saved-db'),db);
+  const storage=join(profile.userData,'User/globalStorage');await mkdir(storage);
+  const db=join(storage,'state.vscdb');await writeFile(join(profile.state,'saved-db'),'preserved database');await symlink(join(profile.state,'saved-db'),db);
   const settingsPath=join(profile.userData,'User/settings.json');const settingsBefore=await readFile(settingsPath,'utf8');
-  await assert.rejects(gitProfile(root,'http://127.0.0.1:23456'),/ownership/);
+  await assert.rejects(gitProfile(root),/ownership/);
   assert.equal(await readFile(settingsPath,'utf8'),settingsBefore);
+  assert.equal(await readFile(db,'utf8'),'preserved database');
   assert.equal(await readFile(realPath,'utf8'),realBefore);
   assert.equal(await readFile(join(root,'personal-settings'),'utf8'),'personal state');
-});
-
-test('Git-only first-use disabled Chat state is repaired only for mock combined and preserves other extensions',async t=>{
-  const {mkdir}=await import('node:fs/promises');
-  const root=await mkdtemp(join(tmpdir(),'git-profile-enable-chat-'));t.after(()=>rm(root,{recursive:true,force:true}));
-  const {profile}=await gitProfile(root);const storage=join(profile.userData,'User/globalStorage');await mkdir(storage,{recursive:true});
-  const path=join(storage,'state.vscdb');const db=new DatabaseSync(path);
-  db.exec('CREATE TABLE ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)');
-  const unrelated={id:'test.unrelated-extension',uuid:'preserved-uuid'};
-  db.prepare('INSERT INTO ItemTable (key,value) VALUES (?,?)').run('extensionsIdentifiers/disabled',JSON.stringify([{id:'github.copilot-chat'},unrelated]));
-  db.prepare('INSERT INTO ItemTable (key,value) VALUES (?,?)').run('unrelated-row','preserved');db.close();
-  await gitProfile(root);const before=new DatabaseSync(path,{readOnly:true});
-  assert.equal(JSON.parse(String(before.prepare('SELECT value FROM ItemTable WHERE key=?').get('extensionsIdentifiers/disabled')?.value)).length,2);before.close();
-  await gitProfile(root,'http://127.0.0.1:12345');
-  const after=new DatabaseSync(path,{readOnly:true});
-  assert.deepEqual(JSON.parse(String(after.prepare('SELECT value FROM ItemTable WHERE key=?').get('extensionsIdentifiers/disabled')?.value)),[unrelated]);
-  assert.equal(after.prepare('SELECT value FROM ItemTable WHERE key=?').get('unrelated-row')?.value,'preserved');after.close();
 });
