@@ -75,6 +75,36 @@ export function formatResult(result: ReportResult): string {
                 lines.push(`  Git commit: ${git.hash} ${git.message}`);
             if (git.log) lines.push(`  Git log: ${git.log}`);
         }
+        if (
+            check.suite === 'python' &&
+            check.evidence &&
+            typeof check.evidence === 'object'
+        ) {
+            const evidence = check.evidence;
+            if ('stage' in evidence && typeof evidence.stage === 'string')
+                lines.push(`  Python stage: ${evidence.stage}`);
+            if (
+                'installMode' in evidence &&
+                typeof evidence.installMode === 'string'
+            )
+                lines.push(`  Python installation: ${evidence.installMode}`);
+            if (
+                'identity' in evidence &&
+                evidence.identity &&
+                typeof evidence.identity === 'object'
+            ) {
+                const identity = evidence.identity;
+                if (
+                    'invocation' in identity &&
+                    typeof identity.invocation === 'string' &&
+                    'version' in identity &&
+                    typeof identity.version === 'string'
+                )
+                    lines.push(
+                        `  Python runtime: ${identity.invocation} (${identity.version})`,
+                    );
+            }
+        }
         if (check.error) lines.push(`  Reason: ${check.error}`);
     }
     lines.push(

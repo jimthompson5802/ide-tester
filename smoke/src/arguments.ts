@@ -1,9 +1,10 @@
 import { isAbsolute } from 'node:path';
 
-export type Suite = 'editing' | 'git' | 'chat' | 'basic';
+export type Suite = 'editing' | 'git' | 'chat' | 'basic' | 'python';
 export type ChatBackend = 'mock' | 'real';
 export interface Options {
     chatBackend?: ChatBackend;
+    pythonInterpreter?: string;
     build: string;
     suite: Suite;
     output?: 'text' | 'json';
@@ -19,9 +20,13 @@ export function parseArguments(
         const key = args[i];
         const value = args[i + 1];
         if (
-            !['--build', '--suite', '--output', '--chat-backend'].includes(
-                key,
-            ) ||
+            ![
+                '--build',
+                '--suite',
+                '--output',
+                '--chat-backend',
+                '--python-interpreter',
+            ].includes(key) ||
             values.has(key) ||
             !value ||
             value.startsWith('--')
@@ -39,9 +44,10 @@ export function parseArguments(
         suite !== 'editing' &&
         suite !== 'git' &&
         suite !== 'chat' &&
-        suite !== 'basic'
+        suite !== 'basic' &&
+        suite !== 'python'
     ) {
-        throw new Error('--suite must be editing, git, chat, or basic');
+        throw new Error('--suite must be editing, git, chat, basic, or python');
     }
     const output = values.get('--output');
     if (output !== undefined && output !== 'text' && output !== 'json') {
@@ -55,12 +61,29 @@ export function parseArguments(
         suite,
         chatBackend,
         ...(output ? { output } : {}),
+        ...(values.has('--python-interpreter')
+            ? { pythonInterpreter: values.get('--python-interpreter') }
+            : {}),
     };
     validateBackend(options);
     return options;
 }
 
 export function validateBackend(options: Options, foundation = false): void {
+    if (options.suite === 'python') {
+        if (!options.pythonInterpreter)
+            throw new Error('--python-interpreter is required for Python');
+        if (foundation)
+            throw new Error(
+                'Foundation qualification does not cover Python; use smoke',
+            );
+        if (options.chatBackend === 'real')
+            throw new Error(
+                'Python-only runs do not select Chat; real backend is unsupported',
+            );
+    } else if (options.pythonInterpreter !== undefined) {
+        throw new Error('--python-interpreter is only supported for Python');
+    }
     if (foundation && options.suite === 'git')
         throw new Error(
             'Foundation qualification does not cover Git; use smoke',

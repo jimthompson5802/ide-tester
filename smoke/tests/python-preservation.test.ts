@@ -110,3 +110,61 @@ test('protected launch uses fixed shell text and escaped lexical/canonical polic
     assert.ok(policy.includes(JSON.stringify(sentinel)));
     assert.ok(policy.startsWith('(version 1)\n(allow default)'));
 });
+
+test('supplied arbitrary interpreter path is protected literally without denying its unrelated parent tree', async (t) => {
+    const root = await fixture();
+    t.after(() => rm(root, { recursive: true }));
+    const resources = join(root, 'owned');
+    await mkdir(resources);
+    const sentinel = join(resources, 'sentinel');
+    await mkdir(sentinel);
+    const supplied = join(root, 'ordinary-file');
+    await writeFile(supplied, 'not Python');
+    const launch = await createProtectedLaunch(
+        resources,
+        '/Applications/Test.app/Code',
+        root,
+        sentinel,
+        supplied,
+    );
+    const policy = await readFile(
+        launch.environment.IDE_PYTHON_SANDBOX_POLICY,
+        'utf8',
+    );
+    assert.ok(
+        policy.includes(
+            `(deny file-write* (literal ${JSON.stringify(supplied)}))`,
+        ),
+    );
+    assert.ok(!policy.includes('(subpath "/private/tmp")'));
+    assert.ok(!policy.includes(`(subpath ${JSON.stringify(root)})`));
+});
+
+test('protected launch guards supplied virtual environment invocation as well as shared canonical installation', async (t) => {
+    const root = await fixture();
+    t.after(() => rm(root, { recursive: true }));
+    const resources = join(root, 'owned');
+    const sentinel = join(resources, 'sentinel');
+    await mkdir(sentinel, { recursive: true });
+    const externalEnvironment = join(root, 'other-environment');
+    await mkdir(join(externalEnvironment, 'bin'), { recursive: true });
+    const invocation = join(externalEnvironment, 'bin/python');
+    const canonical = join(root, '.venv/bin/python');
+    await symlink(canonical, invocation);
+    const launch = await createProtectedLaunch(
+        resources,
+        '/Applications/Test.app/Code',
+        root,
+        sentinel,
+        canonical,
+        invocation,
+    );
+    const policy = await readFile(
+        launch.environment.IDE_PYTHON_SANDBOX_POLICY,
+        'utf8',
+    );
+    assert.ok(
+        policy.includes(`(subpath ${JSON.stringify(externalEnvironment)})`),
+    );
+    assert.ok(policy.includes(`(literal ${JSON.stringify(invocation)})`));
+});

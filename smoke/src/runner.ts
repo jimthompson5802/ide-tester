@@ -1,4 +1,4 @@
-import { writeFile, mkdir, access } from 'node:fs/promises';
+import { writeFile, mkdir, access, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -11,7 +11,12 @@ import { resolveApp, type InstalledApp } from './app.js';
 import { createRun, finishRun } from './resources.js';
 import { startMock } from './mock.js';
 import { prepareProfile } from './profile.js';
-import { bounded, Workbench } from './workbench.js';
+import {
+    bounded,
+    Workbench,
+    PythonDeadline,
+    PythonWorkbench,
+} from './workbench.js';
 import {
     realProfile,
     backendLaunch,
@@ -35,16 +40,36 @@ import {
 } from './git-repository.js';
 import { checkGit, GitFailure, newGitEvidence } from './git.js';
 
+import {
+    preparePythonInterpreter,
+    PythonInterpreterPrerequisite,
+} from './python-interpreter.js';
+import {
+    pythonProfile,
+    pythonEnvironment,
+    PythonProfileFailure,
+} from './python-profile.js';
+import { checkPython, PythonFailure, newPythonEvidence } from './python.js';
+import {
+    capturePreservation,
+    requirePreservationUnchanged,
+    createProtectedLaunch,
+    type PreservationManifest,
+} from './python-preservation.js';
+import { closeOwnedApplication } from './python-shutdown.js';
+
 interface RunnerServices {
     startMock: typeof startMock;
     prepareGit: typeof prepareGit;
     workbench: (page: Page) => Workbench;
     editing: typeof checkEditing;
     git: typeof checkGit;
+    python: typeof checkPython;
+    pythonWorkbench: (page: Page, deadline: PythonDeadline) => PythonWorkbench;
 }
 
 interface CheckResult {
-    suite: 'editing' | 'git' | 'chat';
+    suite: 'editing' | 'git' | 'chat' | 'python';
     outcome: 'not_run' | 'passed' | ChatOutcome;
     durationMs?: number;
     evidence?: unknown;
@@ -81,22 +106,42 @@ async function runSelected(
         workbench: (page) => new Workbench(page),
         editing: checkEditing,
         git: checkGit,
+        python: checkPython,
+        pythonWorkbench: (page, deadline) =>
+            new PythonWorkbench(page, deadline),
         ...injected,
     };
     const started = Date.now();
     const run = await createRun(checkout);
     const chatBackend = options.chatBackend ?? 'mock';
+    const pythonSelected = !foundation && options.suite === 'python';
+    const pythonDeadline = pythonSelected
+        ? new PythonDeadline(480_000)
+        : undefined;
+    let interpreter:
+        Awaited<ReturnType<typeof preparePythonInterpreter>> | undefined;
+    let preservation: PreservationManifest | undefined;
+    let pythonWorkbench: PythonWorkbench | undefined;
+    let pendingPython: Promise<unknown> | undefined;
+    const pythonScenarioEnd = Date.now() + 480_000;
+    const pythonEvidence = newPythonEvidence();
     const gitSelected = !foundation && options.suite === 'git';
     const chatSelected =
         options.suite !== 'git' &&
+        options.suite !== 'python' &&
         (foundation || options.suite === 'chat' || options.suite === 'basic');
-    const mockApplicable = chatBackend === 'mock' && options.suite !== 'git';
+    const mockApplicable =
+        chatBackend === 'mock' &&
+        options.suite !== 'git' &&
+        options.suite !== 'python';
     let repository: GitRepository | undefined;
     let persistentProfilePath: string | undefined;
     let versions: InstalledApp | undefined;
     let error: string | undefined;
     let outcome: 'passed' | 'failed' | 'blocked' | 'harness_error';
     let app: ElectronApplication | undefined;
+    let ownedPythonChild:
+        ReturnType<ElectronApplication['process']> | undefined;
     let page: Page | undefined;
     let mock: Awaited<ReturnType<typeof startMock>> | undefined;
     let launchAttempted = false;
@@ -111,13 +156,21 @@ async function runSelected(
               ? ['editing', 'chat']
               : [options.suite]
     ).map((suite) => ({
-        suite: suite as 'editing' | 'git' | 'chat',
+        suite: suite as CheckResult['suite'],
+        ...(suite === 'python' ? { evidence: pythonEvidence } : {}),
         outcome: 'not_run',
         ...(suite === 'git' ? { evidence: newGitEvidence() } : {}),
     }));
     try {
         validateBackend(options, foundation);
-        versions = await resolveApp(options.build);
+        if (pythonSelected) {
+            interpreter = await pythonDeadline!.perform(() =>
+                preparePythonInterpreter(options.pythonInterpreter!),
+            );
+        }
+        versions = pythonDeadline
+            ? await pythonDeadline.perform(() => resolveApp(options.build))
+            : await resolveApp(options.build);
         if (
             process.platform !== 'darwin' ||
             process.arch !== 'arm64' ||
@@ -150,7 +203,73 @@ async function runSelected(
         const turns = chatTurns(chatBackend, foundation);
         let env: Record<string, string>;
         let backendArgs: string[];
-        if (chatBackend === 'real') {
+        let executable = versions.executable;
+        if (pythonSelected) {
+            stage = 'python-prepare';
+            pythonEvidence.stage = stage;
+            const deadline = pythonDeadline!;
+            preservation = await deadline.perform(() =>
+                capturePreservation(checkout),
+            );
+            await deadline.perform(() =>
+                writeFile(
+                    join(run.report, 'preservation-before.json'),
+                    JSON.stringify(preservation),
+                    { flag: 'wx', mode: 0o600 },
+                ),
+            );
+            const profile = await deadline.perform(() =>
+                pythonProfile(checkout, run.resources),
+            );
+            Object.assign(run, profile);
+            persistentProfilePath = profile.userData;
+            await deadline.perform(() => mkdir(join(run.resources, 'home')));
+            await deadline.perform(() => mkdir(join(run.resources, 'tmp')));
+            const sentinel = join(run.resources, 'protected-sentinel');
+            await deadline.perform(() => mkdir(sentinel));
+            await deadline.perform(() =>
+                writeFile(join(sentinel, 'unchanged'), run.id, { flag: 'wx' }),
+            );
+            const guardScript = join(run.resources, 'terminal-guard.cjs');
+            await deadline.perform(() =>
+                writeFile(
+                    guardScript,
+                    `const fs = require('node:fs');
+let denied = false;
+try { fs.appendFileSync(${JSON.stringify(join(sentinel, 'unchanged'))}, 'mutation'); } catch(e) { if (e.code === 'EPERM' || e.code === 'EACCES') denied = true; else throw e; }
+fs.writeFileSync(${JSON.stringify(join(run.resources, 'terminal-guard.json'))}, JSON.stringify({denied}), {flag:'wx'});
+console.log(denied ? 'GUARD_DENIED ${run.id}' : 'GUARD_FAILED ${run.id}');
+setTimeout(() => process.exit(0), 90000);
+`,
+                    { flag: 'wx' },
+                ),
+            );
+            const guarded = await deadline.perform(() =>
+                createProtectedLaunch(
+                    run.resources,
+                    versions!.executable,
+                    checkout,
+                    sentinel,
+                    interpreter!.canonical,
+                    interpreter!.absolute,
+                ),
+            );
+            executable = guarded.executable;
+            pythonEvidence.protectedPaths = guarded.protectedPaths;
+            env = {
+                ...pythonEnvironment(run.resources),
+                ...guarded.environment,
+                XDG_STATE_HOME: run.state,
+                PATH: '/usr/bin:/bin:/usr/sbin:/sbin',
+                LANG: 'en_US.UTF-8',
+            };
+            backendArgs = [
+                ...backendLaunch('mock', run, {}).args,
+                '--no-sandbox',
+                '--disable-extension',
+                'github.copilot-chat',
+            ];
+        } else if (chatBackend === 'real') {
             try {
                 const profile = await realProfile(checkout);
                 await requireClosedProfile(profile);
@@ -219,35 +338,49 @@ async function runSelected(
             : [];
         stage = 'launch';
         const launchStart = Date.now();
+        pythonDeadline?.stage('launch', 60_000);
+        if (pythonSelected) pythonEvidence.stage = stage;
         launchAttempted = true;
-        app = await launch({
-            executablePath: versions.executable,
-            timeout: 60_000,
-            env,
-            args: [
-                run.workspace,
-                '--new-window',
-                ...backendArgs,
-                ...(chatSelected
-                    ? [`--extensionDevelopmentPath=${helperPath}`]
-                    : []),
-                '--enable-smoke-test-driver',
-                '--skip-welcome',
-                '--skip-release-notes',
-                '--disable-telemetry',
-                '--disable-experiments',
-                '--locale=en',
-            ],
-        });
+        const launchOperation = async () => {
+            const launched = await launch({
+                executablePath: executable,
+                timeout: 60_000,
+                env,
+                args: [
+                    run.workspace,
+                    '--new-window',
+                    ...backendArgs,
+                    ...(chatSelected
+                        ? [`--extensionDevelopmentPath=${helperPath}`]
+                        : []),
+                    '--enable-smoke-test-driver',
+                    '--skip-welcome',
+                    '--skip-release-notes',
+                    '--disable-telemetry',
+                    '--disable-experiments',
+                    '--locale=en',
+                ],
+            });
+            app = launched;
+            if (pythonSelected) ownedPythonChild = launched.process();
+            return launched;
+        };
+        app = pythonDeadline
+            ? await pythonDeadline.perform(launchOperation)
+            : await launchOperation();
         app.process().stdout?.on('data', () => {});
         app.process().stderr?.on('data', () => {});
-        page = await app.firstWindow({
-            timeout: Math.max(1, 60_000 - (Date.now() - launchStart)),
-        });
+        const firstWindow = () =>
+            app!.firstWindow({
+                timeout: Math.max(1, 60_000 - (Date.now() - launchStart)),
+            });
+        page = pythonDeadline
+            ? await pythonDeadline.perform(firstWindow)
+            : await firstWindow();
         page.setDefaultTimeout(15_000);
         page.setDefaultNavigationTimeout(15_000);
         // Real runs never record screenshots/traces: authentication may expire mid-run.
-        if (chatBackend === 'mock') {
+        if (chatBackend === 'mock' && !pythonSelected) {
             await bounded(
                 app.context().tracing.start({
                     screenshots: true,
@@ -260,8 +393,70 @@ async function runSelected(
             tracing = true;
         }
         stage = 'driver';
-        const workbench = services.workbench(page);
-        await workbench.ready(Math.max(1, 60_000 - (Date.now() - launchStart)));
+        const workbench = pythonDeadline
+            ? (pythonWorkbench = services.pythonWorkbench(page, pythonDeadline))
+            : services.workbench(page);
+        const ready = () =>
+            workbench.ready(Math.max(1, 60_000 - (Date.now() - launchStart)));
+        if (pythonDeadline) await pythonDeadline.perform(ready);
+        else await ready();
+        if (pythonDeadline) {
+            pythonDeadline.stage('guard-inheritance', 60_000);
+            pythonEvidence.stage = 'guard-inheritance';
+            const denied = await pythonDeadline.perform(() =>
+                app!.evaluate(
+                    (_electron, path) => {
+                        const fs = process.getBuiltinModule('node:fs');
+                        try {
+                            fs.appendFileSync(path, 'mutation');
+                            return false;
+                        } catch (cause) {
+                            return (
+                                cause instanceof Error &&
+                                'code' in cause &&
+                                (cause.code === 'EPERM' ||
+                                    cause.code === 'EACCES')
+                            );
+                        }
+                    },
+                    join(run.resources, 'protected-sentinel/unchanged'),
+                ),
+            );
+            if (!denied)
+                throw new PythonFailure(
+                    'harness_error',
+                    'Electron preservation guard did not deny sentinel mutation',
+                    pythonEvidence,
+                );
+            await pythonDeadline.perform(() =>
+                pythonWorkbench!.verifyTerminalGuard(`GUARD_DENIED ${run.id}`),
+            );
+            const guard: unknown = JSON.parse(
+                await pythonDeadline.perform(() =>
+                    readFile(
+                        join(run.resources, 'terminal-guard.json'),
+                        'utf8',
+                    ),
+                ),
+            );
+            if (
+                !guard ||
+                typeof guard !== 'object' ||
+                !('denied' in guard) ||
+                guard.denied !== true ||
+                (await pythonDeadline.perform(() =>
+                    readFile(
+                        join(run.resources, 'protected-sentinel/unchanged'),
+                        'utf8',
+                    ),
+                )) !== run.id
+            )
+                throw new PythonFailure(
+                    'harness_error',
+                    'Terminal preservation guard not established',
+                    pythonEvidence,
+                );
+        }
         timings.launchMs = Date.now() - launchStart;
         if (repository) {
             stage = 'git-tool';
@@ -282,7 +477,16 @@ async function runSelected(
                         ? 300_000
                         : 120_000;
                 let operation: Promise<unknown>;
-                if (check.suite === 'editing')
+                if (check.suite === 'python')
+                    operation = pendingPython = services.python(
+                        pythonWorkbench!,
+                        run.workspace,
+                        interpreter!,
+                        pythonEvidence,
+                        pythonDeadline!,
+                        run.extensions,
+                    );
+                else if (check.suite === 'editing')
                     operation = services.editing(workbench, run.workspace);
                 else if (check.suite === 'git')
                     operation = services.git(
@@ -303,13 +507,18 @@ async function runSelected(
                     );
                 check.evidence = await bounded(
                     operation,
-                    deadline,
+                    check.suite === 'python'
+                        ? Math.max(1, pythonScenarioEnd - Date.now())
+                        : deadline,
                     `${check.suite} test`,
                 );
+                if (check.suite === 'python') pythonDeadline!.remaining();
                 check.outcome = 'passed';
             } catch (cause) {
                 check.outcome =
-                    cause instanceof ChatFailure || cause instanceof GitFailure
+                    cause instanceof ChatFailure ||
+                    cause instanceof GitFailure ||
+                    cause instanceof PythonFailure
                         ? cause.outcome
                         : chatBackend === 'real' &&
                             check.suite === 'chat' &&
@@ -318,13 +527,15 @@ async function runSelected(
                           : 'failed';
                 if (
                     (cause instanceof ChatFailure ||
-                        cause instanceof GitFailure) &&
+                        cause instanceof GitFailure ||
+                        cause instanceof PythonFailure) &&
                     cause.evidence
                 )
                     check.evidence = cause.evidence;
                 check.error =
                     cause instanceof ChatFailure ||
                     cause instanceof GitFailure ||
+                    cause instanceof PythonFailure ||
                     chatBackend === 'mock'
                         ? String(cause)
                         : `${check.suite} test failed or timed out`;
@@ -349,18 +560,33 @@ async function runSelected(
             chatBackend === 'real' &&
             launchAttempted &&
             !(cause instanceof ChatFailure) &&
-            !(cause instanceof GitFailure)
+            !(cause instanceof GitFailure) &&
+            !(cause instanceof PythonFailure)
                 ? 'Real test application launch or driver contract failed'
                 : String(cause);
         outcome =
-            cause instanceof ChatFailure || cause instanceof GitFailure
+            cause instanceof ChatFailure ||
+            cause instanceof GitFailure ||
+            cause instanceof PythonFailure
                 ? cause.outcome
-                : stage === 'git-preflight'
-                  ? 'harness_error'
-                  : ['preflight', 'launch', 'driver'].includes(stage)
+                : cause instanceof PythonProfileFailure
+                  ? cause.outcome
+                  : cause instanceof PythonInterpreterPrerequisite
                     ? 'blocked'
-                    : 'failed';
-        if (page && chatBackend === 'mock') {
+                    : pythonSelected &&
+                        stage === 'python' &&
+                        (pythonDeadline?.expired ||
+                            String(cause).includes('python test timed out'))
+                      ? 'failed'
+                      : pythonSelected &&
+                          !['preflight', 'launch'].includes(stage)
+                        ? 'harness_error'
+                        : stage === 'git-preflight'
+                          ? 'harness_error'
+                          : ['preflight', 'launch', 'driver'].includes(stage)
+                            ? 'blocked'
+                            : 'failed';
+        if (page && chatBackend === 'mock' && !pythonSelected) {
             try {
                 await bounded(
                     page.screenshot({
@@ -392,10 +618,50 @@ async function runSelected(
             diagnostics.push(`Trace: ${String(capture)}`);
         }
     }
+    pythonDeadline?.stop();
+    const cleanupDeadline = Date.now() + 120_000;
     const requests = mock?.requests() ?? [];
     const cleanup = await finishRun(run, outcome === 'passed', [
         async () => {
             if (app) {
+                if (pythonDeadline) {
+                    pythonEvidence.applicationExit =
+                        await closeOwnedApplication(
+                            {
+                                process: () => ownedPythonChild!,
+                                close: () => app!.close(),
+                            },
+                            {
+                                deadline: cleanupDeadline,
+                            },
+                        );
+                    await pythonDeadline.settle(
+                        Math.max(1, cleanupDeadline - Date.now()),
+                    );
+                    if (pendingPython)
+                        await bounded(
+                            Promise.allSettled([pendingPython]),
+                            Math.max(1, cleanupDeadline - Date.now()),
+                            'Python scenario settle',
+                        );
+                    if (preservation) {
+                        await bounded(
+                            requirePreservationUnchanged(
+                                checkout,
+                                preservation,
+                            ),
+                            Math.max(1, cleanupDeadline - Date.now()),
+                            'Python preservation comparison',
+                        );
+                        pythonEvidence.preservation = {
+                            unchanged: true,
+                            entries: preservation.entries.length,
+                        };
+                    }
+                    if (Date.now() >= cleanupDeadline)
+                        throw new Error('Python cleanup deadline expired');
+                    return;
+                }
                 const process = app.process();
                 await bounded(app.close(), 10_000, 'Application shutdown');
                 if (process.exitCode === null && process.signalCode === null) {
@@ -411,6 +677,19 @@ async function runSelected(
                 throw new Error(
                     'Launch failed without an application handle; shutdown uncertain',
                 );
+            else if (pythonDeadline) {
+                await pythonDeadline.settle(
+                    Math.max(1, cleanupDeadline - Date.now()),
+                );
+                if (preservation)
+                    await bounded(
+                        requirePreservationUnchanged(checkout, preservation),
+                        Math.max(1, cleanupDeadline - Date.now()),
+                        'Python preservation comparison',
+                    );
+                if (Date.now() >= cleanupDeadline)
+                    throw new Error('Python cleanup deadline expired');
+            }
         },
         async () => {
             if (mock) await bounded(mock.close(), 5000, 'Mock shutdown');

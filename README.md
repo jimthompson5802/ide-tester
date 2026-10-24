@@ -63,7 +63,9 @@ npm --prefix smoke run test:unit
 npm --prefix smoke run smoke -- --build "/Applications/Visual Studio Code.app" --suite basic
 ```
 
-GUI execution needs authorization and an unlocked reserved desktop. Select `editing`, `git`, `chat`, or `basic` (default, editing → Chat). Git runs only through `--suite git`, starts no mock Chat server and preserves its dedicated `profiles/smoke-git`. Renamed mocked `basic` passed GUI verification; real `basic` passed a developer-requested rerun after an earlier Copilot error/warning failure. See [usage and recovery](smoke/README.md) for results, isolation and version requirements.
+GUI execution needs authorization and an unlocked reserved desktop. Select `editing`, `git`, `python`, `chat`, or `basic` (default, editing → Chat). Git runs only through `--suite git`, starts no mock Chat server and preserves its dedicated `profiles/smoke-git`. Renamed mocked `basic` passed GUI verification; real `basic` passed a developer-requested rerun after an earlier Copilot error/warning failure. See [usage and recovery](smoke/README.md) for results, isolation and version requirements.
+
+The standalone Python suite is implemented with non-GUI verification complete and developer validation accepted in [issue #40 phase 2](docs/implementation-plans/issue-40-python-smoke-test.md). It requires `--suite python --python-interpreter <file-path>` and uses a separate persistent profile, UI installation/interpreter selection and combined source/terminal/program evidence. See [Python usage and limits](smoke/README.md#python-suite-and-persistent-profile). Production GUI qualification remains pending phase 3; accepted feasibility evidence does not establish production behavior.
 
 The retained Python environment is preserved separately from the TypeScript tester. Its metadata and installed entry points may reference removed source. Before proposing or performing authorized Python environment changes, follow the [preservation guide](docs/preserved-python-environment.md) for interpreter constraints, dependency procedures, and historical limitations.
 
