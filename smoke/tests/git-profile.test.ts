@@ -88,3 +88,20 @@ test('mock refresh refuses redirected databases and preserves real and personal 
   assert.equal(await readFile(realPath,'utf8'),realBefore);
   assert.equal(await readFile(join(root,'personal-settings'),'utf8'),'personal state');
 });
+
+test('Git-only first-use disabled Chat state is repaired only for mock combined and preserves other extensions',async t=>{
+  const {mkdir}=await import('node:fs/promises');
+  const root=await mkdtemp(join(tmpdir(),'git-profile-enable-chat-'));t.after(()=>rm(root,{recursive:true,force:true}));
+  const {profile}=await gitProfile(root);const storage=join(profile.userData,'User/globalStorage');await mkdir(storage,{recursive:true});
+  const path=join(storage,'state.vscdb');const db=new DatabaseSync(path);
+  db.exec('CREATE TABLE ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)');
+  const unrelated={id:'test.unrelated-extension',uuid:'preserved-uuid'};
+  db.prepare('INSERT INTO ItemTable (key,value) VALUES (?,?)').run('extensionsIdentifiers/disabled',JSON.stringify([{id:'github.copilot-chat'},unrelated]));
+  db.prepare('INSERT INTO ItemTable (key,value) VALUES (?,?)').run('unrelated-row','preserved');db.close();
+  await gitProfile(root);const before=new DatabaseSync(path,{readOnly:true});
+  assert.equal(JSON.parse(String(before.prepare('SELECT value FROM ItemTable WHERE key=?').get('extensionsIdentifiers/disabled')?.value)).length,2);before.close();
+  await gitProfile(root,'http://127.0.0.1:12345');
+  const after=new DatabaseSync(path,{readOnly:true});
+  assert.deepEqual(JSON.parse(String(after.prepare('SELECT value FROM ItemTable WHERE key=?').get('extensionsIdentifiers/disabled')?.value)),[unrelated]);
+  assert.equal(after.prepare('SELECT value FROM ItemTable WHERE key=?').get('unrelated-row')?.value,'preserved');after.close();
+});

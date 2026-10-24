@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile, realpath, lstat, rename } from 'node:fs/promises';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { commonSettings, mockProfileSettings, prepareMockState } from './profile.js';
 import { requireClosedProfile, type ProfilePaths } from './real-profile.js';
 import { GitFailure } from './git-repository.js';
@@ -38,5 +39,25 @@ export async function gitProfile(checkout: string, mockUrl?: string): Promise<{ 
   const temporary = join(user, 'settings.smoke-tmp.json');
   await writeFile(temporary, JSON.stringify(settings, null, 2), { flag: 'wx', mode: 0o600 });
   await rename(temporary, path);
-  return { profile, automation: mockUrl === undefined ? {} : await prepareMockState(profile, mockUrl) };
+  const automation = mockUrl === undefined ? {} : await prepareMockState(profile, mockUrl);
+  if (mockUrl !== undefined) {
+    // VS Code's first Git-only launch can migrate the built-in extension to disabled.
+    // Developer-authorized repair is limited to this identifier in this owned profile.
+    const db = new DatabaseSync(join(user, 'globalStorage/state.vscdb'));
+    try {
+      const key = 'extensionsIdentifiers/disabled';
+      const value = db.prepare('SELECT value FROM ItemTable WHERE key = ?').get(key)?.value;
+      if (value !== undefined) {
+        let disabled: unknown;
+        try { disabled = JSON.parse(String(value)); }
+        catch { throw new GitFailure('harness_error', 'Malformed Git profile extension enablement state'); }
+        if (!Array.isArray(disabled) || disabled.some(item => !item || typeof item.id !== 'string')) {
+          throw new GitFailure('harness_error', 'Malformed Git profile extension enablement state');
+        }
+        const retained = disabled.filter(item => item.id.toLowerCase() !== 'github.copilot-chat');
+        if (retained.length !== disabled.length) db.prepare('UPDATE ItemTable SET value = ? WHERE key = ?').run(JSON.stringify(retained), key);
+      }
+    } finally { db.close(); }
+  }
+  return { profile, automation };
 }
