@@ -10,6 +10,7 @@ import {
     link,
 } from 'node:fs/promises';
 import { join } from 'node:path';
+import { preparePythonInterpreter } from '../src/python-interpreter.js';
 import {
     capturePreservation,
     requirePreservationUnchanged,
@@ -28,6 +29,44 @@ async function fixture(): Promise<string> {
     return root;
 }
 
+test('external interpreter launch does not require a retained virtual environment', async (t) => {
+    const root = await fixture();
+    t.after(() => rm(root, { recursive: true }));
+    await rm(join(root, '.venv'), { recursive: true });
+    const installation = join(root, 'external-python');
+    await mkdir(join(installation, 'bin'), { recursive: true });
+    const python = join(installation, 'bin', 'python');
+    await writeFile(python, 'not executed');
+    const interpreter = await preparePythonInterpreter(python);
+    const before = await capturePreservation(root);
+    await requirePreservationUnchanged(root, before);
+    const resources = join(root, 'owned');
+    const sentinel = join(resources, 'sentinel');
+    await mkdir(sentinel, { recursive: true });
+    const launch = await createProtectedLaunch(
+        resources,
+        '/Applications/Test.app/Code',
+        root,
+        sentinel,
+        interpreter.canonical,
+        interpreter.absolute,
+    );
+    const policy = await readFile(
+        launch.environment.IDE_PYTHON_SANDBOX_POLICY,
+        'utf8',
+    );
+    assert.ok(policy.includes(`(subpath ${JSON.stringify(installation)})`));
+    assert.ok(policy.includes(`(literal ${JSON.stringify(python)})`));
+    assert.ok(
+        policy.includes(`(subpath ${JSON.stringify(join(root, '.venv'))})`),
+    );
+    await mkdir(join(root, '.venv'));
+    await assert.rejects(
+        requirePreservationUnchanged(root, before),
+        /Preserved resources changed/,
+    );
+});
+
 test('preservation captures exact contents, metadata, directory membership and symlink text', async (t) => {
     const root = await fixture();
     t.after(() => rm(root, { recursive: true }));
@@ -44,6 +83,43 @@ test('preservation captures exact contents, metadata, directory membership and s
         requirePreservationUnchanged(root, manifest),
         /Preserved resources changed/,
     );
+});
+
+test('preservation allows a retained environment without a Python executable', async (t) => {
+    const root = await fixture();
+    t.after(() => rm(root, { recursive: true }));
+    await rm(join(root, '.venv', 'bin', 'python'));
+    const before = await capturePreservation(root);
+    assert.ok(before.entries.some((item) => item.path === '.venv'));
+    await requirePreservationUnchanged(root, before);
+    await rm(join(root, '.venv'), { recursive: true });
+    await assert.rejects(
+        requirePreservationUnchanged(root, before),
+        /Preserved resources changed/,
+    );
+});
+
+test('preservation records missing metadata and detects its subsequent creation', async (t) => {
+    const root = await fixture();
+    t.after(() => rm(root, { recursive: true }));
+    await rm(join(root, 'uv.lock'));
+    const before = await capturePreservation(root);
+    assert.ok(before.missingRoots.includes('uv.lock'));
+    await requirePreservationUnchanged(root, before);
+    await writeFile(join(root, 'uv.lock'), 'new metadata');
+    await assert.rejects(
+        requirePreservationUnchanged(root, before),
+        /Preserved resources changed/,
+    );
+});
+
+test('preservation rejects a broken retained interpreter symlink', async (t) => {
+    const root = await fixture();
+    t.after(() => rm(root, { recursive: true }));
+    const interpreter = join(root, '.venv', 'bin', 'python');
+    await rm(interpreter);
+    await symlink('missing-python', interpreter);
+    await assert.rejects(capturePreservation(root), /ENOENT/);
 });
 
 test('preservation rejects redirected retained roots and unreviewed external symlink targets', async (t) => {

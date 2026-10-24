@@ -134,6 +134,12 @@ export async function runPythonWalkthrough(args: string[]): Promise<boolean> {
             checkout,
             sentinel,
         );
+        const canonicalInterpreter = launch.canonicalInterpreter;
+        if (!canonicalInterpreter) {
+            throw new Error(
+                'Feasibility walkthrough requires the retained Python interpreter',
+            );
+        }
         evidence.protectedPaths = launch.protectedPaths;
         evidence.chromiumSandbox = 'disabled-by-approved-diagnostic';
         const pythonEnv = {
@@ -581,8 +587,7 @@ export async function runPythonWalkthrough(args: string[]): Promise<boolean> {
                             const identity = verifyPythonEvidence(lines, raw, {
                                 token,
                                 script,
-                                canonicalInterpreter:
-                                    launch.canonicalInterpreter,
+                                canonicalInterpreter,
                             });
                             await verifySavedFile(
                                 run.workspace,

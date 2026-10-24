@@ -69,6 +69,8 @@ The standalone Python suite is implemented and developer accepted through [issue
 
 The retained Python environment is preserved separately from the TypeScript tester. Its metadata and installed entry points may reference removed source. Before proposing or performing authorized Python environment changes, follow the [preservation guide](docs/preserved-python-environment.md) for interpreter constraints, dependency procedures, and historical limitations.
 
+Python suite preservation inventories protect retained resources when present and detect changes in root presence. External-interpreter preparation without a repository-local `.venv` has non-GUI coverage; the recorded GUI qualifications used the retained interpreter. See the [Python preservation contract](smoke/README.md#python-suite-and-persistent-profile).
+
 ## Development workflow
 
 See the [coding standards](smoke/CODING_STANDARDS.md) for TypeScript implementation, testing, and review conventions.

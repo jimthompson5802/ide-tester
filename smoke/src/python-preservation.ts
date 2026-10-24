@@ -22,12 +22,34 @@ interface PreservationEntry {
 
 export interface PreservationManifest {
     entries: PreservationEntry[];
-    invocationInterpreter: string;
-    canonicalInterpreter: string;
+    missingRoots: string[];
+    invocationInterpreter?: string;
+    canonicalInterpreter?: string;
 }
 
-const requiredRoots = ['.venv', 'pyproject.toml', 'uv.lock', '.python-version'];
-const optionalRoots = ['.vscode', 'reports/m1-03/preserved-workspaces'];
+const directoryRoots = [
+    '.venv',
+    '.vscode',
+    'reports/m1-03/preserved-workspaces',
+];
+const fileRoots = ['pyproject.toml', 'uv.lock', '.python-version'];
+
+async function retainedStat(
+    path: string,
+): Promise<Awaited<ReturnType<typeof lstat>> | undefined> {
+    try {
+        return await lstat(path);
+    } catch (error: unknown) {
+        if (
+            error instanceof Error &&
+            'code' in error &&
+            error.code === 'ENOENT'
+        ) {
+            return undefined;
+        }
+        throw error;
+    }
+}
 
 function within(root: string, path: string): boolean {
     const suffix = relative(root, path);
@@ -44,9 +66,15 @@ export async function capturePreservation(
 ): Promise<PreservationManifest> {
     if (!isAbsolute(checkout) || (await realpath(checkout)) !== checkout)
         throw new Error('Redirected retained checkout');
-    const invocationInterpreter = join(checkout, '.venv', 'bin', 'python');
-    const canonicalInterpreter = await realpath(invocationInterpreter);
+    const retainedInterpreter = join(checkout, '.venv', 'bin', 'python');
+    const invocationInterpreter = (await retainedStat(retainedInterpreter))
+        ? retainedInterpreter
+        : undefined;
+    const canonicalInterpreter = invocationInterpreter
+        ? await realpath(invocationInterpreter)
+        : undefined;
     const entries: PreservationEntry[] = [];
+    const missingRoots: string[] = [];
     const visit = async (path: string): Promise<void> => {
         const stat = await lstat(path);
         const item: PreservationEntry = {
@@ -62,7 +90,7 @@ export async function capturePreservation(
         if (stat.isSymbolicLink()) {
             item.link = await readlink(path);
             const target = await realpath(path);
-            // Only the specifically supplied interpreter may resolve outside the
+            // Only the retained environment's interpreter may resolve outside the
             // environment. Do not traverse or hash unrelated external targets.
             if (
                 !within(join(checkout, '.venv'), target) &&
@@ -92,31 +120,27 @@ export async function capturePreservation(
             );
         entries.push(item);
     };
-    for (const name of [...requiredRoots, ...optionalRoots]) {
+    for (const name of [...directoryRoots, ...fileRoots]) {
         const path = join(checkout, name);
-        let stat;
-        try {
-            stat = await lstat(path);
-        } catch (error) {
-            if (
-                optionalRoots.includes(name) &&
-                error instanceof Error &&
-                'code' in error &&
-                error.code === 'ENOENT'
-            )
-                continue;
-            throw error;
+        const stat = await retainedStat(path);
+        if (!stat) {
+            missingRoots.push(name);
+            continue;
         }
         if (stat.isSymbolicLink() || (await realpath(path)) !== path)
             throw new Error(`Redirected retained root: ${name}`);
-        const expectDirectory =
-            name === '.venv' || optionalRoots.includes(name);
+        const expectDirectory = directoryRoots.includes(name);
         if (expectDirectory ? !stat.isDirectory() : !stat.isFile())
             throw new Error(`Unexpected retained resource type: ${name}`);
         await visit(path);
     }
     entries.sort((left, right) => left.path.localeCompare(right.path));
-    return { entries, invocationInterpreter, canonicalInterpreter };
+    return {
+        entries,
+        missingRoots,
+        invocationInterpreter,
+        canonicalInterpreter,
+    };
 }
 
 export async function requirePreservationUnchanged(
@@ -138,8 +162,8 @@ interface ProtectedLaunch {
         IDE_PYTHON_SANDBOX_POLICY: string;
         IDE_PYTHON_EXECUTABLE: string;
     };
-    invocationInterpreter: string;
-    canonicalInterpreter: string;
+    invocationInterpreter?: string;
+    canonicalInterpreter?: string;
     protectedPaths: string[];
 }
 
@@ -159,14 +183,15 @@ export async function createProtectedLaunch(
         throw new Error('Redirected or unowned guard resources');
     const manifest = await capturePreservation(checkout);
     const directoryTargets = [
-        join(checkout, '.venv'),
-        ...optionalRoots.map((name) => join(checkout, name)),
+        ...directoryRoots.map((name) => join(checkout, name)),
         sentinel,
     ];
     // Only a conventional bin/<executable> layout establishes an installation
     // tree. A standalone supplied file must not deny writes to / or /tmp.
     const interpreters = new Set([
-        manifest.canonicalInterpreter,
+        ...(manifest.canonicalInterpreter
+            ? [manifest.canonicalInterpreter]
+            : []),
         ...(canonicalInterpreter ? [canonicalInterpreter] : []),
         ...(invocationInterpreter ? [invocationInterpreter] : []),
     ]);
@@ -182,7 +207,7 @@ export async function createProtectedLaunch(
         }
     }
     const fileTargets = [
-        ...requiredRoots.slice(1).map((name) => join(checkout, name)),
+        ...fileRoots.map((name) => join(checkout, name)),
         ...interpreters,
     ];
     const quote = (path: string): string => {
@@ -224,8 +249,10 @@ export async function createProtectedLaunch(
             IDE_PYTHON_SANDBOX_POLICY: policy,
             IDE_PYTHON_EXECUTABLE: executable,
         },
-        invocationInterpreter: manifest.invocationInterpreter,
-        canonicalInterpreter: manifest.canonicalInterpreter,
+        invocationInterpreter:
+            invocationInterpreter ?? manifest.invocationInterpreter,
+        canonicalInterpreter:
+            canonicalInterpreter ?? manifest.canonicalInterpreter,
         protectedPaths: [...directoryTargets, ...fileTargets],
     };
 }
