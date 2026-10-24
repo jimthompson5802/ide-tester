@@ -6,8 +6,8 @@ import { parseArguments } from './arguments.js';
 import { createRun, finishRun } from './resources.js';
 import { runFoundation, runSmoke } from './runner.js';
 
-export const checkoutRoot = fileURLToPath(
-    new URL('../../../', import.meta.url),
+export const checkoutRoot = resolve(
+    fileURLToPath(new URL('../../../', import.meta.url)),
 );
 
 export async function executeCLI(
@@ -19,8 +19,8 @@ export async function executeCLI(
     const started = Date.now();
     const suiteIndex = args.indexOf('--suite');
     const requestedSuite = suiteIndex >= 0 ? args[suiteIndex + 1] : undefined;
-    const gitOnly = requestedSuite === 'git';
-    const chatSelected = gitOnly
+    const standalone = requestedSuite === 'git' || requestedSuite === 'python';
+    const chatSelected = standalone
         ? false
         : qualify ||
           requestedSuite === 'chat' ||
@@ -31,7 +31,7 @@ export async function executeCLI(
         backendIndex >= 0 && args[backendIndex + 1] === 'real'
             ? 'real'
             : 'mock';
-    const mockApplicable = chatBackend === 'mock' && !gitOnly;
+    const mockApplicable = chatBackend === 'mock' && !standalone;
     // Recover the requested presentation even when other arguments are invalid.
     const outputIndex = args.indexOf('--output');
     const mode =

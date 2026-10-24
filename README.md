@@ -63,9 +63,13 @@ npm --prefix smoke run test:unit
 npm --prefix smoke run smoke -- --build "/Applications/Visual Studio Code.app" --suite basic
 ```
 
-GUI execution needs authorization and an unlocked reserved desktop. Select `editing`, `git`, `chat`, or `basic` (default, editing → Chat). Git runs only through `--suite git`, starts no mock Chat server and preserves its dedicated `profiles/smoke-git`. Renamed mocked `basic` passed GUI verification; real `basic` passed a developer-requested rerun after an earlier Copilot error/warning failure. See [usage and recovery](smoke/README.md) for results, isolation and version requirements.
+GUI execution needs authorization and an unlocked reserved desktop. Select `editing`, `git`, `python`, `chat`, or `basic` (default, editing → Chat). Git runs only through `--suite git`, starts no mock Chat server and preserves its dedicated `profiles/smoke-git`. Renamed mocked `basic` passed GUI verification; real `basic` passed a developer-requested rerun after an earlier Copilot error/warning failure. See [usage and recovery](smoke/README.md) for results, isolation and version requirements.
+
+The standalone Python suite is implemented and developer accepted through [issue #40 phase 2](docs/implementation-plans/issue-40-python-smoke-test.md). Production fresh-install and reused-profile GUI runs passed on 2026-10-24 with VS Code 1.135.0, Python extension 2026.10.0 and Python 3.12.15 arm64; both preserved all 2,643 protected entries and confirmed owned main-process exit, disposable cleanup and reservation release. Missing-interpreter blocking and rejection of an observed fallback to a different interpreter also passed qualification. It requires `--suite python --python-interpreter <file-path>` and uses a separate persistent profile, UI installation/interpreter selection and combined source/terminal/program evidence. See [Python evidence, usage and limits](smoke/README.md#python-suite-and-persistent-profile). Phase 3 is complete and developer accepted (2026-10-24).
 
 The retained Python environment is preserved separately from the TypeScript tester. Its metadata and installed entry points may reference removed source. Before proposing or performing authorized Python environment changes, follow the [preservation guide](docs/preserved-python-environment.md) for interpreter constraints, dependency procedures, and historical limitations.
+
+Python suite preservation inventories protect retained resources when present and detect changes in root presence. External-interpreter preparation without a repository-local `.venv` has non-GUI coverage; the recorded GUI qualifications used the retained interpreter. See the [Python preservation contract](smoke/README.md#python-suite-and-persistent-profile).
 
 ## Development workflow
 

@@ -82,3 +82,77 @@ test('Git selection is explicit, mock-only and unavailable for foundation qualif
         /Foundation/,
     );
 });
+
+test('Python requires one interpreter path and preserves relative paths and spaces for preflight', () => {
+    for (const pythonInterpreter of [
+        '.venv/bin/python',
+        'some folder/python',
+    ]) {
+        assert.deepEqual(
+            parseArguments(
+                [
+                    '--build',
+                    '/a.app',
+                    '--suite',
+                    'python',
+                    '--python-interpreter',
+                    pythonInterpreter,
+                ],
+                'darwin',
+            ),
+            {
+                build: '/a.app',
+                suite: 'python',
+                chatBackend: 'mock',
+                pythonInterpreter,
+            },
+        );
+    }
+    for (const tail of [
+        [],
+        ['--python-interpreter'],
+        ['--python-interpreter', ''],
+        ['--python-interpreter', 'python', '--python-interpreter', 'other'],
+        ['--python-interpreter', 'python', '--chat-backend', 'real'],
+    ]) {
+        assert.throws(() =>
+            parseArguments(
+                ['--build', '/a.app', '--suite', 'python', ...tail],
+                'darwin',
+            ),
+        );
+    }
+    for (const suite of ['basic', 'editing', 'chat', 'git']) {
+        assert.throws(
+            () =>
+                parseArguments(
+                    [
+                        '--build',
+                        '/a.app',
+                        '--suite',
+                        suite,
+                        '--python-interpreter',
+                        'python',
+                    ],
+                    'darwin',
+                ),
+            /python-interpreter/,
+        );
+    }
+});
+
+test('Python foundation qualification is rejected before launch', async () => {
+    const { validateBackend } = await import('../src/arguments.js');
+    assert.throws(
+        () =>
+            validateBackend(
+                {
+                    build: '/a.app',
+                    suite: 'python',
+                    pythonInterpreter: '.venv/bin/python',
+                },
+                true,
+            ),
+        /Foundation.*Python/,
+    );
+});

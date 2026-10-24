@@ -1,9 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { executeCLI } from '../src/cli.js';
+import { checkoutRoot, executeCLI } from '../src/cli.js';
+
+test('default checkout is the canonical directory path required by preservation checks', async () => {
+    assert.equal(checkoutRoot, await realpath(checkoutRoot));
+});
 
 test('CLI reports invalid arguments and missing installed apps as nonzero without GUI execution', async (t) => {
     const checkout = await mkdtemp(join(tmpdir(), 'smoke-cli-test-'));
@@ -222,4 +226,62 @@ test('Git-only text errors explicitly show Chat not selected', async (t) => {
     const path = text.match(/JSON report: (.+)/)![1];
     const result = JSON.parse(await readFile(path, 'utf8'));
     t.after(() => rm(result.resourcesPath, { recursive: true, force: true }));
+});
+
+test('Python early errors and unsupported foundation retain non-Chat metadata', async (t) => {
+    const root = await mkdtemp(join(tmpdir(), 'python-cli-early-'));
+    t.after(() => rm(root, { recursive: true, force: true }));
+    for (const qualify of [false, true]) {
+        let message = '';
+        await executeCLI(
+            ['--suite', 'python', '--output', 'json'],
+            root,
+            qualify,
+            (value) => {
+                message = value;
+            },
+        );
+        const result = JSON.parse(message);
+        t.after(() =>
+            rm(result.resourcesPath, { recursive: true, force: true }),
+        );
+        assert.equal(result.outcome, 'blocked');
+        assert.equal(result.chatSelected, false);
+        assert.equal(result.mockRequestEvidence, 'inapplicable');
+        assert.equal(result.mockRequestCount, null);
+        assert.equal(result.requests, null);
+    }
+});
+
+test('Python text and reservation errors retain inapplicable Chat evidence', async (t) => {
+    const { writeFile } = await import('node:fs/promises');
+    const root = await mkdtemp(join(tmpdir(), 'python-cli-contract-'));
+    t.after(() => rm(root, { recursive: true, force: true }));
+    let message = '';
+    await executeCLI(['--suite', 'python'], root, false, (value) => {
+        message = value;
+    });
+    assert.match(message, /Chat: Not selected/);
+    assert.match(message, /Mock request evidence: Inapplicable/);
+    const path = message.match(/JSON report: (.+)/)![1];
+    const saved = JSON.parse(await readFile(path, 'utf8'));
+    t.after(() => rm(saved.resourcesPath, { recursive: true, force: true }));
+    await writeFile(
+        join(root, 'reports/smoke/.reservation'),
+        'reserved elsewhere',
+    );
+    await executeCLI(
+        ['--suite', 'python', '--output', 'json'],
+        root,
+        false,
+        (value) => {
+            message = value;
+        },
+    );
+    const result = JSON.parse(message);
+    assert.equal(result.outcome, 'harness_error');
+    assert.equal(result.chatSelected, false);
+    assert.equal(result.mockRequestEvidence, 'inapplicable');
+    assert.equal(result.mockRequestCount, null);
+    assert.equal(result.requests, null);
 });

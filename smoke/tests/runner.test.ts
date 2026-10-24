@@ -369,3 +369,48 @@ test('missing Git blocks before launcher or mock and cleanup uncertainty dominat
     assert.equal(failed.outcome, 'harness_error');
     assert.equal(failed.cleanup.reservationRetained, true);
 });
+
+test('Python missing interpreter blocks without Chat, mock, profile or application launch', async (t) => {
+    const checkout = await mkdtemp(join(tmpdir(), 'python-missing-runner-'));
+    t.after(() => rm(checkout, { recursive: true, force: true }));
+    const build = await fixtureApp(checkout);
+    const result = await runSmoke(
+        { build, suite: 'python', pythonInterpreter: join(checkout, 'absent') },
+        checkout,
+        async () => assert.fail('Missing interpreter must not launch'),
+        { startMock: async () => assert.fail('Python must not start mock') },
+    );
+    t.after(() => rm(result.resourcesPath, { recursive: true, force: true }));
+    assert.equal(result.outcome, 'blocked');
+    assert.equal(result.chatSelected, false);
+    assert.equal(result.mockRequestEvidence, 'inapplicable');
+    assert.equal(result.mockRequestCount, null);
+    assert.equal(result.requests, null);
+    assert.match(result.error ?? '', /interpreter/i);
+    assert.deepEqual(
+        result.checks.map((check) => check.suite),
+        ['python'],
+    );
+    assert.equal(result.cleanup.reservationRetained, false);
+    await assert.rejects(access(join(checkout, 'profiles/smoke-python')));
+});
+
+test('Python foundation rejects before launch with standalone metadata', async (t) => {
+    const checkout = await mkdtemp(join(tmpdir(), 'python-foundation-runner-'));
+    t.after(() => rm(checkout, { recursive: true, force: true }));
+    const result = await runFoundation(
+        {
+            build: '/abs/unused.app',
+            suite: 'python',
+            pythonInterpreter: '/abs/unused',
+        },
+        checkout,
+        async () => assert.fail('Unsupported foundation must not launch'),
+    );
+    t.after(() => rm(result.resourcesPath, { recursive: true, force: true }));
+    assert.equal(result.outcome, 'blocked');
+    assert.equal(result.chatSelected, false);
+    assert.equal(result.mockRequestCount, null);
+    assert.equal(result.requests, null);
+    assert.match(result.error ?? '', /Python.*foundation|foundation.*Python/i);
+});

@@ -13,6 +13,7 @@ import { readFile, rm, lstat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { basename } from 'node:path';
 
+import { PythonFailure, pythonUiIssue } from './python.js';
 import { GitFailure } from './git-repository.js';
 
 const mainEditor = '.part.editor .monaco-editor[role="code"]';
@@ -21,6 +22,7 @@ const mainEditor = '.part.editor .monaco-editor[role="code"]';
 interface SmokeDriver {
     whenWorkbenchRestored(): Promise<void>;
     typeInEditor(selector: string, text: string): Promise<void>;
+    getTerminalBuffer(selector: string): Promise<string[]>;
 }
 declare global {
     interface Window {
@@ -687,5 +689,454 @@ export class Workbench {
             }
             throw cause;
         }
+    }
+}
+
+const pythonEditor = mainEditor;
+const pythonQuickInput = '.quick-input-widget .quick-input-box input';
+
+export class PythonDeadline {
+    private readonly end: number;
+    private stageEnd: number;
+    private label = 'prepare';
+    private stopped = false;
+    private timedOut = false;
+    private readonly pending = new Set<Promise<unknown>>();
+
+    constructor(
+        timeoutMs: number,
+        private readonly now: () => number = Date.now,
+    ) {
+        this.end = now() + timeoutMs;
+        this.stageEnd = this.end;
+    }
+
+    get expired(): boolean {
+        return this.timedOut;
+    }
+
+    remaining(limit = 15_000): number {
+        if (this.now() >= Math.min(this.end, this.stageEnd)) {
+            this.timedOut = true;
+            this.stopped = true;
+        }
+        if (this.timedOut)
+            throw new Error(`Python scenario expired at ${this.label}`);
+        if (this.stopped) throw new Error('Python scenario stopped');
+        return Math.min(
+            limit,
+            this.end - this.now(),
+            this.stageEnd - this.now(),
+        );
+    }
+
+    stage(label: string, budgetMs: number): void {
+        this.remaining();
+        this.label = label;
+        this.stageEnd = Math.min(this.end, this.now() + budgetMs);
+    }
+
+    async perform<T>(operation: () => Promise<T>): Promise<T> {
+        const timeoutMs = this.remaining(Number.MAX_SAFE_INTEGER);
+        const work = Promise.resolve().then(async () => {
+            this.remaining();
+            const result = await operation();
+            this.remaining();
+            return result;
+        });
+        this.pending.add(work);
+        // Both handlers consume completion, including after the caller timed out.
+        void work.then(
+            () => this.pending.delete(work),
+            () => this.pending.delete(work),
+        );
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+            return await Promise.race([
+                work,
+                new Promise<never>((_, reject) => {
+                    timer = setTimeout(() => {
+                        this.timedOut = true;
+                        this.stopped = true;
+                        reject(
+                            new Error(
+                                `Python scenario expired at ${this.label}`,
+                            ),
+                        );
+                    }, timeoutMs);
+                }),
+            ]);
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
+    stop(): void {
+        this.stopped = true;
+    }
+
+    async settle(timeoutMs: number): Promise<void> {
+        this.stop();
+        await bounded(
+            Promise.allSettled([...this.pending]),
+            timeoutMs,
+            'Python scenario pending operations settle',
+        );
+    }
+}
+
+export class PythonWorkbench extends Workbench {
+    constructor(
+        page: Page,
+        private readonly deadline: PythonDeadline,
+    ) {
+        super(page);
+    }
+
+    private step<T>(operation: () => Promise<T>): Promise<T> {
+        return this.deadline.perform(operation);
+    }
+
+    private timeout(): { timeout: number } {
+        return { timeout: this.deadline.remaining() };
+    }
+
+    async ready(timeout: number): Promise<void> {
+        await this.step(() =>
+            this.page.waitForFunction(
+                () =>
+                    typeof window.driver?.whenWorkbenchRestored ===
+                        'function' &&
+                    typeof window.driver?.typeInEditor === 'function' &&
+                    typeof window.driver?.getTerminalBuffer === 'function',
+                undefined,
+                { timeout },
+            ),
+        );
+        await this.step(() =>
+            this.page.evaluate(() => window.driver.whenWorkbenchRestored()),
+        );
+        await this.step(() =>
+            expect(this.page.locator('.monaco-workbench')).toBeVisible(
+                this.timeout(),
+            ),
+        );
+    }
+
+    async typeInEditor(selector: string, text: string): Promise<void> {
+        const input = `${selector} .native-edit-context`;
+        await this.step(() => this.page.locator(input).focus());
+        await this.step(() =>
+            this.page.evaluate(
+                ({ input, text }) => window.driver.typeInEditor(input, text),
+                { input, text },
+            ),
+        );
+    }
+
+    async openFile(path: string): Promise<void> {
+        await this.step(() => this.page.keyboard.press('Meta+P'));
+        const input = this.page.locator(pythonQuickInput);
+        await this.step(() => input.fill(path));
+        const row = this.page
+            .locator('.quick-input-widget .monaco-list-row')
+            .filter({ hasText: basename(path) });
+        await this.step(() => expect(row).toHaveCount(1, this.timeout()));
+        await this.step(() => input.press('Enter'));
+        await this.step(() => expect(input).toBeHidden(this.timeout()));
+        await this.step(() =>
+            expect(
+                this.page.locator('.part.editor .tab.active .label-name'),
+            ).toHaveText(basename(path), this.timeout()),
+        );
+        await this.step(() =>
+            expect(this.page.locator(pythonEditor)).toBeVisible(this.timeout()),
+        );
+    }
+
+    async replaceEditorText(text: string): Promise<void> {
+        await this.step(() =>
+            this.page.locator(`${pythonEditor} .native-edit-context`).focus(),
+        );
+        await this.step(() => this.page.keyboard.press('Meta+A'));
+        await this.typeInEditor(pythonEditor, text);
+    }
+
+    async newTextFile(): Promise<void> {
+        await this.step(() => this.page.keyboard.press('Meta+N'));
+        await this.step(() =>
+            expect(
+                this.page.locator('.part.editor .tab.active .label-name'),
+            ).toHaveText(/^Untitled-/, this.timeout()),
+        );
+        await this.step(() =>
+            expect(this.page.locator(pythonEditor)).toBeVisible(this.timeout()),
+        );
+    }
+
+    async saveAs(path: string): Promise<void> {
+        await this.step(() => this.page.keyboard.press('Meta+Shift+S'));
+        const input = this.page.locator(pythonQuickInput);
+        await this.step(() => input.fill(path));
+        await this.step(() => input.press('Enter'));
+        await this.step(() => expect(input).toBeHidden(this.timeout()));
+        await this.step(() =>
+            expect(
+                this.page.locator('.part.editor .tab.active .label-name'),
+            ).toHaveText(basename(path), this.timeout()),
+        );
+    }
+
+    async closeEditors(): Promise<void> {
+        await this.step(() =>
+            this.page.locator(`${pythonEditor} .native-edit-context`).focus(),
+        );
+        await this.step(() => this.page.keyboard.press('Meta+K'));
+        await this.step(() => this.page.keyboard.press('Meta+W'));
+        await this.step(() =>
+            expect(
+                this.page.locator('.part.editor .tabs-container .tab'),
+            ).toHaveCount(0, this.timeout()),
+        );
+    }
+
+    async expectEditorText(text: string): Promise<string[]> {
+        const read = async (): Promise<string[]> =>
+            (
+                await this.step(() =>
+                    this.page
+                        .locator(`${pythonEditor} .view-lines .view-line`)
+                        .allTextContents(),
+                )
+            ).map((line) => line.replaceAll('\u00a0', ' ').trimEnd());
+        await this.step(() =>
+            expect.poll(read, this.timeout()).toEqual(text.split('\n')),
+        );
+        return read();
+    }
+
+    async pythonCommand(title: string): Promise<void> {
+        await this.step(() => this.page.keyboard.press('Meta+Shift+P'));
+        const input = this.page.locator(pythonQuickInput);
+        await this.step(() => input.fill(`>${title}`));
+        const labels = [title, title.slice(title.indexOf(': ') + 2)];
+        const pattern = new RegExp(
+            `^(?:${labels.map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})$`,
+        );
+        const item = this.page
+            .locator('.quick-input-widget .label-name')
+            .filter({ hasText: pattern });
+        await this.step(() => expect(item).toHaveCount(1, this.timeout()));
+        await this.step(() => item.click(this.timeout()));
+    }
+
+    private async pythonNotificationIssue(
+        stage: 'installation' | 'interpreter',
+    ): Promise<void> {
+        const messages = await this.step(() =>
+            this.page
+                .locator(
+                    '.notifications-toasts .notification-list-item:visible',
+                )
+                .allTextContents(),
+        );
+        const issue = pythonUiIssue(stage, messages);
+        if (issue) throw issue;
+    }
+
+    async ensurePythonExtension(): Promise<{
+        installed: true;
+        enabled: true;
+        header: string;
+    }> {
+        await this.pythonCommand('Extensions: Install Extensions');
+        const search = '.extensions-search-container .monaco-editor';
+        await this.step(() =>
+            this.page.locator(`${search} .native-edit-context`).focus(),
+        );
+        await this.step(() => this.page.keyboard.press('Meta+A'));
+        await this.typeInEditor(search, '@id:ms-python.python');
+        const row = this.page
+            .locator('.extensions-viewlet .monaco-list-row')
+            .filter({
+                has: this.page.locator('.name').filter({ hasText: /^Python$/ }),
+            });
+        await this.step(() => expect(row).toHaveCount(1, this.timeout()));
+        await this.step(() => row.click(this.timeout()));
+        const extension = this.page.locator('.extension-editor');
+        await this.step(() =>
+            expect(extension.locator('.header .name')).toHaveText(
+                'Python',
+                this.timeout(),
+            ),
+        );
+        const header = await this.step(() =>
+            extension.locator('.header').innerText(),
+        );
+        if (!/(?:^|\n)Microsoft(?:\n|$)/.test(header))
+            throw new Error('Python extension publisher identity unavailable');
+        const actions = extension.locator(
+            ':scope > .header .extension-action:visible',
+        );
+        const install = actions.filter({ hasText: /^Install$/ });
+        if (await this.step(() => install.count()))
+            await this.step(() => install.click(this.timeout()));
+        const enable = actions.filter({
+            hasText: /^Enable(?: \(Workspace\))?$/,
+        });
+        if (await this.step(() => enable.count()))
+            await this.step(() => enable.click(this.timeout()));
+        while (true) {
+            await this.pythonNotificationIssue('installation');
+            const installed = await this.step(() =>
+                actions.filter({ hasText: /^Uninstall$/ }).isVisible(),
+            );
+            const enabled = await this.step(() =>
+                actions
+                    .filter({ hasText: /^Disable(?: \(Workspace\))?$/ })
+                    .isVisible(),
+            );
+            if (installed && enabled) break;
+            await this.step(() => this.page.waitForTimeout(100));
+        }
+        const prompts = await this.step(() =>
+            this.page
+                .getByText(
+                    /Reload Required|Restart Extensions|Sign in to|Keychain/,
+                    { exact: false },
+                )
+                .count(),
+        );
+        if (prompts)
+            throw new Error(
+                'Unexpected reload/authentication prompt requires review',
+            );
+        return {
+            installed: true,
+            enabled: true,
+            header: await this.step(() =>
+                extension.locator('.header').innerText(),
+            ),
+        };
+    }
+
+    async selectPythonInterpreter(path: string): Promise<string> {
+        await this.pythonCommand('Python: Select Interpreter');
+        const row = this.page
+            .locator('.quick-input-widget .label-name')
+            .filter({ hasText: /^\s*Enter interpreter path\.\.\.\s*$/ });
+        await this.step(() => row.click(this.timeout()));
+        const input = this.page.locator(pythonQuickInput);
+        await this.step(() =>
+            expect(input).toHaveAttribute(
+                'placeholder',
+                'Enter path to a Python interpreter.',
+                this.timeout(),
+            ),
+        );
+        await this.step(() => input.fill(path));
+        await this.step(() => expect(input).toHaveValue(path, this.timeout()));
+        await this.step(() => input.press('Enter'));
+        await this.step(() => expect(input).toBeHidden(this.timeout()));
+        await this.pythonNotificationIssue('interpreter');
+        await this.pythonCommand('Python: Select Interpreter');
+        const selectedBy = Date.now() + this.deadline.remaining(60_000);
+        while (true) {
+            await this.pythonNotificationIssue('interpreter');
+            const selected = await this.step(() =>
+                input.getAttribute('placeholder'),
+            );
+            if (selected === `Selected Interpreter: ${path}`) break;
+            if (Date.now() >= selectedBy)
+                throw new PythonFailure(
+                    'harness_error',
+                    'Python interpreter selection observation unavailable',
+                );
+            await this.step(() => this.page.waitForTimeout(100));
+        }
+        await this.step(() => this.page.keyboard.press('Escape'));
+        return path;
+    }
+
+    async readPythonTerminal(): Promise<string[]> {
+        try {
+            await this.step(() =>
+                this.page.waitForFunction(
+                    () => {
+                        const nodes = document.querySelectorAll(
+                            '#terminal .terminal-wrapper.active',
+                        );
+                        return (
+                            nodes.length === 1 &&
+                            nodes[0].getClientRects().length > 0 &&
+                            'xterm' in nodes[0] &&
+                            !!nodes[0].xterm
+                        );
+                    },
+                    undefined,
+                    this.timeout(),
+                ),
+            );
+            const result: unknown = await this.step(() =>
+                this.page.evaluate(async () => {
+                    if (typeof window.driver?.getTerminalBuffer !== 'function')
+                        throw new Error('No terminal observation driver');
+                    return window.driver.getTerminalBuffer(
+                        '#terminal .terminal-wrapper.active',
+                    );
+                }),
+            );
+            if (
+                !Array.isArray(result) ||
+                result.length > 2000 ||
+                !result.every(
+                    (line): line is string => typeof line === 'string',
+                ) ||
+                Buffer.byteLength(result.join('\n')) > 262144
+            )
+                throw new Error('Invalid terminal observation contract');
+            return result;
+        } catch (cause) {
+            if (this.deadline.expired) throw cause;
+            throw new PythonFailure(
+                'harness_error',
+                'Python terminal observation contract unavailable',
+            );
+        }
+    }
+
+    async pythonTerminalBaseline(): Promise<string[]> {
+        await this.pythonCommand('Python: Create Terminal');
+        return this.readPythonTerminal();
+    }
+
+    async runPythonFile(): Promise<void> {
+        await this.pythonCommand('Python: Run Python File in Terminal');
+    }
+
+    async pythonTerminalCount(): Promise<number> {
+        return this.step(() =>
+            this.page.locator('#terminal .terminal-wrapper').count(),
+        );
+    }
+    async verifyTerminalGuard(marker: string): Promise<string[]> {
+        await this.pythonCommand(
+            'Terminal: Create New Terminal (With Profile)',
+        );
+        const row = this.page
+            .locator('.quick-input-widget .label-name')
+            .filter({ hasText: /^\s*Guard verification\s*$/ });
+        await this.step(() => row.click(this.timeout()));
+        let lines: string[] = [];
+        await this.step(() =>
+            expect
+                .poll(async () => {
+                    lines = await this.readPythonTerminal();
+                    return lines.includes(marker);
+                }, this.timeout())
+                .toBe(true),
+        );
+        await this.pythonCommand('Terminal: Kill All Terminals');
+        return lines;
     }
 }

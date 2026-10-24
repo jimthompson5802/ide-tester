@@ -225,3 +225,39 @@ test('partial Graph failure retains independent Git confirmation without claimin
     );
     assert.match(text, /Reason: Graph message missing/);
 });
+
+test('Python text includes observed stage, installation and runtime while leaving partial identity unavailable', () => {
+    const text = formatResult({
+        outcome: 'passed',
+        chatSelected: false,
+        checks: [
+            {
+                suite: 'python',
+                outcome: 'passed',
+                evidence: {
+                    stage: 'complete',
+                    installMode: 'fresh',
+                    identity: {
+                        invocation: '/env/bin/python',
+                        version: '3.12.15',
+                    },
+                },
+            },
+        ],
+    });
+    assert.match(text, /Python stage: complete/);
+    assert.match(text, /Python installation: fresh/);
+    assert.match(text, /Python runtime: \/env\/bin\/python \(3.12.15\)/);
+    const partial = formatResult({
+        outcome: 'failed',
+        checks: [
+            {
+                suite: 'python',
+                outcome: 'failed',
+                evidence: { stage: 'extension-install' },
+            },
+        ],
+    });
+    assert.match(partial, /Python stage: extension-install/);
+    assert.doesNotMatch(partial, /Python runtime:/);
+});
