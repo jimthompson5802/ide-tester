@@ -23,6 +23,14 @@ For dependency installation and Node/host requirements, follow [non-GUI setup](R
 
 For authorized GUI runs, follow the README's [selected suites](README.md#selected-suites), [real backend](README.md#optional-real-copilot-backend), or [foundation qualification](README.md#foundation-gui-qualification) instructions. For abnormal shutdowns, inspect the owned run and follow [results and recovery](README.md#results-and-recovery).
 
+## Secret storage
+
+Use in-memory secret storage for probes, qualification, Git-only, editing-only and mocked Chat runs. Launch those tester-owned VS Code instances with `--use-inmemory-secretstorage`; verify helpers also use only in-memory storage. The sole saved-authentication exception is real Chat testing, including a combined suite selecting real Chat: VS Code may reuse authentication already saved in the authorized dedicated `profiles/smoke-real-chat` profile. Omit the in-memory flag only for that exception; never extract, copy or migrate saved credentials, and never use personal profiles. New sign-in remains manual and requires applicable setup authorization.
+
+The developer permits VS Code to read an existing Keychain encryption key solely to reuse that dedicated real Chat profile's saved authentication. This exception does not permit agent tools to inspect Keychain, access unrelated entries, extract keys, or create, update, unlock, reset or delete Keychain entries. Disable credential helpers and other integrations outside this exception. If the existing key is unavailable or a Keychain dialog appears, stop and report the prerequisite as blocked; retain sanitized owned evidence without interacting with the dialog or falling back to creating a key.
+
+Before running an existing launch path, verify it meets this policy. Missing enforcement is a harness error; unavailable or expired permitted authentication is blocked. Preserve existing profiles. Historical real-backend passing runs do not establish current authentication readiness; check it only during an authorized run under this exception. This permission does not itself authorize a GUI run or advance an implementation gate.
+
 ## Project structure
 
 Paths below are relative to `smoke/`:
