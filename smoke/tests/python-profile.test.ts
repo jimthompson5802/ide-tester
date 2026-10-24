@@ -11,7 +11,11 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pythonProfile, pythonEnvironment } from '../src/python-profile.js';
+import {
+    pythonProfile,
+    pythonEnvironment,
+    PythonProfileFailure,
+} from '../src/python-profile.js';
 
 test('production Python profile preserves unrelated settings, state and feasibility profile', async (t) => {
     const root = await realpath(
@@ -77,6 +81,31 @@ test('production profile refuses redirected roots without writing their target',
     await assert.rejects(pythonProfile(root, root), /ownership/);
 });
 
+test('Python profile rejects redirected workspace storage before changing settings or external state', async (t) => {
+    const root = await realpath(
+        await mkdtemp(join(tmpdir(), 'python-profile-')),
+    );
+    t.after(() => rm(root, { recursive: true, force: true }));
+    const profile = await pythonProfile(root, root);
+    const settings = join(profile.userData, 'User/settings.json');
+    const originalSettings = '{"unrelated.setting":"preserve"}';
+    await writeFile(settings, originalSettings);
+    const external = join(root, 'external-workspace-storage');
+    await mkdir(external);
+    const state = join(external, 'state.vscdb');
+    await writeFile(state, 'private workspace state');
+    await symlink(external, join(profile.userData, 'User/workspaceStorage'));
+
+    await assert.rejects(
+        pythonProfile(root, root),
+        (error: unknown) =>
+            error instanceof PythonProfileFailure &&
+            error.outcome === 'harness_error',
+    );
+    assert.equal(await readFile(settings, 'utf8'), originalSettings);
+    assert.equal(await readFile(state, 'utf8'), 'private workspace state');
+});
+
 test('Python profile refuses redirected settings and user-data without changing targets', async (t) => {
     const root = await realpath(
         await mkdtemp(join(tmpdir(), 'python-profile-')),
@@ -98,3 +127,30 @@ test('Python profile refuses redirected settings and user-data without changing 
     await symlink(root, user);
     await assert.rejects(pythonProfile(root, root), /ownership/);
 });
+
+for (const area of ['userData', 'extensions', 'state'] as const) {
+    test(`Python profile rejects deeply nested links in ${area} without changing settings or targets`, async (t) => {
+        const root = await realpath(
+            await mkdtemp(join(tmpdir(), 'python-profile-')),
+        );
+        t.after(() => rm(root, { recursive: true, force: true }));
+        const profile = await pythonProfile(root, root);
+        const settings = join(profile.userData, 'User/settings.json');
+        const originalSettings = '{"unrelated.setting":"preserve"}';
+        await writeFile(settings, originalSettings);
+        const external = join(root, 'external-state');
+        await writeFile(external, 'private state');
+        const nested = join(profile[area], 'nested', 'deeper');
+        await mkdir(nested, { recursive: true });
+        await symlink(external, join(nested, 'redirect'));
+
+        await assert.rejects(
+            pythonProfile(root, root),
+            (error: unknown) =>
+                error instanceof PythonProfileFailure &&
+                error.outcome === 'harness_error',
+        );
+        assert.equal(await readFile(settings, 'utf8'), originalSettings);
+        assert.equal(await readFile(external, 'utf8'), 'private state');
+    });
+}

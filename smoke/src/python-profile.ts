@@ -5,6 +5,7 @@ import {
     realpath,
     lstat,
     rename,
+    readdir,
 } from 'node:fs/promises';
 import { join } from 'node:path';
 import { commonSettings } from './profile.js';
@@ -118,6 +119,21 @@ export async function pythonProfile(
             throw cause;
         }
         await owned(item, directory);
+    }
+    // Refuse nested redirects before settings writes or VS Code can follow them.
+    const pending = [root];
+    while (pending.length) {
+        const directory = pending.pop();
+        if (!directory) break;
+        for (const entry of await readdir(directory, { withFileTypes: true })) {
+            if (entry.isSymbolicLink()) {
+                throw new PythonProfileFailure(
+                    'harness_error',
+                    'Redirected Python profile state',
+                );
+            }
+            if (entry.isDirectory()) pending.push(join(directory, entry.name));
+        }
     }
     const temporary = join(user, 'settings.smoke-tmp.json');
     await writeFile(temporary, JSON.stringify(settings, null, 2), {
