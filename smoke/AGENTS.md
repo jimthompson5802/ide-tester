@@ -5,6 +5,7 @@ These instructions apply to `smoke/` in addition to the [repository-wide instruc
 ## Start here
 
 - Before tester execution or maintenance, read [README.md](README.md) for setup, compatibility limits, suite behavior, reporting, and recovery.
+- Before writing or reviewing TypeScript implementation or tests, read the [coding standards](CODING_STANDARDS.md).
 - For changes to the optional real Copilot backend, read the [backend plan and execution record](../docs/implementation-plans/real-chat-backend.md), including pending validation gates.
 - For original implementation decisions or qualification evidence, read the [completed replacement plan](../docs/vscode-smoke-tester-plan.md). Recorded GUI authorization applies to its recorded runs.
 
