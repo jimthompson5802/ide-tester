@@ -13,7 +13,7 @@ export async function executeCLI(args: string[], checkout = checkoutRoot, qualif
   const suiteIndex = args.indexOf('--suite');
   const requestedSuite = suiteIndex >= 0 ? args[suiteIndex + 1] : undefined;
   const gitOnly = requestedSuite === 'git';
-  const chatSelected = gitOnly ? false : qualify || requestedSuite === 'chat' || requestedSuite === 'all' || requestedSuite === undefined;
+  const chatSelected = gitOnly ? false : qualify || requestedSuite === 'chat' || requestedSuite === 'basic' || requestedSuite === undefined;
   const backendIndex = args.indexOf('--chat-backend');
   const chatBackend: 'real' | 'mock' = backendIndex >= 0 && args[backendIndex + 1] === 'real' ? 'real' : 'mock';
   const mockApplicable = chatBackend === 'mock' && !gitOnly;

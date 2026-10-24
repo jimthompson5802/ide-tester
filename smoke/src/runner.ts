@@ -39,8 +39,8 @@ async function runSelected(options: Options, checkout: string, foundation: boole
   const started = Date.now();
   const run = await createRun(checkout);
   const chatBackend = options.chatBackend ?? 'mock';
-  const gitSelected = !foundation && (options.suite === 'git' || options.suite === 'all');
-  const chatSelected = options.suite !== 'git' && (foundation || options.suite === 'chat' || options.suite === 'all');
+  const gitSelected = !foundation && options.suite === 'git';
+  const chatSelected = options.suite !== 'git' && (foundation || options.suite === 'chat' || options.suite === 'basic');
   const mockApplicable = chatBackend === 'mock' && options.suite !== 'git';
   let repository: GitRepository | undefined;
   let persistentProfilePath: string | undefined;
@@ -55,7 +55,7 @@ async function runSelected(options: Options, checkout: string, foundation: boole
   let stage = 'preflight';
   const timings: Record<string, number> = {};
   const diagnostics: string[] = [];
-  const checks: CheckResult[] = (foundation ? ['chat'] : options.suite === 'all' ? ['editing', 'git', 'chat'] : [options.suite])
+  const checks: CheckResult[] = (foundation ? ['chat'] : options.suite === 'basic' ? ['editing', 'chat'] : [options.suite])
     .map(suite => ({ suite: suite as 'editing' | 'git' | 'chat', outcome: 'not_run', ...(suite === 'git' ? { evidence: newGitEvidence() } : {}) }));
   try {
     validateBackend(options, foundation);

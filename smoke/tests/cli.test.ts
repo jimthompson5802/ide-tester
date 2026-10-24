@@ -9,7 +9,7 @@ test('CLI reports invalid arguments and missing installed apps as nonzero withou
   const checkout = await mkdtemp(join(tmpdir(), 'smoke-cli-test-'));
   t.after(() => rm(checkout, { recursive: true, force: true }));
   const messages: string[] = [];
-  for (const args of [[], ['--build', join(checkout, 'Missing.app'), '--suite', 'all']]) {
+  for (const args of [[], ['--build', join(checkout, 'Missing.app'), '--suite', 'basic']]) {
     assert.equal(await executeCLI([...args, '--output', 'json'], checkout, false, message => messages.push(message)), 1);
     const message = messages.at(-1)!;
     assert.match(message, /blocked/);

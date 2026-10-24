@@ -46,13 +46,11 @@ export class Workbench {
     await this.page.evaluate(({ selector, text }) => window.driver.typeInEditor(selector, text), { selector: input, text });
   }
 
-  async command(title: string, followedByPicker = false, allowDuplicateTitle = false): Promise<void> {
+  async command(title: string, followedByPicker = false): Promise<void> {
     await this.page.keyboard.press('Meta+Shift+P');
     const input = this.page.locator('.quick-input-widget .quick-input-box input');
     await input.fill(`>${title}`);
-    const item = allowDuplicateTitle
-      ? this.page.locator('.quick-input-widget').getByRole('option', { name: title, exact: true }).first()
-      : this.page.locator('.quick-input-widget .monaco-list-row').filter({ hasText: title });
+    const item = this.page.locator('.quick-input-widget .monaco-list-row').filter({ hasText: title });
     await expect(item).toHaveCount(1);
     await item.click();
     if (!followedByPicker) await expect(input).toBeHidden();
@@ -232,17 +230,29 @@ export class Workbench {
           await this.page.waitForTimeout(100);
         }
       }
-      diagnosticStage = 'select-ask';
-      // This pinned build can hide Ask from both anonymous and authenticated menus.
-      // Select its supported model before observing the session's model-binding event.
-      await this.command('Chat: Open Chat (Ask)', false, true);
-      await expect(chat.locator('.chat-mode-picker-item .chat-input-picker-label')).toHaveText('Ask');
       diagnosticStage = 'new-session-identity';
       await expect.poll(async () => {
         const current = await session();
         return !!current && current !== previousSession;
       }, { timeout: 15_000, message: 'Expected a new local sidebar session identity' }).toBe(true);
-
+      diagnosticStage = 'select-ask';
+      if (backend === 'real') {
+        // The authenticated build can hide legacy Ask from the mode menu.
+        // Its built-in command still selects Ask through the visible command palette.
+        await this.command('Chat: Open Chat (Ask)');
+      } else {
+        await chat.locator('.chat-mode-picker-item [role="button"]').click();
+        diagnosticStage = 'ask-menu-item';
+        const ask = this.page.locator('.action-widget').getByRole('menuitemcheckbox', { name: /^Ask,/ });
+        await expect(ask).toBeVisible();
+        const position = Number(await ask.getAttribute('data-index'));
+        if (!Number.isSafeInteger(position) || position < 0 || position > 10) throw new Error('Invalid Ask picker position');
+        await this.page.keyboard.press('Home');
+        for (let i = 0; i < position; i++) await this.page.keyboard.press('ArrowDown');
+        await this.page.keyboard.press('Enter');
+      }
+      diagnosticStage = 'ask-selected-label';
+      await expect(chat.locator('.chat-mode-picker-item .chat-input-picker-label')).toHaveText('Ask');
       const responses = chat.locator('.interactive-item-container.interactive-response');
       diagnosticStage = 'empty-session';
       await expect(responses).toHaveCount(0);

@@ -82,7 +82,7 @@ test('real runs block missing setup and launch only with persistent storage and 
   assert.equal(invalid.outcome, 'harness_error');
   await writeFile(settingsPath, settings);
   let launched = false;
-  const result = await runSmoke({ build: app, suite: 'all', chatBackend: 'real' }, checkout, async options => {
+  const result = await runSmoke({ build: app, suite: 'basic', chatBackend: 'real' }, checkout, async options => {
     launched = true;
     assert.ok(options!.args!.includes(profile.userData));
     assert.ok(options!.args!.includes(profile.extensions));
@@ -99,7 +99,7 @@ test('real runs block missing setup and launch only with persistent storage and 
   assert.equal(result.mockRequestEvidence, 'inapplicable');
   assert.equal(result.requests, null);
   assert.equal(result.mockRequestCount, null);
-  assert.deepEqual(result.checks.map(check => check.outcome), ['not_run', 'not_run', 'not_run']);
+  assert.deepEqual(result.checks.map(check => check.outcome), ['not_run', 'not_run']);
   assert.equal(result.cleanup.reservationRetained, true);
   await access(profile.userData);
   const saved = JSON.parse(await readFile(result.resultPath, 'utf8'));
@@ -143,25 +143,50 @@ async function applicationFixture(options?: {args?: string[]}, closeFails=false)
   return app as never;
 }
 
-test('all dispatches editing/Git/Chat in order and a Git failure leaves Chat not_run',async t=>{
-  const {GitFailure}=await import('../src/git.js');
-  for (const backend of ['mock','real'] as const) for (const failure of [undefined,'failed','blocked','harness_error'] as const) {
-    const checkout=await mkdtemp(join(tmpdir(),'git-order-runner-'));t.after(()=>rm(checkout,{recursive:true,force:true}));
-    const build=await fixtureApp(checkout);if(backend==='real')await realProfile(checkout,true);
-    const order:string[]=[];let mockStarted=0;let mockClosed=0;
-    const result=await runSmoke({build,suite:'all',chatBackend:backend},checkout,async options=>applicationFixture(options),{
-      startMock:async()=>{mockStarted++;return {url:'http://127.0.0.1:12345',requests:()=>[],close:async()=>{mockClosed++;}};},
-      workbench:()=>({ready:async()=>{},qualifyChat:async()=>{order.push('chat');return {session:'test',turns:[]};}} as never),
-      editing:async()=>{order.push('editing');return {files:[],createdInitiallyAbsent:true};},
-      git:async(_wb,_repo,_workspace,evidence)=>{order.push('git');evidence!.stage='graph';if(failure)throw new GitFailure(failure,'Injected Git outcome',evidence);return evidence!;},
+test('basic runs editing then Chat without Git preparation or the Git profile, and stops on editing failure', async t => {
+  for (const backend of ['mock', 'real'] as const) for (const editingFails of [false, true]) {
+    const checkout = await mkdtemp(join(tmpdir(), 'editing-chat-runner-'));
+    t.after(() => rm(checkout, { recursive: true, force: true }));
+    const build = await fixtureApp(checkout);
+    const profile = backend === 'real' ? await realProfile(checkout, true) : undefined;
+    const settingsPath = profile ? join(profile.userData, 'User/settings.json') : undefined;
+    const settings = settingsPath ? await readFile(settingsPath, 'utf8') : undefined;
+    const order: string[] = [];
+    let mockStarted = 0;
+    let mockClosed = 0;
+    const result = await runSmoke({ build, suite: 'basic', chatBackend: backend }, checkout, async options => {
+      const args = options!.args!;
+      const userData = args[args.indexOf('--user-data-dir') + 1];
+      if (profile) assert.equal(userData, profile.userData);
+      else assert.ok(!userData.includes('smoke-git'));
+      assert.equal(options!.env!.GIT_CONFIG_NOSYSTEM, undefined);
+      return applicationFixture();
+    }, {
+      prepareGit: async () => assert.fail('basic must not require Git'),
+      git: async () => assert.fail('basic must not run Git'),
+      startMock: async () => {
+        mockStarted++;
+        return { url: 'http://127.0.0.1:12345', requests: () => [], close: async () => { mockClosed++; } };
+      },
+      workbench: () => ({ ready: async () => {}, qualifyChat: async () => {
+        order.push('chat'); return { session: 'test', turns: [] };
+      } } as never),
+      editing: async () => {
+        order.push('editing');
+        if (editingFails) throw new Error('Injected editing failure');
+        return { files: [], createdInitiallyAbsent: true };
+      },
     });
-    t.after(()=>rm(result.resourcesPath,{recursive:true,force:true}));
-    assert.deepEqual(order,failure?['editing','git']:['editing','git','chat']);
-    assert.equal(result.outcome,failure??'passed');
-    assert.deepEqual(result.checks.map(c=>c.outcome),failure?['passed',failure,'not_run']:['passed','passed','passed']);
-    assert.equal(mockStarted,backend==='mock'?1:0);assert.equal(mockClosed,mockStarted);
-    if(failure){assert.match(result.error!,/Injected Git outcome/);assert.equal((result.checks[1].evidence as any).stage,'graph');}
-    assert.equal(result.cleanup.reservationRetained,false);await access(result.persistentProfilePath!);
+    t.after(() => rm(result.resourcesPath, { recursive: true, force: true }));
+    assert.deepEqual(order, editingFails ? ['editing'] : ['editing', 'chat']);
+    assert.equal(result.outcome, editingFails ? 'failed' : 'passed');
+    assert.deepEqual(result.checks.map(c => c.suite), ['editing', 'chat']);
+    assert.deepEqual(result.checks.map(c => c.outcome), editingFails ? ['failed', 'not_run'] : ['passed', 'passed']);
+    assert.equal(mockStarted, backend === 'mock' ? 1 : 0);
+    assert.equal(mockClosed, mockStarted);
+    assert.equal(result.cleanup.reservationRetained, false);
+    await assert.rejects(access(join(checkout, 'profiles/smoke-git')));
+    if (settingsPath) assert.equal(await readFile(settingsPath, 'utf8'), settings);
   }
 });
 
