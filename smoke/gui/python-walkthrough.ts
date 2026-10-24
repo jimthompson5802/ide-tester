@@ -15,10 +15,13 @@ import {
 import { isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
+import { WalkthroughDeadline } from './python-deadline.js';
+import { closeOwnedApplication } from './python-shutdown.js';
+import { DeadlineWorkbench } from './python-workbench.js';
 import { resolveApp } from '../src/app.js';
 import { createRun, finishRun } from '../src/resources.js';
 import { commonSettings } from '../src/profile.js';
-import { bounded, Workbench } from '../src/workbench.js';
+import { bounded } from '../src/workbench.js';
 import { requireAbsent, verifySavedFile } from '../src/files.js';
 import {
     prepareObservationProfile,
@@ -85,8 +88,7 @@ export async function runPythonWalkthrough(args: string[]): Promise<boolean> {
         versions: installed,
         runId: run.id,
     };
-    const deadline = Date.now() + 480_000;
-    let stageDeadline = deadline;
+    const deadline = new WalkthroughDeadline(480_000);
     let stage = 'prepare';
     let app: ElectronApplication | undefined;
     let page: Page | undefined;
@@ -94,19 +96,12 @@ export async function runPythonWalkthrough(args: string[]): Promise<boolean> {
     let passed = false;
     let error: string | undefined;
     let before: PreservationManifest | undefined;
-    const remaining = (limit = 15_000): number => {
-        if (Date.now() >= Math.min(deadline, stageDeadline))
-            throw new Error(`Scenario expired at ${stage}`);
-        return Math.min(
-            limit,
-            deadline - Date.now(),
-            stageDeadline - Date.now(),
-        );
-    };
+    const remaining = (limit = 15_000): number => deadline.remaining(limit);
+    const step = <T>(operation: () => Promise<T>): Promise<T> =>
+        deadline.perform(operation);
     const mark = (value: string, budget = 60_000): void => {
-        remaining();
+        deadline.stage(value, budget);
         stage = value;
-        stageDeadline = Math.min(deadline, Date.now() + budget);
         process.stdout.write(`Python walkthrough: ${stage}\n`);
     };
     try {
@@ -239,6 +234,7 @@ export async function runPythonWalkthrough(args: string[]): Promise<boolean> {
                 '--locale=en',
             ],
         });
+        remaining();
         app.process().stdout?.on('data', () => {});
         app.process().stderr?.on('data', (chunk: Buffer) => {
             evidence.applicationStderr =
@@ -247,80 +243,90 @@ export async function runPythonWalkthrough(args: string[]): Promise<boolean> {
                 );
         });
         evidence.applicationPid = app.process().pid;
-        page = await app.firstWindow({ timeout: remaining(60_000) });
+        page = await step(() =>
+            app!.firstWindow({ timeout: remaining(60_000) }),
+        );
         page.setDefaultTimeout(10_000);
-        const workbench = new Workbench(page);
-        await workbench.ready(remaining(60_000));
+        const workbench = new DeadlineWorkbench(page, deadline);
+        await step(() => workbench.ready(remaining(60_000)));
         const input = page.locator(
             '.quick-input-widget .quick-input-box input',
         );
         const command = async (title: string): Promise<void> => {
             remaining();
-            await page!.keyboard.press('Meta+Shift+P');
-            await input.fill(`>${title}`);
+            await step(() => page!.keyboard.press('Meta+Shift+P'));
+            await step(() => input.fill(`>${title}`));
             const item = page!
                 .locator('.quick-input-widget .label-name')
                 .filter({ hasText: commandLabelPattern(title) });
-            await expect(item).toHaveCount(1, { timeout: remaining() });
+            await step(() =>
+                expect(item).toHaveCount(1, { timeout: remaining() }),
+            );
             evidence.lastCommand = title;
-            evidence.lastCommandLabel = await item.textContent();
-            await item.click({ timeout: remaining() });
+            evidence.lastCommandLabel = await step(() => item.textContent());
+            await step(() => item.click({ timeout: remaining() }));
         };
         const readTerminal = async (): Promise<string[]> => {
             remaining();
-            await page!.waitForFunction(
-                () => {
-                    const nodes = document.querySelectorAll(
-                        '#terminal .terminal-wrapper.active',
-                    );
-                    return (
-                        nodes.length === 1 &&
-                        nodes[0].getClientRects().length > 0 &&
-                        'xterm' in nodes[0] &&
-                        !!nodes[0].xterm
-                    );
-                },
-                undefined,
-                { timeout: remaining() },
+            await step(() =>
+                page!.waitForFunction(
+                    () => {
+                        const nodes = document.querySelectorAll(
+                            '#terminal .terminal-wrapper.active',
+                        );
+                        return (
+                            nodes.length === 1 &&
+                            nodes[0].getClientRects().length > 0 &&
+                            'xterm' in nodes[0] &&
+                            !!nodes[0].xterm
+                        );
+                    },
+                    undefined,
+                    { timeout: remaining() },
+                ),
             );
-            const result: unknown = await bounded(
-                page!.evaluate(async () => {
-                    const driver: unknown = window.driver;
-                    if (
-                        !driver ||
-                        typeof driver !== 'object' ||
-                        !('getTerminalBuffer' in driver) ||
-                        typeof driver.getTerminalBuffer !== 'function'
-                    )
-                        throw new Error('No terminal observation driver');
-                    const result: unknown = await driver.getTerminalBuffer(
-                        '#terminal .terminal-wrapper.active',
-                    );
-                    return result;
-                }),
-                remaining(),
-                'Read terminal',
+            const result: unknown = await step(() =>
+                bounded(
+                    page!.evaluate(async () => {
+                        const driver: unknown = window.driver;
+                        if (
+                            !driver ||
+                            typeof driver !== 'object' ||
+                            !('getTerminalBuffer' in driver) ||
+                            typeof driver.getTerminalBuffer !== 'function'
+                        )
+                            throw new Error('No terminal observation driver');
+                        const result: unknown = await driver.getTerminalBuffer(
+                            '#terminal .terminal-wrapper.active',
+                        );
+                        return result;
+                    }),
+                    remaining(),
+                    'Read terminal',
+                ),
             );
             remaining();
             return validateTerminalLines(result);
         };
         mark('guard-inheritance');
-        evidence.mainGuardDenied = await bounded(
-            app.evaluate((_electron, path) => {
-                const fs = process.getBuiltinModule('node:fs');
-                try {
-                    fs.appendFileSync(path, 'mutation');
-                    return false;
-                } catch (cause) {
-                    return (
-                        cause instanceof Error &&
-                        'code' in cause &&
-                        (cause.code === 'EPERM' || cause.code === 'EACCES')
-                    );
-                }
-            }, sentinelFile),
-            remaining(),
-            'Electron guard verification',
+        evidence.mainGuardDenied = await step(() =>
+            bounded(
+                app!.evaluate((_electron, path) => {
+                    const fs = process.getBuiltinModule('node:fs');
+                    try {
+                        fs.appendFileSync(path, 'mutation');
+                        return false;
+                    } catch (cause) {
+                        return (
+                            cause instanceof Error &&
+                            'code' in cause &&
+                            (cause.code === 'EPERM' || cause.code === 'EACCES')
+                        );
+                    }
+                }, sentinelFile),
+                remaining(),
+                'Electron guard verification',
+            ),
         );
         if (!evidence.mainGuardDenied)
             throw new Error(
@@ -330,14 +336,18 @@ export async function runPythonWalkthrough(args: string[]): Promise<boolean> {
         const guardRow = page
             .locator('.quick-input-widget .label-name')
             .filter({ hasText: /^\s*Guard verification\s*$/ });
-        await guardRow.click({ timeout: remaining() });
-        await expect
-            .poll(
-                async () =>
-                    (await readTerminal()).includes(`GUARD_DENIED ${token}`),
-                { timeout: remaining(30_000) },
-            )
-            .toBe(true);
+        await step(() => guardRow.click({ timeout: remaining() }));
+        await step(() =>
+            expect
+                .poll(
+                    async () =>
+                        (await readTerminal()).includes(
+                            `GUARD_DENIED ${token}`,
+                        ),
+                    { timeout: remaining(30_000) },
+                )
+                .toBe(true),
+        );
         const terminalGuard: unknown = JSON.parse(
             await readFile(guardResult, 'utf8'),
         );
@@ -363,45 +373,63 @@ export async function runPythonWalkthrough(args: string[]): Promise<boolean> {
             : 'fresh';
         await command('Extensions: Install Extensions');
         const searchSelector = '.extensions-search-container .monaco-editor';
-        await page.locator(`${searchSelector} .native-edit-context`).focus();
-        await page.keyboard.press('Meta+A');
-        await workbench.typeInEditor(searchSelector, '@id:ms-python.python');
+        await step(() =>
+            page!.locator(`${searchSelector} .native-edit-context`).focus(),
+        );
+        await step(() => page!.keyboard.press('Meta+A'));
+        await step(() =>
+            workbench.typeInEditor(searchSelector, '@id:ms-python.python'),
+        );
         const extension = page
             .locator('.extensions-viewlet .monaco-list-row')
             .filter({
                 has: page.locator('.name').filter({ hasText: /^Python$/ }),
             });
-        await expect(extension).toHaveCount(1, { timeout: remaining(30_000) });
-        await extension.click();
+        await step(() =>
+            expect(extension).toHaveCount(1, { timeout: remaining(30_000) }),
+        );
+        await step(() => extension.click());
         const editor = page.locator('.extension-editor');
-        await expect(editor.locator('.header .name')).toHaveText('Python', {
-            timeout: remaining(),
-        });
-        evidence.extensionHeader = await editor.locator('.header').innerText();
+        await step(() =>
+            expect(editor.locator('.header .name')).toHaveText('Python', {
+                timeout: remaining(),
+            }),
+        );
+        evidence.extensionHeader = await step(() =>
+            editor.locator('.header').innerText(),
+        );
         if (evidence.installMode === 'fresh') {
             const install = editor
                 .locator(':scope > .header .extension-action:visible')
                 .filter({ hasText: /^Install$/ });
-            await expect(install).toHaveCount(1, { timeout: remaining() });
-            await install.click();
+            await step(() =>
+                expect(install).toHaveCount(1, { timeout: remaining() }),
+            );
+            await step(() => install.click());
         }
-        await expect
-            .poll(
-                async () => {
-                    remaining();
-                    return (await extensionDirectories()).length;
-                },
-                { timeout: Math.max(1, installDeadline - Date.now()) },
-            )
-            .toBe(1);
-        await expect(
-            editor
-                .locator(':scope > .header .extension-action:visible')
-                .filter({ hasText: /^Uninstall$/ }),
-        ).toBeVisible({ timeout: Math.max(1, installDeadline - Date.now()) });
-        evidence.extensionInstalledHeader = await editor
-            .locator('.header')
-            .innerText();
+        await step(() =>
+            expect
+                .poll(
+                    async () => {
+                        remaining();
+                        return (await extensionDirectories()).length;
+                    },
+                    { timeout: Math.max(1, installDeadline - Date.now()) },
+                )
+                .toBe(1),
+        );
+        await step(() =>
+            expect(
+                editor
+                    .locator(':scope > .header .extension-action:visible')
+                    .filter({ hasText: /^Uninstall$/ }),
+            ).toBeVisible({
+                timeout: Math.max(1, installDeadline - Date.now()),
+            }),
+        );
+        evidence.extensionInstalledHeader = await step(() =>
+            editor.locator('.header').innerText(),
+        );
         const properties: Record<string, unknown> = {};
         const extensions: unknown[] = [];
         for (const name of (await readdir(profile.extensions)).filter((value) =>
@@ -433,12 +461,14 @@ export async function runPythonWalkthrough(args: string[]): Promise<boolean> {
                 `Installed suppression controls unsupported: ${unsupported.join(', ')}`,
             );
         if (
-            await page
-                .getByText(
-                    /Reload Required|Restart Extensions|Sign in to|Keychain/,
-                    { exact: false },
-                )
-                .count()
+            await step(() =>
+                page!
+                    .getByText(
+                        /Reload Required|Restart Extensions|Sign in to|Keychain/,
+                        { exact: false },
+                    )
+                    .count(),
+            )
         )
             throw new Error(
                 'Unexpected reload/authentication prompt requires review',
@@ -449,17 +479,19 @@ export async function runPythonWalkthrough(args: string[]): Promise<boolean> {
         await requireAbsent(run.workspace, 'hello.py');
         await requireAbsent(run.workspace, `python-evidence-${token}.json`);
         const source = makePythonSource(token, resultPath);
-        await workbench.newTextFile();
-        await workbench.replaceEditorText(source);
-        await workbench.saveAs(script);
+        await step(() => workbench.newTextFile());
+        await step(() => workbench.replaceEditorText(source));
+        await step(() => workbench.saveAs(script));
         evidence.savedFile = await verifySavedFile(
             run.workspace,
             'hello.py',
             source,
         );
-        await workbench.closeEditors();
-        await workbench.openFile(script);
-        evidence.reopenedLines = await workbench.expectEditorText(source);
+        await step(() => workbench.closeEditors());
+        await step(() => workbench.openFile(script));
+        evidence.reopenedLines = await step(() =>
+            workbench.expectEditorText(source),
+        );
         evidence.reopened = true;
         await verifySavedFile(run.workspace, 'hello.py', source);
         mark('interpreter-selection');
@@ -467,106 +499,123 @@ export async function runPythonWalkthrough(args: string[]): Promise<boolean> {
         const enterPath = page
             .locator('.quick-input-widget .label-name')
             .filter({ hasText: /^\s*Enter interpreter path\.\.\.\s*$/ });
-        await enterPath.click({ timeout: remaining(60_000) });
-        await expect(input).toHaveAttribute(
-            'placeholder',
-            'Enter path to a Python interpreter.',
-            { timeout: remaining() },
+        await step(() => enterPath.click({ timeout: remaining(60_000) }));
+        await step(() =>
+            expect(input).toHaveAttribute(
+                'placeholder',
+                'Enter path to a Python interpreter.',
+                { timeout: remaining() },
+            ),
         );
-        await input.fill(options.interpreter);
-        await expect(input).toHaveValue(options.interpreter);
-        evidence.enteredInterpreterPath = await input.inputValue();
-        await input.press('Enter');
-        await expect(input).toBeHidden({ timeout: remaining(60_000) });
-        evidence.interpreterStatus = await page
-            .locator('.statusbar-item[id*="python"]')
-            .evaluateAll((nodes) =>
-                nodes.map((node) => ({
-                    id: node.id,
-                    text: node.textContent,
-                    aria: node.getAttribute('aria-label'),
-                })),
-            );
+        await step(() => input.fill(options.interpreter));
+        await step(() => expect(input).toHaveValue(options.interpreter));
+        evidence.enteredInterpreterPath = await step(() => input.inputValue());
+        await step(() => input.press('Enter'));
+        await step(() =>
+            expect(input).toBeHidden({ timeout: remaining(60_000) }),
+        );
+        evidence.interpreterStatus = await step(() =>
+            page!
+                .locator('.statusbar-item[id*="python"]')
+                .evaluateAll((nodes) =>
+                    nodes.map((node) => ({
+                        id: node.id,
+                        text: node.textContent,
+                        aria: node.getAttribute('aria-label'),
+                    })),
+                ),
+        );
         await command('Python: Select Interpreter');
-        await expect(input).toHaveAttribute(
-            'placeholder',
-            `Selected Interpreter: ${options.interpreter}`,
-            { timeout: remaining() },
+        await step(() =>
+            expect(input).toHaveAttribute(
+                'placeholder',
+                `Selected Interpreter: ${options.interpreter}`,
+                { timeout: remaining() },
+            ),
         );
-        evidence.selectedInterpreterPlaceholder =
-            await input.getAttribute('placeholder');
-        evidence.selectionRows = await page
-            .locator('.quick-input-widget .monaco-list-row')
-            .allTextContents();
-        evidence.selectionTitle = await page
-            .locator('.quick-input-widget .quick-input-title')
-            .textContent();
-        await page.keyboard.press('Escape');
+        evidence.selectedInterpreterPlaceholder = await step(() =>
+            input.getAttribute('placeholder'),
+        );
+        evidence.selectionRows = await step(() =>
+            page!
+                .locator('.quick-input-widget .monaco-list-row')
+                .allTextContents(),
+        );
+        evidence.selectionTitle = await step(() =>
+            page!
+                .locator('.quick-input-widget .quick-input-title')
+                .textContent(),
+        );
+        await step(() => page!.keyboard.press('Escape'));
         await command('Python: Create Terminal');
         const baseline = await readTerminal();
         if (baseline.some((line) => line.includes(token)))
             throw new Error('Current Python evidence already in baseline');
         evidence.baseline = baseline;
         evidence.terminalSelector = '#terminal .terminal-wrapper.active';
-        evidence.terminalsBeforeRun = await page
-            .locator('#terminal .terminal-wrapper')
-            .count();
+        evidence.terminalsBeforeRun = await step(() =>
+            page!.locator('#terminal .terminal-wrapper').count(),
+        );
         await requireAbsent(run.workspace, `python-evidence-${token}.json`);
         mark('python-run');
-        await workbench.openFile(script);
+        await step(() => workbench.openFile(script));
         await command('Python: Run Python File in Terminal');
         const executionDeadline = Date.now() + remaining(60_000);
-        await expect
-            .poll(
-                async () => {
-                    remaining();
-                    const lines = await readTerminal();
-                    evidence.terminal = lines;
-                    try {
-                        const stat = await lstat(resultPath);
-                        if (
-                            !stat.isFile() ||
-                            stat.isSymbolicLink() ||
-                            stat.size > 8192 ||
-                            (await realpath(resultPath)) !== resultPath
-                        )
-                            throw new Error('Invalid Python evidence file');
-                        const raw = await readFile(resultPath, 'utf8');
-                        const identity = verifyPythonEvidence(lines, raw, {
-                            token,
-                            script,
-                            canonicalInterpreter: launch.canonicalInterpreter,
-                        });
-                        await verifySavedFile(
-                            run.workspace,
-                            'hello.py',
-                            source,
-                        );
-                        evidence.identity = identity;
-                        evidence.programJson = raw;
-                        return true;
-                    } catch {
-                        return false;
-                    }
-                },
-                {
-                    timeout: Math.max(1, executionDeadline - Date.now()),
-                    message:
-                        'Combined saved source, terminal and program-written Python evidence',
-                },
-            )
-            .toBe(true);
+        await step(() =>
+            expect
+                .poll(
+                    async () => {
+                        remaining();
+                        const lines = await readTerminal();
+                        evidence.terminal = lines;
+                        try {
+                            const stat = await lstat(resultPath);
+                            if (
+                                !stat.isFile() ||
+                                stat.isSymbolicLink() ||
+                                stat.size > 8192 ||
+                                (await realpath(resultPath)) !== resultPath
+                            )
+                                throw new Error('Invalid Python evidence file');
+                            const raw = await readFile(resultPath, 'utf8');
+                            const identity = verifyPythonEvidence(lines, raw, {
+                                token,
+                                script,
+                                canonicalInterpreter:
+                                    launch.canonicalInterpreter,
+                            });
+                            await verifySavedFile(
+                                run.workspace,
+                                'hello.py',
+                                source,
+                            );
+                            remaining();
+                            evidence.identity = identity;
+                            evidence.programJson = raw;
+                            return true;
+                        } catch {
+                            return false;
+                        }
+                    },
+                    {
+                        timeout: Math.max(1, executionDeadline - Date.now()),
+                        message:
+                            'Combined saved source, terminal and program-written Python evidence',
+                    },
+                )
+                .toBe(true),
+        );
         remaining();
-        evidence.terminalsAfterRun = await page
-            .locator('#terminal .terminal-wrapper')
-            .count();
-        evidence.activeTerminalsAfterRun = await page
-            .locator('#terminal .terminal-wrapper.active')
-            .count();
+        evidence.terminalsAfterRun = await step(() =>
+            page!.locator('#terminal .terminal-wrapper').count(),
+        );
+        evidence.activeTerminalsAfterRun = await step(() =>
+            page!.locator('#terminal .terminal-wrapper.active').count(),
+        );
         passed = true;
     } catch (cause) {
         error = cause instanceof Error ? cause.message : String(cause);
-        if (page && !page.isClosed()) {
+        if (page && !page.isClosed() && !deadline.expired) {
             evidence.pythonStatusItems = await page
                 .locator('.statusbar-item[id*="python"]')
                 .evaluateAll((nodes) =>
@@ -587,33 +636,24 @@ export async function runPythonWalkthrough(args: string[]): Promise<boolean> {
                 .catch(() => []);
         }
     }
+    deadline.stop();
+    evidence.deadlineExpired = deadline.expired;
     const cleanupDeadline = Date.now() + 120_000;
     const cleanup = await finishRun(run, passed, [
         async () => {
             if (app) {
-                const child = app.process();
-                if (child.exitCode === null && child.signalCode === null)
-                    await bounded(
-                        app.close(),
-                        60_000,
-                        'Owned application close',
-                    );
-                if (child.exitCode === null && child.signalCode === null)
-                    await bounded(
-                        new Promise<void>((done) =>
-                            child.once('exit', () => done()),
-                        ),
-                        Math.max(1, cleanupDeadline - Date.now()),
-                        'Owned main process exit',
-                    );
-                evidence.applicationExit = {
-                    exitCode: child.exitCode,
-                    signalCode: child.signalCode,
-                };
+                evidence.applicationExit = await closeOwnedApplication(app, {
+                    deadline: cleanupDeadline,
+                });
             } else if (attempted)
                 throw new Error('Launch uncertain; retain reservation');
+            await deadline.settle(Math.max(1, cleanupDeadline - Date.now()));
             if (before) {
-                await requirePreservationUnchanged(checkout, before);
+                await bounded(
+                    requirePreservationUnchanged(checkout, before),
+                    Math.max(1, cleanupDeadline - Date.now()),
+                    'Preservation comparison',
+                );
                 evidence.preservation = {
                     unchanged: true,
                     entries: before.entries.length,
@@ -631,6 +671,8 @@ export async function runPythonWalkthrough(args: string[]): Promise<boolean> {
                     throw cause;
             }
             evidence.productionProfileAbsent = true;
+            if (Date.now() >= cleanupDeadline)
+                throw new Error('Cleanup deadline expired; retain reservation');
         },
     ]);
     const result = {
