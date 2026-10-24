@@ -54,9 +54,11 @@ Historical documents retain their original decisions and completion records. Tho
 
 ## Setup and usage
 
+Run these commands from the repository root (the directory containing `smoke/`):
+
 ```sh
 npm --prefix smoke ci
-npm --prefix smoke run compile
+npm --prefix smoke run build
 npm --prefix smoke run test:unit
 npm --prefix smoke run smoke -- --build "/Applications/Visual Studio Code.app" --suite basic
 ```
@@ -67,7 +69,9 @@ The retained Python environment is preserved separately from the TypeScript test
 
 ## Development workflow
 
-See the [development workflow](docs/development-workflow.md) for the workflow diagram, skill invocations, and developer validation checkpoints.
+See the [coding standards](smoke/CODING_STANDARDS.md) for TypeScript implementation, testing, and review conventions.
+
+See the [development workflow](smoke/DEVELOPMENT_WORKFLOW.md) for the workflow diagram, skill invocations, and developer validation checkpoints.
 
 Repository-local skills remain available for [backlog generation](.agents/skills/generate-milestone-user-stories/SKILL.md), [story planning](.agents/skills/plan-user-story/SKILL.md), [plan execution](.agents/skills/execute-plan/SKILL.md), [issue creation](.agents/skills/create-github-issue/SKILL.md), and [pull request creation](.agents/skills/create-pull-request/SKILL.md).
 
