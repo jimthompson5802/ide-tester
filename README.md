@@ -67,6 +67,8 @@ The retained Python environment is preserved separately from the TypeScript test
 
 ## Development workflow
 
+See the [development workflow](docs/development-workflow.md) for the workflow diagram, skill invocations, and developer validation checkpoints.
+
 Repository-local skills remain available for [backlog generation](.agents/skills/generate-milestone-user-stories/SKILL.md), [story planning](.agents/skills/plan-user-story/SKILL.md), [plan execution](.agents/skills/execute-plan/SKILL.md), [issue creation](.agents/skills/create-github-issue/SKILL.md), and [pull request creation](.agents/skills/create-pull-request/SKILL.md).
 
 The replacement plan is complete and developer accepted. Follow [repository instructions](AGENTS.md) and use TDD for future software changes. New scope requires developer direction. GUI execution requires authorization and an unlocked reserved desktop; these were authorized for the recorded qualifications. Retained historical stories are reference material until explicitly selected or revised.
