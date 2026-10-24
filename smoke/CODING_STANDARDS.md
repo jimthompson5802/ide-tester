@@ -2,7 +2,7 @@
 
 These standards apply to TypeScript implementation and tests under `smoke/`, including the helper extension. They formalize the current tester's conventions and establish clearer readability and typing requirements for future changes. They do not apply retroactively to retained historical Python designs.
 
-Existing code is not uniformly compliant, particularly in statement layout, explicit return types, and test error typing. Apply these standards to new code and code changed for the approved task. Keep unrelated formatting and refactoring in separately scoped changes.
+Existing code is not uniformly compliant, particularly in explicit return types and test error typing. TypeScript sources have a shared Prettier formatting baseline. Apply these standards to new code and code changed for the approved task. Keep unrelated formatting and refactoring in separately scoped changes.
 
 ## Language and modules
 
@@ -13,7 +13,7 @@ Existing code is not uniformly compliant, particularly in statement layout, expl
 
 ## Formatting and naming
 
-- Use two-space indentation, single-quoted strings, semicolons, and trailing commas in multiline structures. Use template literals for interpolation.
+- Use four-space indentation, single-quoted strings, semicolons, and trailing commas in multiline structures. Use template literals for interpolation.
 - Put each statement and interface member on its own line. Expand control flow and long expressions when multiple actions, conditions, or nested alternatives obscure the sequence.
 - Use `camelCase` for variables, functions, and methods; `PascalCase` for types and classes; and descriptive kebab-case module filenames. Name test files `<module>.test.ts`.
 - Name operations by their observable purpose. Use names such as `requireAbsent` for precondition checks and `verifySavedFile` for evidence checks.
@@ -86,4 +86,16 @@ Follow the [repository validation rules](../AGENTS.md#validation), including TDD
 
 Use compiler checks, relevant tests, and code review to enforce these standards. Review changed code for readable layout, sound boundary validation, meaningful verification, and safe resource handling. Compiler and test success do not establish compliance with every rule.
 
-This document adds no formatter, linter, compiler setting, dependency, or automated enforcement. Introducing such tooling or performing a broad cleanup is a separate scoped change. Repository authorization, preservation rules, and developer validation gates remain defined in [AGENTS.md](../AGENTS.md) and the applicable implementation plan.
+ESLint and Prettier provide local automated checks:
+
+```sh
+npm --prefix smoke run lint
+npm --prefix smoke run format:check
+npm --prefix smoke run format
+```
+
+`lint` checks tester sources, tests, and the helper extension using the recommended ESLint/TypeScript rules, type-only imports, unused variables, and floating promises. It fails on warnings. Node test-registration calls are exempt from floating-promise checks because the test runner owns their completion. Constant loop conditions are allowed for bounded polling; deadlines remain a review responsibility. Setup's existing cleanup-error propagation has a documented local exception to `no-unsafe-finally`.
+
+`format:check` checks TypeScript sources and tooling JSON/MJS files; `format` rewrites those files. Generated output, dependencies, and the lockfile are excluded. Markdown is outside the formatting command's scope. Configuration lives in [eslint.config.mjs](eslint.config.mjs), [.prettierrc.json](.prettierrc.json), and [.prettierignore](.prettierignore).
+
+Explicit `any` is currently allowed to accommodate existing external data and test doubles. Explicit return types, naming, resource ownership, deadline adequacy, and evidence quality still require review. Prefer `unknown` and narrowing for new code as specified above. Broad typing cleanup or stricter enforcement is a separate scoped change. These commands are local checks; no CI workflow or Git hook is added. Repository authorization, preservation rules, and developer validation gates remain defined in [AGENTS.md](../AGENTS.md) and the applicable implementation plan.

@@ -6,15 +6,21 @@ Status: original mocked foundation, selected suites and final handoff developer 
 
 ## Non-GUI commands
 
-Use Node 26.3.1 arm64 on macOS:
+Use Node 26.3.1 arm64 on macOS. Run these commands from the repository root (the directory containing `smoke/`):
 
 ```sh
 npm --prefix smoke ci
-npm --prefix smoke run compile
+npm --prefix smoke run build
 npm --prefix smoke run test:unit
 ```
 
+If your terminal is already in `smoke/`, omit `--prefix smoke`: use `npm ci`, `npm run build`, and `npm run test:unit`.
+
 The project `.npmrc` disables install scripts, omits optional dependencies (including native `fsevents`), and enforces the Node engine. No VS Code, Electron, or browser download is needed. TypeScript compiles the tester and tests into `smoke/dist/`, and the helper into `smoke/helper/dist/`. Unit tests use Node's test runner with concurrency one; their HTTP checks need permission to bind an ephemeral loopback port.
+
+`build` runs lint, formatting checks, and compilation in order, stopping at the first failure.
+
+See [coding standards](CODING_STANDARDS.md) for lint rules and enforcement limits. Run `npm --prefix smoke run format` to apply Prettier formatting before checking changes. Lint and formatting checks do not launch VS Code.
 
 The neighboring VS Code checkout is not an install, compile, or runtime dependency. Root uv metadata, Python environments, `.vscode/`, existing profiles, and preserved workspaces are untouched.
 

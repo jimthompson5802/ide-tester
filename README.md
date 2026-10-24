@@ -54,9 +54,11 @@ Historical documents retain their original decisions and completion records. Tho
 
 ## Setup and usage
 
+Run these commands from the repository root (the directory containing `smoke/`):
+
 ```sh
 npm --prefix smoke ci
-npm --prefix smoke run compile
+npm --prefix smoke run build
 npm --prefix smoke run test:unit
 npm --prefix smoke run smoke -- --build "/Applications/Visual Studio Code.app" --suite basic
 ```

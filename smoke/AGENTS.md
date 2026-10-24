@@ -14,7 +14,7 @@ These instructions apply to `smoke/` in addition to the [repository-wide instruc
 Run these from the repository root:
 
 ```sh
-npm --prefix smoke run compile
+npm --prefix smoke run build
 npm --prefix smoke run test:unit
 ```
 
