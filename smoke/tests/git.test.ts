@@ -138,3 +138,32 @@ test('wrong saved bytes stop before staging and a wrong independently committed 
     );
     assert.ok(!second.events.includes('graph'));
 });
+
+test('cancellation after Git initialization prevents repository configuration and later stages', async (t) => {
+    const { Cancellation, CancellationError } =
+        await import('../src/cancellation.js');
+    const cancellation = new Cancellation();
+    const { run, repository, workbench, events } = await scenario(t);
+    const initialize = workbench.initializeGit;
+    workbench.initializeGit = async (path) => {
+        await initialize(path);
+        cancellation.request();
+    };
+    let configured = false;
+    repository.configure = async () => {
+        configured = true;
+    };
+    await assert.rejects(
+        checkGit(
+            workbench,
+            repository,
+            run.workspace,
+            newGitEvidence(),
+            cancellation,
+        ),
+        CancellationError,
+    );
+    await cancellation.settle(1000);
+    assert.equal(configured, false);
+    assert.deepEqual(events, ['init']);
+});

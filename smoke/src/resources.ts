@@ -81,7 +81,45 @@ export async function finishRun(
     run: Run,
     passed: boolean,
     shutdown: (() => Promise<void>)[],
-) {
+    options: { canRemove?: () => boolean; deadline?: number } = {},
+): Promise<{
+    disposition: string;
+    errors: string[];
+    reservationRetained: boolean;
+}> {
+    const requireBudget = (): void => {
+        if (options.deadline !== undefined && Date.now() >= options.deadline)
+            throw new Error(
+                'Cleanup deadline expired before final filesystem commitment',
+            );
+    };
+    const inspect = async <T>(operation: () => Promise<T>): Promise<T> => {
+        requireBudget();
+        const deadline = options.deadline;
+        if (deadline === undefined) return operation();
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+            return await Promise.race([
+                Promise.resolve().then(() => {
+                    requireBudget();
+                    return operation();
+                }),
+                new Promise<never>((_, reject) => {
+                    timer = setTimeout(
+                        () =>
+                            reject(
+                                new Error(
+                                    'Cleanup deadline expired during ownership verification',
+                                ),
+                            ),
+                        Math.max(1, deadline - Date.now()),
+                    );
+                }),
+            ]);
+        } finally {
+            clearTimeout(timer);
+        }
+    };
     const errors: string[] = [];
     for (const close of shutdown) {
         try {
@@ -93,22 +131,31 @@ export async function finishRun(
     let disposition = 'retained';
     if (errors.length === 0) {
         try {
+            requireBudget();
             if (
-                (await realpath(run.report)) !== run.report ||
-                (await realpath(run.resources)) !== run.resources ||
-                (await lstat(run.resources)).isSymbolicLink() ||
-                (await readFile(join(run.resources, '.owner'), 'utf8')) !==
-                    run.id
+                (await inspect(() => realpath(run.report))) !== run.report ||
+                (await inspect(() => realpath(run.resources))) !==
+                    run.resources ||
+                (await inspect(() => lstat(run.resources))).isSymbolicLink() ||
+                (await inspect(() =>
+                    readFile(join(run.resources, '.owner'), 'utf8'),
+                )) !== run.id
             ) {
                 throw new Error('Resource ownership mismatch');
             }
-            const lock = JSON.parse(await readFile(run.reservation, 'utf8'));
+            const lock = JSON.parse(
+                await inspect(() => readFile(run.reservation, 'utf8')),
+            );
             if (lock.id !== run.id)
                 throw new Error('Reservation ownership mismatch');
-            if (passed) {
+            requireBudget();
+            if (passed && (options.canRemove?.() ?? true)) {
+                requireBudget();
+                // Admitted filesystem removal is awaited; it cannot be cancelled.
                 await rm(run.resources, { recursive: true });
                 disposition = 'removed';
             }
+            requireBudget();
             await rm(run.reservation);
         } catch (error) {
             errors.push(String(error));

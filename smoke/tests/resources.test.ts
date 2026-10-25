@@ -137,3 +137,78 @@ test('run creation rejects a reports directory redirected outside the checkout',
     await assert.rejects(createRun(checkout), /ownership/);
     await assert.rejects(access(join(outside, 'smoke/.reservation')));
 });
+
+test('cancellation during shutdown retains successful resources but releases a safely settled reservation', async (t) => {
+    const checkout = await mkdtemp(join(tmpdir(), 'smoke-cancel-cleanup-'));
+    t.after(() => rm(checkout, { recursive: true, force: true }));
+    const run = await ownedRun(t, checkout);
+    let cancelled = false;
+    const result = await finishRun(
+        run,
+        true,
+        [
+            async () => {
+                cancelled = true;
+            },
+        ],
+        { canRemove: () => !cancelled, deadline: Date.now() + 1000 },
+    );
+    assert.equal(result.disposition, 'retained');
+    assert.equal(result.reservationRetained, false);
+    await access(run.resources);
+    await assert.rejects(access(run.reservation));
+});
+
+test('expired cleanup admission retains exact reservation and disposable resources', async (t) => {
+    const checkout = await mkdtemp(join(tmpdir(), 'smoke-cleanup-expired-'));
+    t.after(() => rm(checkout, { recursive: true, force: true }));
+    const run = await ownedRun(t, checkout);
+    const reservation = await readFile(run.reservation);
+    const cleanup = await finishRun(run, true, [], {
+        deadline: Date.now() - 1,
+    });
+    assert.equal(cleanup.disposition, 'retained');
+    assert.equal(cleanup.reservationRetained, true);
+    assert.match(cleanup.errors.join(), /deadline expired/i);
+    assert.deepEqual(await readFile(run.reservation), reservation);
+    await access(run.workspace);
+});
+
+test('a stalled ownership read expires without admitting late deletion', async (t) => {
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const { writeFile } = await import('node:fs/promises');
+    const checkout = await mkdtemp(
+        join(tmpdir(), 'smoke-ownership-read-expiry-'),
+    );
+    t.after(() => rm(checkout, { recursive: true, force: true }));
+    const run = await ownedRun(t, checkout);
+    const owner = join(run.resources, '.owner');
+    await rm(owner);
+    await promisify(execFile)('/usr/bin/mkfifo', [owner]);
+    // A FIFO makes the public cleanup seam wait on actual owned filesystem I/O.
+    // The fallback releases the read even against the pre-fix implementation.
+    let fallbackReleased = false;
+    let releaseWrite: Promise<void> | undefined;
+    const fallback = setTimeout(() => {
+        fallbackReleased = true;
+        releaseWrite = writeFile(owner, run.id);
+        releaseWrite.catch(() => {});
+    }, 500);
+    const cleanup = await finishRun(run, true, [], {
+        deadline: Date.now() + 50,
+    });
+    clearTimeout(fallback);
+    if (!fallbackReleased) await writeFile(owner, run.id);
+    else await releaseWrite;
+    assert.equal(
+        fallbackReleased,
+        false,
+        'cleanup must return before the stalled ownership read is released',
+    );
+    assert.equal(cleanup.disposition, 'retained');
+    assert.equal(cleanup.reservationRetained, true);
+    assert.match(cleanup.errors.join(), /deadline expired/i);
+    await access(run.reservation);
+    await access(run.workspace);
+});

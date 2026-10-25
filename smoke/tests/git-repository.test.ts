@@ -293,3 +293,29 @@ test('a commit with no expected blob is a functional mismatch, not a subprocess 
         (e: any) => e.outcome === 'failed',
     );
 });
+
+test('a cancelled Git command never starts its subprocess', async (t) => {
+    const { Cancellation, CancellationError } =
+        await import('../src/cancellation.js');
+    const cancellation = new Cancellation();
+    const run = await fixture(t);
+    cancellation.request();
+    const marker = join(run.workspace, 'must-not-exist');
+    await assert.rejects(
+        gitCommand(
+            process.execPath,
+            [
+                '-e',
+                'require("node:fs").writeFileSync(process.argv[1], "started")',
+                marker,
+            ],
+            run.workspace,
+            {},
+            1000,
+            cancellation,
+        ),
+        CancellationError,
+    );
+    const { access } = await import('node:fs/promises');
+    await assert.rejects(access(marker));
+});

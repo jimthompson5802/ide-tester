@@ -51,6 +51,7 @@ export function chatTurns(
 
 export type ChatOutcome = 'blocked' | 'failed' | 'harness_error';
 export interface ChatEvidence {
+    originatingFailure?: { outcome: ChatOutcome; error: string };
     session: string;
     turns: {
         marker: string;

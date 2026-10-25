@@ -225,3 +225,120 @@ test('Python runner isolates launch, preserves both profiles and original outcom
             await access(join(checkout, 'reports/smoke/.reservation'));
     }
 });
+
+for (const mutateProtectedFixture of [false, true]) {
+    test(`active Python cancellation settles work and ${mutateProtectedFixture ? 'retains the reservation after a preservation mismatch' : 'releases only after preservation and actual exit'}`, async (t) => {
+        const { Cancellation } = await import('../src/cancellation.js');
+        const cancellation = new Cancellation();
+        const { checkout, build, interpreter } = await fixture();
+        t.after(() => rm(checkout, { recursive: true, force: true }));
+        const events: string[] = [];
+        let ownedResources = '';
+        const reservation = join(checkout, 'reports/smoke/.reservation');
+        const child = Object.assign(new EventEmitter(), {
+            exitCode: null as number | null,
+            signalCode: null,
+        });
+        const result = await runSmoke(
+            { build, suite: 'python', pythonInterpreter: interpreter },
+            checkout,
+            async (options) => {
+                ownedResources = options!.env!.HOME!.slice(0, -'/home'.length);
+                return {
+                    process: () => child,
+                    firstWindow: async () => ({
+                        setDefaultTimeout() {},
+                        setDefaultNavigationTimeout() {},
+                    }),
+                    evaluate: async () => true,
+                    close: async () => {
+                        events.push('close');
+                        child.exitCode = 0;
+                        child.emit('exit');
+                        events.push('actual-exit');
+                    },
+                } as never;
+            },
+            {
+                pythonWorkbench: () =>
+                    ({
+                        ready: async () => {},
+                        verifyTerminalGuard: async () => {
+                            await writeFile(
+                                join(ownedResources, 'terminal-guard.json'),
+                                '{"denied":true}',
+                            );
+                            return [];
+                        },
+                    }) as never,
+                python: async (
+                    _wb,
+                    _workspace,
+                    _interpreter,
+                    evidence,
+                    deadline,
+                ) => {
+                    evidence!.stage = 'python-run';
+                    evidence!.completedStages.push('editor-save-reopen');
+                    await deadline!.perform(async () => {
+                        cancellation.request();
+                        await new Promise<void>((resolve) =>
+                            setTimeout(resolve, 15),
+                        );
+                        await access(reservation);
+                        await access(ownedResources);
+                        if (mutateProtectedFixture)
+                            await writeFile(
+                                interpreter,
+                                'injected protected fixture mutation',
+                            );
+                        events.push('raw-work-settled');
+                    });
+                    events.push('forbidden-acceptance');
+                    return evidence!;
+                },
+            },
+            cancellation,
+        );
+        t.after(() =>
+            rm(result.resourcesPath, { recursive: true, force: true }),
+        );
+        assert.equal(result.outcome, 'harness_error');
+        assert.equal(result.error, 'Cancelled by user');
+        assert.equal(result.checks[0].outcome, 'harness_error');
+        assert.deepEqual(events, ['close', 'actual-exit', 'raw-work-settled']);
+        const evidence = result.checks[0].evidence as {
+            stage: string;
+            completedStages: string[];
+        };
+        assert.equal(evidence.stage, 'python-run');
+        assert.deepEqual(evidence.completedStages, ['editor-save-reopen']);
+        assert.equal(result.cleanup.disposition, 'retained');
+        assert.equal(
+            result.cleanup.reservationRetained,
+            mutateProtectedFixture,
+        );
+        if (mutateProtectedFixture) {
+            await access(reservation);
+            assert.match(result.cleanup.errors.join('\n'), /preserv/i);
+        } else {
+            await assert.rejects(access(reservation));
+            assert.deepEqual(result.cleanup.errors, []);
+            assert.equal(
+                await readFile(interpreter, 'utf8'),
+                'arbitrary presence-only fixture',
+            );
+        }
+        assert.equal(
+            await readFile(
+                join(checkout, 'profiles/smoke-python-feasibility/.owner'),
+                'utf8',
+            ),
+            'preserved',
+        );
+        await access(result.persistentProfilePath!);
+        const saved = JSON.parse(await readFile(result.resultPath, 'utf8'));
+        assert.equal(saved.outcome, 'harness_error');
+        assert.equal(saved.error, 'Cancelled by user');
+    });
+}

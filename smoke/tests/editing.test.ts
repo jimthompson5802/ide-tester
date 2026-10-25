@@ -53,3 +53,29 @@ test('editing completes its file verification with all editors closed', async (t
         'No verified file should remain open when the suite completes',
     );
 });
+
+test('cancellation after opening an editor prevents typing and later filesystem checks', async (t) => {
+    const { Cancellation, CancellationError } =
+        await import('../src/cancellation.js');
+    const cancellation = new Cancellation();
+    const workspace = await realpath(
+        await mkdtemp(join(tmpdir(), 'editing-cancel-')),
+    );
+    t.after(() => rm(workspace, { recursive: true, force: true }));
+    const events: string[] = [];
+    const workbench = {
+        async openFile() {
+            events.push('open');
+            cancellation.request();
+        },
+        async replaceEditorText() {
+            events.push('type');
+        },
+    } as unknown as Workbench;
+    await assert.rejects(
+        checkEditing(workbench, workspace, cancellation),
+        CancellationError,
+    );
+    await cancellation.settle(100);
+    assert.deepEqual(events, ['open']);
+});

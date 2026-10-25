@@ -8,7 +8,7 @@ import {
 } from '@playwright/test';
 import { validateBackend, type Options } from './arguments.js';
 import { resolveApp, type InstalledApp } from './app.js';
-import { createRun, finishRun } from './resources.js';
+import { createRun, finishRun, type Run } from './resources.js';
 import { startMock } from './mock.js';
 import { prepareProfile } from './profile.js';
 import {
@@ -57,15 +57,22 @@ import {
     type PreservationManifest,
 } from './python-preservation.js';
 import { closeOwnedApplication } from './python-shutdown.js';
+import {
+    Cancellation,
+    CancellationError,
+    ScenarioStoppedError,
+} from './cancellation.js';
 
 interface RunnerServices {
+    createRun: typeof createRun;
     startMock: typeof startMock;
     prepareGit: typeof prepareGit;
-    workbench: (page: Page) => Workbench;
+    workbench: (page: Page, cancellation: Cancellation) => Workbench;
     editing: typeof checkEditing;
     git: typeof checkGit;
     python: typeof checkPython;
     pythonWorkbench: (page: Page, deadline: PythonDeadline) => PythonWorkbench;
+    cleanupTimeoutMs: number;
 }
 
 interface CheckResult {
@@ -80,8 +87,10 @@ export async function runFoundation(
     options: Options,
     checkout: string,
     launch: typeof _electron.launch = _electron.launch.bind(_electron),
-) {
-    return runSelected(options, checkout, true, launch);
+    cancellation = new Cancellation(),
+): Promise<Awaited<ReturnType<typeof runSelected>>> {
+    cancellation.check();
+    return runSelected(options, checkout, true, launch, {}, cancellation);
 }
 
 export async function runSmoke(
@@ -89,8 +98,17 @@ export async function runSmoke(
     checkout: string,
     launch: typeof _electron.launch = _electron.launch.bind(_electron),
     services: Partial<RunnerServices> = {},
-) {
-    return runSelected(options, checkout, false, launch, services);
+    cancellation = new Cancellation(),
+): Promise<Awaited<ReturnType<typeof runSelected>>> {
+    cancellation.check();
+    return runSelected(
+        options,
+        checkout,
+        false,
+        launch,
+        services,
+        cancellation,
+    );
 }
 
 async function runSelected(
@@ -99,11 +117,14 @@ async function runSelected(
     foundation: boolean,
     launch: typeof _electron.launch,
     injected: Partial<RunnerServices> = {},
+    cancellation = new Cancellation(),
 ) {
     const services: RunnerServices = {
+        createRun,
         startMock,
         prepareGit,
-        workbench: (page) => new Workbench(page),
+        cleanupTimeoutMs: 120_000,
+        workbench: (page, scope) => new Workbench(page, scope),
         editing: checkEditing,
         git: checkGit,
         python: checkPython,
@@ -112,11 +133,33 @@ async function runSelected(
         ...injected,
     };
     const started = Date.now();
-    const run = await createRun(checkout);
+    let acquired: Run | undefined;
+    let acquisitionError: unknown;
+    let acquisitionCleanupEnd: number | undefined;
+    try {
+        await cancellation.perform(async () => {
+            try {
+                acquired = await services.createRun(checkout);
+            } catch (cause) {
+                acquisitionError = cause;
+                throw cause;
+            }
+        });
+    } catch (cause) {
+        if (!(cause instanceof CancellationError)) throw cause;
+        acquisitionCleanupEnd = Date.now() + services.cleanupTimeoutMs;
+        await cancellation.settle(
+            Math.max(1, acquisitionCleanupEnd - Date.now()),
+        );
+        if (!acquired) throw acquisitionError ?? cause;
+    }
+    if (!acquired)
+        throw new Error('Run acquisition did not return owned resources');
+    const run = acquired;
     const chatBackend = options.chatBackend ?? 'mock';
     const pythonSelected = !foundation && options.suite === 'python';
     const pythonDeadline = pythonSelected
-        ? new PythonDeadline(480_000)
+        ? new PythonDeadline(480_000, Date.now, cancellation)
         : undefined;
     let interpreter:
         Awaited<ReturnType<typeof preparePythonInterpreter>> | undefined;
@@ -138,13 +181,38 @@ async function runSelected(
     let persistentProfilePath: string | undefined;
     let versions: InstalledApp | undefined;
     let error: string | undefined;
+    let originating: { outcome: string; error?: string } | undefined;
     let outcome: 'passed' | 'failed' | 'blocked' | 'harness_error';
     let app: ElectronApplication | undefined;
-    let ownedPythonChild:
-        ReturnType<ElectronApplication['process']> | undefined;
+    let ownedChild: ReturnType<ElectronApplication['process']> | undefined;
     let page: Page | undefined;
     let mock: Awaited<ReturnType<typeof startMock>> | undefined;
+    let cleanupEnd: number | undefined = acquisitionCleanupEnd;
+    let cleanupFinished = false;
+    const enterCleanup = (): number => {
+        cleanupEnd ??= Date.now() + services.cleanupTimeoutMs;
+        cancellation.stop();
+        pythonDeadline?.stop();
+        return cleanupEnd;
+    };
+    const remainingCleanup = (maximum = Number.MAX_SAFE_INTEGER): number => {
+        const remaining = enterCleanup() - Date.now();
+        if (remaining <= 0)
+            throw new Error(
+                'Cleanup deadline expired; shutdown or settlement uncertain',
+            );
+        return Math.min(remaining, maximum);
+    };
+    const cleanupOperation = <T>(
+        operation: () => Promise<T>,
+        maximum: number,
+        label: string,
+    ): Promise<T> => {
+        const budget = remainingCleanup(maximum);
+        return bounded(cancellation.track(operation()), budget, label);
+    };
     let launchAttempted = false;
+    let pendingLaunch: Promise<ElectronApplication> | undefined;
     let tracing = false;
     let stage = 'preflight';
     const timings: Record<string, number> = {};
@@ -164,13 +232,17 @@ async function runSelected(
     try {
         validateBackend(options, foundation);
         if (pythonSelected) {
-            interpreter = await pythonDeadline!.perform(() =>
-                preparePythonInterpreter(options.pythonInterpreter!),
+            interpreter = await cancellation.perform(() =>
+                pythonDeadline!.perform(() =>
+                    preparePythonInterpreter(options.pythonInterpreter!),
+                ),
             );
         }
         versions = pythonDeadline
-            ? await pythonDeadline.perform(() => resolveApp(options.build))
-            : await resolveApp(options.build);
+            ? await cancellation.perform(() =>
+                  pythonDeadline.perform(() => resolveApp(options.build)),
+              )
+            : await cancellation.perform(() => resolveApp(options.build));
         if (
             process.platform !== 'darwin' ||
             process.arch !== 'arm64' ||
@@ -191,11 +263,18 @@ async function runSelected(
         const helperPath = fileURLToPath(
             new URL('../../helper/', import.meta.url),
         );
-        if (chatSelected) await access(join(helperPath, 'dist/extension.js'));
+        if (chatSelected)
+            await cancellation.perform(() =>
+                access(join(helperPath, 'dist/extension.js')),
+            );
         if (gitSelected) {
             stage = 'git-preflight';
-            repository = await services.prepareGit(run);
-            await repository.requireUninitialized();
+            repository = await cancellation.perform(() =>
+                services.prepareGit(run, '/usr/bin/git', cancellation),
+            );
+            await cancellation.perform(() =>
+                repository!.requireUninitialized(),
+            );
             const evidence = checks.find((check) => check.suite === 'git')!
                 .evidence as ReturnType<typeof newGitEvidence>;
             evidence.version = repository.version;
@@ -208,50 +287,69 @@ async function runSelected(
             stage = 'python-prepare';
             pythonEvidence.stage = stage;
             const deadline = pythonDeadline!;
-            preservation = await deadline.perform(() =>
-                capturePreservation(checkout),
+            preservation = await cancellation.perform(() =>
+                deadline.perform(async () => {
+                    preservation = await capturePreservation(checkout);
+                    return preservation;
+                }),
             );
-            await deadline.perform(() =>
-                writeFile(
-                    join(run.report, 'preservation-before.json'),
-                    JSON.stringify(preservation),
-                    { flag: 'wx', mode: 0o600 },
+            await cancellation.perform(() =>
+                deadline.perform(() =>
+                    writeFile(
+                        join(run.report, 'preservation-before.json'),
+                        JSON.stringify(preservation),
+                        { flag: 'wx', mode: 0o600 },
+                    ),
                 ),
             );
-            const profile = await deadline.perform(() =>
-                pythonProfile(checkout, run.resources),
+            const profile = await cancellation.perform(() =>
+                deadline.perform(() => pythonProfile(checkout, run.resources)),
             );
             Object.assign(run, profile);
             persistentProfilePath = profile.userData;
-            await deadline.perform(() => mkdir(join(run.resources, 'home')));
-            await deadline.perform(() => mkdir(join(run.resources, 'tmp')));
+            await cancellation.perform(() =>
+                deadline.perform(() => mkdir(join(run.resources, 'home'))),
+            );
+            await cancellation.perform(() =>
+                deadline.perform(() => mkdir(join(run.resources, 'tmp'))),
+            );
             const sentinel = join(run.resources, 'protected-sentinel');
-            await deadline.perform(() => mkdir(sentinel));
-            await deadline.perform(() =>
-                writeFile(join(sentinel, 'unchanged'), run.id, { flag: 'wx' }),
+            await cancellation.perform(() =>
+                deadline.perform(() => mkdir(sentinel)),
+            );
+            await cancellation.perform(() =>
+                deadline.perform(() =>
+                    writeFile(join(sentinel, 'unchanged'), run.id, {
+                        flag: 'wx',
+                    }),
+                ),
             );
             const guardScript = join(run.resources, 'terminal-guard.cjs');
-            await deadline.perform(() =>
-                writeFile(
-                    guardScript,
-                    `const fs = require('node:fs');
+            await cancellation.perform(() =>
+                deadline.perform(() =>
+                    writeFile(
+                        guardScript,
+                        `const fs = require('node:fs');
 let denied = false;
 try { fs.appendFileSync(${JSON.stringify(join(sentinel, 'unchanged'))}, 'mutation'); } catch(e) { if (e.code === 'EPERM' || e.code === 'EACCES') denied = true; else throw e; }
 fs.writeFileSync(${JSON.stringify(join(run.resources, 'terminal-guard.json'))}, JSON.stringify({denied}), {flag:'wx'});
 console.log(denied ? 'GUARD_DENIED ${run.id}' : 'GUARD_FAILED ${run.id}');
 setTimeout(() => process.exit(0), 90000);
 `,
-                    { flag: 'wx' },
+                        { flag: 'wx' },
+                    ),
                 ),
             );
-            const guarded = await deadline.perform(() =>
-                createProtectedLaunch(
-                    run.resources,
-                    versions!.executable,
-                    checkout,
-                    sentinel,
-                    interpreter!.canonical,
-                    interpreter!.absolute,
+            const guarded = await cancellation.perform(() =>
+                deadline.perform(() =>
+                    createProtectedLaunch(
+                        run.resources,
+                        versions!.executable,
+                        checkout,
+                        sentinel,
+                        interpreter!.canonical,
+                        interpreter!.absolute,
+                    ),
                 ),
             );
             executable = guarded.executable;
@@ -271,11 +369,18 @@ setTimeout(() => process.exit(0), 90000);
             ];
         } else if (chatBackend === 'real') {
             try {
-                const profile = await realProfile(checkout);
-                await requireClosedProfile(profile);
+                const profile = await cancellation.perform(() =>
+                    realProfile(checkout),
+                );
+                await cancellation.perform(() => requireClosedProfile(profile));
                 Object.assign(run, profile);
                 persistentProfilePath = profile.userData;
             } catch (cause) {
+                if (
+                    cause instanceof CancellationError ||
+                    cause instanceof ScenarioStoppedError
+                )
+                    throw cause;
                 if (!(cause instanceof ProfilePrerequisite))
                     throw new ChatFailure(
                         'harness_error',
@@ -291,19 +396,33 @@ setTimeout(() => process.exit(0), 90000);
             backendArgs = config.args;
         } else {
             if (mockApplicable)
-                mock = await services.startMock(
-                    Object.fromEntries(
-                        turns.map((turn) => [turn.marker, turn.reply]),
-                    ),
-                );
+                mock = await cancellation.perform(async () => {
+                    mock = await services.startMock(
+                        Object.fromEntries(
+                            turns.map((turn) => [turn.marker, turn.reply]),
+                        ),
+                    );
+                    if (
+                        cleanupFinished ||
+                        (cleanupEnd !== undefined && Date.now() >= cleanupEnd)
+                    ) {
+                        void mock.close().catch(() => {});
+                    }
+                    return mock;
+                });
             let automation: Record<string, string> = {};
             if (gitSelected) {
-                const profile = await gitProfile(checkout);
+                const profile = await cancellation.perform(() =>
+                    gitProfile(checkout),
+                );
                 Object.assign(run, profile);
                 persistentProfilePath = profile.userData;
-            } else automation = await prepareProfile(run, mock!.url);
+            } else
+                automation = await cancellation.perform(() =>
+                    prepareProfile(run, mock!.url),
+                );
             const home = join(run.resources, 'home');
-            await mkdir(home);
+            await cancellation.perform(() => mkdir(home));
             env = {
                 ...automation,
                 HOME: home,
@@ -317,7 +436,7 @@ setTimeout(() => process.exit(0), 90000);
                 NO_PROXY: '127.0.0.1,localhost',
                 ELECTRON_ENABLE_LOGGING: '1',
             };
-            await mkdir(env.TMPDIR);
+            await cancellation.perform(() => mkdir(env.TMPDIR));
             backendArgs = backendLaunch('mock', run, {}).args;
         }
         if (repository) {
@@ -331,20 +450,20 @@ setTimeout(() => process.exit(0), 90000);
                 backendArgs.push('--disable-extension', 'github.copilot-chat');
         }
         const previousLogs = chatSelected
-            ? await rendererLogs(run.userData)
+            ? await cancellation.perform(() => rendererLogs(run.userData))
             : [];
         const previousGitLogs = repository
-            ? await gitExtensionLogs(run.userData)
+            ? await cancellation.perform(() => gitExtensionLogs(run.userData))
             : [];
         stage = 'launch';
         const launchStart = Date.now();
-        pythonDeadline?.stage('launch', 60_000);
+        pythonDeadline?.stage('launch', 60000);
         if (pythonSelected) pythonEvidence.stage = stage;
         launchAttempted = true;
         const launchOperation = async () => {
             const launched = await launch({
                 executablePath: executable,
-                timeout: 60_000,
+                timeout: 60000,
                 env,
                 args: [
                     run.workspace,
@@ -362,64 +481,89 @@ setTimeout(() => process.exit(0), 90000);
                 ],
             });
             app = launched;
-            if (pythonSelected) ownedPythonChild = launched.process();
+            ownedChild = launched.process();
+            if (
+                cleanupFinished ||
+                (cleanupEnd !== undefined && Date.now() >= cleanupEnd)
+            ) {
+                // This late handle is still ours; the uncertain run stays reserved.
+                void closeOwnedApplication(launched, {
+                    deadline: Date.now() + (pythonSelected ? 120_000 : 15_000),
+                    closeTimeoutMs: pythonSelected ? 60_000 : 10_000,
+                }).catch(() => {});
+            }
             return launched;
         };
-        app = pythonDeadline
-            ? await pythonDeadline.perform(launchOperation)
-            : await launchOperation();
+        app = await cancellation.perform(() => {
+            pendingLaunch = cancellation.track(launchOperation());
+            return pythonDeadline
+                ? pythonDeadline.perform(() => pendingLaunch!)
+                : pendingLaunch;
+        });
         app.process().stdout?.on('data', () => {});
         app.process().stderr?.on('data', () => {});
         const firstWindow = () =>
             app!.firstWindow({
-                timeout: Math.max(1, 60_000 - (Date.now() - launchStart)),
+                timeout: Math.max(1, 60000 - (Date.now() - launchStart)),
             });
         page = pythonDeadline
-            ? await pythonDeadline.perform(firstWindow)
-            : await firstWindow();
-        page.setDefaultTimeout(15_000);
-        page.setDefaultNavigationTimeout(15_000);
+            ? await cancellation.perform(() =>
+                  pythonDeadline.perform(firstWindow),
+              )
+            : await cancellation.perform(() => firstWindow());
+        page.setDefaultTimeout(15000);
+        page.setDefaultNavigationTimeout(15000);
         // Real runs never record screenshots/traces: authentication may expire mid-run.
         if (chatBackend === 'mock' && !pythonSelected) {
-            await bounded(
-                app.context().tracing.start({
-                    screenshots: true,
-                    snapshots: true,
-                    sources: true,
-                }),
-                Math.max(1, 60_000 - (Date.now() - launchStart)),
-                'Trace start',
+            await cancellation.perform(() =>
+                bounded(
+                    cancellation.track(
+                        (async () => {
+                            await app!.context().tracing.start({
+                                screenshots: true,
+                                snapshots: true,
+                                sources: true,
+                            });
+                            tracing = true;
+                        })(),
+                    ),
+                    Math.max(1, 60000 - (Date.now() - launchStart)),
+                    'Trace start',
+                ),
             );
             tracing = true;
         }
         stage = 'driver';
         const workbench = pythonDeadline
             ? (pythonWorkbench = services.pythonWorkbench(page, pythonDeadline))
-            : services.workbench(page);
+            : services.workbench(page, cancellation);
         const ready = () =>
-            workbench.ready(Math.max(1, 60_000 - (Date.now() - launchStart)));
-        if (pythonDeadline) await pythonDeadline.perform(ready);
-        else await ready();
+            workbench.ready(Math.max(1, 60000 - (Date.now() - launchStart)));
+        if (pythonDeadline)
+            await cancellation.perform(() => pythonDeadline.perform(ready));
+        else await cancellation.perform(() => ready());
         if (pythonDeadline) {
-            pythonDeadline.stage('guard-inheritance', 60_000);
+            pythonDeadline.stage('guard-inheritance', 60000);
             pythonEvidence.stage = 'guard-inheritance';
-            const denied = await pythonDeadline.perform(() =>
-                app!.evaluate(
-                    (_electron, path) => {
-                        const fs = process.getBuiltinModule('node:fs');
-                        try {
-                            fs.appendFileSync(path, 'mutation');
-                            return false;
-                        } catch (cause) {
-                            return (
-                                cause instanceof Error &&
-                                'code' in cause &&
-                                (cause.code === 'EPERM' ||
-                                    cause.code === 'EACCES')
-                            );
-                        }
-                    },
-                    join(run.resources, 'protected-sentinel/unchanged'),
+            const denied = await cancellation.perform(() =>
+                pythonDeadline.perform(() =>
+                    app!.evaluate(
+                        (_electron, path) => {
+                            const fs = process.getBuiltinModule('node:fs');
+                            try {
+                                fs.appendFileSync(path, 'mutation');
+                                return false;
+                            } catch (cause) {
+                                return (
+                                    cause instanceof Error &&
+                                    'code' in cause &&
+                                    (cause.code === 'EPERM' ||
+                                        cause.code === 'EACCES')
+                                );
+                            }
+                        },
+                        join(run.resources, 'protected-sentinel/unchanged'),
+                    ),
                 ),
             );
             if (!denied)
@@ -428,14 +572,20 @@ setTimeout(() => process.exit(0), 90000);
                     'Electron preservation guard did not deny sentinel mutation',
                     pythonEvidence,
                 );
-            await pythonDeadline.perform(() =>
-                pythonWorkbench!.verifyTerminalGuard(`GUARD_DENIED ${run.id}`),
+            await cancellation.perform(() =>
+                pythonDeadline.perform(() =>
+                    pythonWorkbench!.verifyTerminalGuard(
+                        `GUARD_DENIED ${run.id}`,
+                    ),
+                ),
             );
             const guard: unknown = JSON.parse(
-                await pythonDeadline.perform(() =>
-                    readFile(
-                        join(run.resources, 'terminal-guard.json'),
-                        'utf8',
+                await cancellation.perform(() =>
+                    pythonDeadline.perform(() =>
+                        readFile(
+                            join(run.resources, 'terminal-guard.json'),
+                            'utf8',
+                        ),
                     ),
                 ),
             );
@@ -444,10 +594,12 @@ setTimeout(() => process.exit(0), 90000);
                 typeof guard !== 'object' ||
                 !('denied' in guard) ||
                 guard.denied !== true ||
-                (await pythonDeadline.perform(() =>
-                    readFile(
-                        join(run.resources, 'protected-sentinel/unchanged'),
-                        'utf8',
+                (await cancellation.perform(() =>
+                    pythonDeadline.perform(() =>
+                        readFile(
+                            join(run.resources, 'protected-sentinel/unchanged'),
+                            'utf8',
+                        ),
                     ),
                 )) !== run.id
             )
@@ -460,13 +612,18 @@ setTimeout(() => process.exit(0), 90000);
         timings.launchMs = Date.now() - launchStart;
         if (repository) {
             stage = 'git-tool';
-            await requireGitExtension(
-                run.userData,
-                repository,
-                previousGitLogs,
+            await cancellation.perform(() =>
+                requireGitExtension(
+                    run.userData,
+                    repository!,
+                    previousGitLogs,
+                    15_000,
+                    cancellation,
+                ),
             );
         }
         for (const check of checks) {
+            cancellation.check();
             stage = check.suite;
             const checkStart = Date.now();
             const chatEvidence: ChatEvidence = { session: '', turns: [] };
@@ -474,8 +631,8 @@ setTimeout(() => process.exit(0), 90000);
             try {
                 const deadline =
                     check.suite === 'chat' && chatBackend === 'real'
-                        ? 300_000
-                        : 120_000;
+                        ? 300000
+                        : 120000;
                 let operation: Promise<unknown>;
                 if (check.suite === 'python')
                     operation = pendingPython = services.python(
@@ -487,13 +644,18 @@ setTimeout(() => process.exit(0), 90000);
                         run.extensions,
                     );
                 else if (check.suite === 'editing')
-                    operation = services.editing(workbench, run.workspace);
+                    operation = services.editing(
+                        workbench,
+                        run.workspace,
+                        cancellation,
+                    );
                 else if (check.suite === 'git')
                     operation = services.git(
                         workbench,
                         repository!,
                         run.workspace,
                         check.evidence as ReturnType<typeof newGitEvidence>,
+                        cancellation,
                     );
                 else
                     operation = workbench.qualifyChat(
@@ -501,30 +663,49 @@ setTimeout(() => process.exit(0), 90000);
                         chatBackend,
                         () => mock?.requests() ?? [],
                         () => readLocalSession(run.userData, previousLogs),
-                        120_000,
+                        120000,
                         run.workspace,
                         chatEvidence,
                     );
-                check.evidence = await bounded(
-                    operation,
-                    check.suite === 'python'
-                        ? Math.max(1, pythonScenarioEnd - Date.now())
-                        : deadline,
-                    `${check.suite} test`,
+                operation = cancellation.track(operation);
+                check.evidence = await cancellation.perform(() =>
+                    bounded(
+                        operation,
+                        check.suite === 'python'
+                            ? Math.max(1, pythonScenarioEnd - Date.now())
+                            : deadline,
+                        `${check.suite} test`,
+                    ),
                 );
                 if (check.suite === 'python') pythonDeadline!.remaining();
                 check.outcome = 'passed';
             } catch (cause) {
+                if (
+                    cause instanceof CancellationError ||
+                    cause instanceof ScenarioStoppedError
+                ) {
+                    check.outcome = 'harness_error';
+                    check.error = cause.message;
+                    if (
+                        check.suite === 'chat' &&
+                        chatEvidence.originatingFailure
+                    )
+                        originating ??= { ...chatEvidence.originatingFailure };
+                    throw cause;
+                }
                 check.outcome =
-                    cause instanceof ChatFailure ||
-                    cause instanceof GitFailure ||
-                    cause instanceof PythonFailure
-                        ? cause.outcome
-                        : chatBackend === 'real' &&
-                            check.suite === 'chat' &&
-                            !String(cause).includes('test timed out')
-                          ? 'harness_error'
-                          : 'failed';
+                    cause instanceof CancellationError ||
+                    cause instanceof ScenarioStoppedError
+                        ? 'harness_error'
+                        : cause instanceof ChatFailure ||
+                            cause instanceof GitFailure ||
+                            cause instanceof PythonFailure
+                          ? cause.outcome
+                          : chatBackend === 'real' &&
+                              check.suite === 'chat' &&
+                              !String(cause).includes('test timed out')
+                            ? 'harness_error'
+                            : 'failed';
                 if (
                     (cause instanceof ChatFailure ||
                         cause instanceof GitFailure ||
@@ -556,6 +737,7 @@ setTimeout(() => process.exit(0), 90000);
         }
         outcome = 'passed';
     } catch (cause) {
+        enterCleanup();
         error =
             chatBackend === 'real' &&
             launchAttempted &&
@@ -586,13 +768,23 @@ setTimeout(() => process.exit(0), 90000);
                           : ['preflight', 'launch', 'driver'].includes(stage)
                             ? 'blocked'
                             : 'failed';
+        if (cancellation.requested) {
+            if (!(
+                cause instanceof CancellationError ||
+                cause instanceof ScenarioStoppedError
+            ))
+                originating = { outcome, error };
+            error = 'Cancelled by user';
+            outcome = 'harness_error';
+        }
         if (page && chatBackend === 'mock' && !pythonSelected) {
             try {
-                await bounded(
-                    page.screenshot({
-                        path: join(run.report, 'failure.png'),
-                        timeout: 5000,
-                    }),
+                await cleanupOperation(
+                    () =>
+                        page!.screenshot({
+                            path: join(run.report, 'failure.png'),
+                            timeout: remainingCleanup(5000),
+                        }),
                     5000,
                     'Failure screenshot',
                 );
@@ -601,16 +793,18 @@ setTimeout(() => process.exit(0), 90000);
             }
         }
     }
+    enterCleanup();
     if (tracing && app) {
         try {
-            await bounded(
-                app
-                    .context()
-                    .tracing.stop(
-                        outcome === 'passed'
-                            ? {}
-                            : { path: join(run.report, 'trace.zip') },
-                    ),
+            await cleanupOperation(
+                () =>
+                    app!
+                        .context()
+                        .tracing.stop(
+                            outcome === 'passed' && !cancellation.requested
+                                ? {}
+                                : { path: join(run.report, 'trace.zip') },
+                        ),
                 5000,
                 'Trace collection',
             );
@@ -618,83 +812,108 @@ setTimeout(() => process.exit(0), 90000);
             diagnostics.push(`Trace: ${String(capture)}`);
         }
     }
-    pythonDeadline?.stop();
-    const cleanupDeadline = Date.now() + 120_000;
+    const cleanupDeadline = enterCleanup();
     const requests = mock?.requests() ?? [];
-    const cleanup = await finishRun(run, outcome === 'passed', [
-        async () => {
-            if (app) {
-                if (pythonDeadline) {
-                    pythonEvidence.applicationExit =
+    const cleanup = await finishRun(
+        run,
+        outcome === 'passed',
+        [
+            async () => {
+                if (pendingLaunch)
+                    await cleanupOperation(
+                        () => Promise.allSettled([pendingLaunch!]),
+                        Number.MAX_SAFE_INTEGER,
+                        'Launch settle',
+                    );
+                if (app) {
+                    if (pythonDeadline) {
+                        pythonEvidence.applicationExit =
+                            await closeOwnedApplication(
+                                {
+                                    process: () => ownedChild!,
+                                    close: () =>
+                                        cancellation.track(app!.close()),
+                                },
+                                {
+                                    deadline: cleanupDeadline,
+                                    closeTimeoutMs: Math.min(
+                                        60_000,
+                                        remainingCleanup(),
+                                    ),
+                                },
+                            );
+                    } else {
+                        // Preserve ordinary close/exit limits, and always observe the captured owned child.
+                        await cleanupOperation(
+                            () => app!.close(),
+                            10_000,
+                            'Application shutdown',
+                        );
                         await closeOwnedApplication(
                             {
-                                process: () => ownedPythonChild!,
-                                close: () => app!.close(),
+                                process: () => ownedChild!,
+                                close: async () => {},
                             },
                             {
-                                deadline: cleanupDeadline,
+                                deadline: Date.now() + remainingCleanup(5000),
+                                closeTimeoutMs: 1,
                             },
                         );
-                    await pythonDeadline.settle(
-                        Math.max(1, cleanupDeadline - Date.now()),
+                    }
+                } else if (launchAttempted)
+                    throw new Error(
+                        'Launch failed without an application handle; shutdown uncertain',
                     );
-                    if (pendingPython)
-                        await bounded(
-                            Promise.allSettled([pendingPython]),
-                            Math.max(1, cleanupDeadline - Date.now()),
-                            'Python scenario settle',
-                        );
-                    if (preservation) {
-                        await bounded(
+            },
+            async () => {
+                // Settlement also captures late prelaunch handles before mock/preservation cleanup.
+                if (pythonDeadline)
+                    await pythonDeadline.settle(remainingCleanup());
+                await cancellation.settle(remainingCleanup());
+                if (pendingPython)
+                    await cleanupOperation(
+                        () => Promise.allSettled([pendingPython!]),
+                        Number.MAX_SAFE_INTEGER,
+                        'Python scenario settle',
+                    );
+            },
+            async () => {
+                if (preservation) {
+                    await cleanupOperation(
+                        () =>
                             requirePreservationUnchanged(
                                 checkout,
-                                preservation,
+                                preservation!,
                             ),
-                            Math.max(1, cleanupDeadline - Date.now()),
-                            'Python preservation comparison',
-                        );
-                        pythonEvidence.preservation = {
-                            unchanged: true,
-                            entries: preservation.entries.length,
-                        };
-                    }
-                    if (Date.now() >= cleanupDeadline)
-                        throw new Error('Python cleanup deadline expired');
-                    return;
-                }
-                const process = app.process();
-                await bounded(app.close(), 10_000, 'Application shutdown');
-                if (process.exitCode === null && process.signalCode === null) {
-                    await bounded(
-                        new Promise<void>((resolve) =>
-                            process.once('exit', () => resolve()),
-                        ),
-                        5000,
-                        'Owned process exit',
-                    );
-                }
-            } else if (launchAttempted)
-                throw new Error(
-                    'Launch failed without an application handle; shutdown uncertain',
-                );
-            else if (pythonDeadline) {
-                await pythonDeadline.settle(
-                    Math.max(1, cleanupDeadline - Date.now()),
-                );
-                if (preservation)
-                    await bounded(
-                        requirePreservationUnchanged(checkout, preservation),
-                        Math.max(1, cleanupDeadline - Date.now()),
+                        Number.MAX_SAFE_INTEGER,
                         'Python preservation comparison',
                     );
-                if (Date.now() >= cleanupDeadline)
-                    throw new Error('Python cleanup deadline expired');
-            }
-        },
-        async () => {
-            if (mock) await bounded(mock.close(), 5000, 'Mock shutdown');
-        },
-    ]);
+                    pythonEvidence.preservation = {
+                        unchanged: true,
+                        entries: preservation.entries.length,
+                    };
+                }
+            },
+            async () => {
+                if (mock)
+                    await cleanupOperation(
+                        () => mock!.close(),
+                        5000,
+                        'Mock shutdown',
+                    );
+            },
+            async () => {
+                await cancellation.settle(remainingCleanup());
+            },
+        ],
+        { canRemove: () => !cancellation.requested, deadline: cleanupDeadline },
+    );
+    cleanupFinished = true;
+    if (cancellation.requested) {
+        if (error !== 'Cancelled by user') originating ??= { outcome, error };
+        error = 'Cancelled by user';
+        outcome = 'harness_error';
+    }
     if (cleanup.errors.length) outcome = 'harness_error';
     const result = {
         runId: run.id,
@@ -704,6 +923,12 @@ setTimeout(() => process.exit(0), 90000);
         chatSelected,
         outcome,
         error,
+        ...(cancellation.requested
+            ? {
+                  cancellation: { reason: 'Cancelled by user' },
+                  ...(originating ? { originating } : {}),
+              }
+            : {}),
         stage,
         execution: { workers: 1, retries: 0 },
         versions: {
@@ -728,6 +953,17 @@ setTimeout(() => process.exit(0), 90000);
         ...(persistentProfilePath ? { persistentProfilePath } : {}),
         resultPath: join(run.report, 'result.json'),
     };
-    await writeFile(result.resultPath, JSON.stringify(result, null, 2));
-    return result;
+    const snapshot: typeof result = JSON.parse(JSON.stringify(result));
+    await writeFile(snapshot.resultPath, JSON.stringify(snapshot, null, 2));
+    if (cancellation.requested && !snapshot.cancellation) {
+        snapshot.originating = {
+            outcome: snapshot.outcome,
+            ...(snapshot.error ? { error: snapshot.error } : {}),
+        };
+        snapshot.cancellation = { reason: 'Cancelled by user' };
+        snapshot.outcome = 'harness_error';
+        snapshot.error = 'Cancelled by user';
+        await writeFile(snapshot.resultPath, JSON.stringify(snapshot, null, 2));
+    }
+    return snapshot;
 }

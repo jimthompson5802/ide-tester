@@ -171,6 +171,44 @@ The mock advertises one Chat Completions model under `data` and an empty proxy i
 
 The installed build has no DOM session-binding attribute. Session tracking instead reads the local conversation URI from `ChatModelSelection` workbench-view events in the owned renderer log. The latest event must identify a local session; missing/unbound/non-local events fail closed. Before submission, the tester requires a new URI and an empty response transcript. After submission, it requires the same URI, the current unique prompt marker visible in the UI, exactly one new completed assistant bubble, exact reply text, and a newer completed matching mock request. The driver targets Monaco's native edit-context element for text entry. These log, UI and driver contracts remain version-dependent.
 
+## Sequential real basic, Git and Python command
+
+Build explicitly before first use and after changing tester sources:
+
+```sh
+npm --prefix smoke run build
+```
+
+Then run the previously compiled real `basic`, standalone `git` and standalone `python` suites sequentially:
+
+```sh
+npm --prefix smoke run test:gui -- \
+  --build "/Applications/Visual Studio Code.app" \
+  --python-interpreter "${PWD}/.venv/bin/python"
+```
+
+Only `--build` and `--python-interpreter` are accepted, each exactly once. `--build` identifies the installed VS Code application; it does not compile the tester. Its value must be an absolute `.app` path. Quote paths containing spaces. Relative interpreter paths resolve against npm's original invocation directory (`INIT_CWD`), falling back to the current working directory for direct Node execution. The absolute invocation spelling, including symlinks, is preserved for Python selection; filesystem preflight resolves its canonical executable without running it.
+
+The GUI command does not run lint, formatting checks or compilation. Syntax validation and initial aggregate persistence precede loading existing compiled output. Missing or unloadable compiled command code returns nonzero with a reminder to run the separate build; all suites remain `not_run`. Existing output is not checked for source freshness, so rebuild explicitly after source changes. Interpreter preflight precedes every GUI launch; an unavailable interpreter blocks the batch with all suites `not_run`. The wrapper does not check authentication or inspect profiles in advance. It stops at the first unsuccessful suite, cleanup uncertainty or reporting failure, with no retry. Brief progress and the final summary show backend, outcome, duration and available individual report paths. Raw child JSON and stderr are suppressed.
+
+GUI execution requires separate authorization, an unlocked exclusively reserved desktop, compatible VS Code and Node, Git, the selected interpreter and applicable network/Marketplace access. Prepare and sign in to the dedicated real Chat profile manually using [real-backend setup](#optional-real-copilot-backend) before an authorized run. Authentication expiry is blocked. The command reuses the existing real Chat, Git and Python profile/lifecycle contracts and the [secret-storage policy](AGENTS.md#secret-storage): real Chat may reuse permitted saved authentication; Git and Python use in-memory secret storage. Persistent profiles remain preserved.
+
+Aggregate `result.json` and `result.txt` live under `reports/smoke-batches/<batch-id>/`, separately from [individual suite artifacts](#results-and-recovery). Initial records exist before compiled command loading; a running stage is persisted before each subprocess starts. Updates replace each file atomically, with no transaction across the pair. An incomplete record, stale running stage or disagreement between files never proves success or shutdown. Aggregate storage failure prevents the next launch and returns nonzero. An observed child reporting error remains in the aggregate even if its individual JSON says passed.
+
+Ctrl-C or SIGTERM requests orderly cancellation. Further suites stop; the owned active child receives one cancellation request while the wrapper waits for its cleanup/result. Repeated interrupts print shutdown-pending status and do not bypass cleanup. The commitment cutoff is the successful final JSON/text save followed by a synchronous cancellation check before summary output; cancellation observed during that save is persisted again. Cancellation before this cutoff returns nonzero even if every suite row already passed; completed rows and cleanup evidence remain intact. A completed report can describe cancellation, whereas missing final lifecycle evidence leaves the record incomplete. SIGKILL, process loss and detached application descendants remain outside orderly-cleanup guarantees.
+
+The standard `smoke` executable now handles signals and final reporting on the main thread, with one worker running the suite. Cancellation reaches that worker through a message, avoiding Playwright's competing process signal handlers. The controller awaits both the result and worker exit; missing/invalid evidence or worker failure returns a harness error with cleanup uncertain. It never terminates the worker to manufacture cleanup. Imported `executeCLI` retains caller-owned cancellation; retained foundation/setup entry points have not been broadened by this repair. R2 non-GUI checks exercise the installed launcher with an inert Node inspector, not an IDE; real VS Code behavior still requires the plan's recovery and requalification gates. R2 is developer validated; renewed interruption is GUI verified. The direct-venv full batch is GUI verified as recorded below; the earlier alias failure remains documented and space-path qualification is deferred by developer decision.
+
+The aggregate `build.state` remains `not_run` because compilation is external; it does not attest that an earlier build passed. Zero exit requires all three suites passed, confirmed disposable cleanup and reservation release, and successful aggregate reporting. Child exit alone cannot establish application shutdown. The wrapper owns no desktop reservation and never deletes locks or recovers uncertain runs. Follow [recovery](#results-and-recovery) deliberately when shutdown or pending-work settlement is uncertain. Existing safety deadlines bound cleanup admission and settlement; admitted filesystem deletion can outlast that budget and must actually finish before success is emitted.
+
+The build-separation change is verified by non-GUI tests; the GUI qualifications below predate it. The aggregate's original non-GUI implementation belongs to [issue #50 Phase 2](../docs/implementation-plans/issue-50-gui-suite-command.md); R1/R2 are developer validated. Following deliberate recovery of the original failed reservation, renewed interruption qualification passed with valid cancellation reports, actual owned main exit, retained evidence, empty cleanup errors, reservation release and no later suites.
+
+A subsequent full batch using a temporary interpreter alias with spaces passed basic and Git but failed Python identity: the selected path resolved to 3.12.15 arm64, whereas the extension ran 3.14.5 x86_64. The tester correctly rejected this mismatch. The alias was safely removed; failed resources/reports remain retained. Diagnosis found divergence between the configured selection and cached resolved interpreter; it did not establish spaces as the cause. No selection-code fix was made.
+
+The developer then selected `"${PWD}/.venv/bin/python"` and authorized a new full command. It passed real basic (8.219 seconds), Git (4.727 seconds) and Python (5.016 seconds) in order, total 23.739 seconds, exit 0. Python identity confirmed the exact repository `.venv/bin/python` invocation, Python 3.12.15 arm64 and expected canonical executable; all 2,643 protected entries remained unchanged. Every suite confirmed owned shutdown, empty cleanup errors, removed disposable resources and released reservation. Individual and aggregate JSON/text agree. This establishes the direct-venv workflow, not a fix for the prior alias-selection failure. The developer accepted deferring the spaces edge case. Phase 3 is complete and developer accepted for the direct-venv workflow.
+
+Private local aggregate evidence: `reports/smoke-batches/2026-10-25T00-21-32.341Z-7cf3d83c-8935-433f-b337-2f1c50fb04b2/` (renewed interruption), `reports/smoke-batches/2026-10-25T00-22-01.936Z-c513861f-113a-4190-b0d6-4d4f9194ee91/` (alias failure), and `reports/smoke-batches/2026-10-25T00-33-32.301Z-623e9165-cb59-48f2-8261-bcba39705615/` (passing direct-venv batch). Each contains JSON/text reports; the plan records individual evidence, versions and limitations.
+
 ## Results and recovery
 
 Both `smoke` and `qualify` print a plain-text summary by default and save the same text as `result.txt` beside the unchanged `result.json`. For example (durations and run ID are illustrative):

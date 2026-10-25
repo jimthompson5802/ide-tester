@@ -2,6 +2,19 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
+    {
+        files: ['scripts/**/*.mjs'],
+        ...js.configs.recommended,
+        languageOptions: {
+            globals: {
+                process: 'readonly',
+                Buffer: 'readonly',
+                console: 'readonly',
+                setTimeout: 'readonly',
+                clearTimeout: 'readonly',
+            },
+        },
+    },
     { ignores: ['dist/**', 'helper/dist/**', 'node_modules/**'] },
     {
         files: [

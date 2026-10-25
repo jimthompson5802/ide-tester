@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { GitEvidence } from './git-repository.js';
+import type { Cancellation } from './cancellation.js';
 
 export interface ReportResult {
     chatSelected?: boolean;
@@ -12,6 +13,8 @@ export interface ReportResult {
     chatBackend?: 'mock' | 'real';
     outcome: string;
     error?: string;
+    cancellation?: { reason: string };
+    originating?: { outcome: string; error?: string };
     durationMs?: number;
     checks?: {
         suite: string;
@@ -115,6 +118,15 @@ export function formatResult(result: ReportResult): string {
         `Duration: ${duration(result.durationMs)}`,
     );
     if (result.error) lines.push(`Failure reason: ${result.error}`);
+    if (result.cancellation)
+        lines.push(`Cancellation: ${result.cancellation.reason}`);
+    if (result.originating) {
+        lines.push(
+            `Originating disposition: ${status(result.originating.outcome)}`,
+        );
+        if (result.originating.error)
+            lines.push(`Originating reason: ${result.originating.error}`);
+    }
     for (const error of result.cleanup?.errors ?? [])
         lines.push(`Cleanup error: ${error}`);
     if (result.cleanup?.disposition === 'retained' && result.resourcesPath)
@@ -127,23 +139,83 @@ export async function reportResult(
     result: ReportResult,
     mode: 'text' | 'json',
     output: (message: string) => void,
+    cancellation?: Cancellation,
 ): Promise<number> {
-    const summary = formatResult(result);
+    // The result may contain suite-specific fields outside the presentation contract.
+    let presented = { ...result };
+    const applyCancellation = (): boolean => {
+        if (!cancellation?.requested || presented.cancellation) return false;
+        presented = {
+            ...presented,
+            originating: presented.originating ?? {
+                outcome: presented.outcome,
+                ...(presented.error ? { error: presented.error } : {}),
+            },
+            outcome: 'harness_error',
+            error: 'Cancelled by user',
+            cancellation: { reason: 'Cancelled by user' },
+        };
+        return true;
+    };
+    let cancellationChanged = applyCancellation();
+    let summary = formatResult(presented);
+    let reportTarget = 'result.txt';
     try {
-        if (result.resultPath)
+        if (presented.resultPath) {
+            // Ordinary results retain their existing JSON persistence behavior.
+            // A late cancellation must reconcile both saved reports before output.
+            if (cancellationChanged) {
+                reportTarget = 'result.json';
+                await writeFile(
+                    presented.resultPath,
+                    JSON.stringify(presented, null, 2),
+                );
+            }
+            reportTarget = 'result.txt';
             await writeFile(
-                join(dirname(result.resultPath), 'result.txt'),
+                join(dirname(presented.resultPath), 'result.txt'),
                 summary + '\n',
             );
+            cancellationChanged = applyCancellation();
+            if (cancellationChanged) {
+                summary = formatResult(presented);
+                reportTarget = 'result.json';
+                await writeFile(
+                    presented.resultPath,
+                    JSON.stringify(presented, null, 2),
+                );
+                reportTarget = 'result.txt';
+                await writeFile(
+                    join(dirname(presented.resultPath), 'result.txt'),
+                    summary + '\n',
+                );
+            }
+        }
     } catch (error) {
-        const reportingError = `Reporting error: could not write result.txt: ${String(error)}; JSON report: ${result.resultPath}`;
+        const changedOnFailure = applyCancellation();
+        let reconciliationError = '';
+        if (changedOnFailure && presented.resultPath) {
+            try {
+                await writeFile(
+                    presented.resultPath,
+                    JSON.stringify(presented, null, 2),
+                );
+            } catch (cause) {
+                reconciliationError = `; cancellation JSON reconciliation failed: ${String(cause)}`;
+            }
+        }
+        summary = formatResult(presented);
+        const reportingError = `Reporting error: could not write ${reportTarget}: ${String(error)}; JSON report: ${presented.resultPath}${reconciliationError}`;
         output(
             mode === 'json'
-                ? JSON.stringify({ ...result, reportingError })
+                ? JSON.stringify({ ...presented, reportingError })
                 : summary + '\n' + reportingError,
         );
         return 1;
     }
-    output(mode === 'json' ? JSON.stringify(result) : summary);
-    return result.outcome === 'passed' ? 0 : 1;
+    // No awaited work separates this final cancellation check from output commitment.
+    applyCancellation();
+    summary = formatResult(presented);
+    output(mode === 'json' ? JSON.stringify(presented) : summary);
+    return presented.outcome === 'passed' && !cancellation?.requested ? 0 : 1;
 }

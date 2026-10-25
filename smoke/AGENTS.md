@@ -39,6 +39,7 @@ Paths below are relative to `smoke/`:
 | Path | Responsibility |
 | --- | --- |
 | `src/cli.ts`, `src/arguments.ts`, `src/qualify.ts` | CLI execution, option validation, and foundation qualification entry point. |
+| `src/cli-controller.ts`, `src/cli-worker.ts`, `src/cli-protocol.ts` | Standard CLI signal ownership, worker-isolated suite execution and validated result transport; final reporting stays on the main thread. |
 | `src/runner.ts`, `src/app.ts`, `src/workbench.ts` | Suite orchestration, installed VS Code discovery, and Playwright workbench interactions. |
 | `src/git.ts`, `src/git-repository.ts`, `src/git-profile.ts` | Git UI scenario, independent bounded Git verification and owned persistent standalone Git profile lifecycle. |
 | `src/python.ts`, `src/python-interpreter.ts`, `src/python-evidence.ts` | Standalone Python UI scenario, presence-only interpreter resolution and combined saved-source/terminal/program evidence validation. |
@@ -48,6 +49,10 @@ Paths below are relative to `smoke/`:
 | `src/chat.ts`, `src/turn.ts`, `src/session.ts` | Chat prompts and evidence validation, turn completion, and session discovery from renderer logs. |
 | `src/mock.ts`, `src/profile.ts` | Mock Chat service and mock profile preparation. |
 | `src/real-profile.ts`, `src/setup-real-chat.ts` | Persistent real-backend profile checks and setup for manual authentication. |
+| `scripts/test-gui.mjs` | Uncompiled aggregate bootstrap: validates syntax, persists evidence, then loads existing compiled orchestration; build separately before use. |
+| `scripts/gui-arguments.mjs`, `src/gui-arguments.ts` | Shared GUI argument syntax parser and typed adapter, preserving original invocation-directory semantics. |
+| `scripts/gui-bootstrap-report.mjs`, `src/gui-report.ts` | Single aggregate persistence/summary implementation and typed adapter. |
+| `src/gui-command.ts` | Sequential real basic/Git/Python subprocess routing, result validation and cancellation. |
 | `src/resources.ts`, `src/report.ts` | Owned run resources, cleanup, and result reporting. |
 | `helper/extension.ts`, `helper/package.json` | VS Code helper extension implementation and manifest. |
 | `tests/` | Non-GUI tests for tester behavior. |
@@ -70,6 +75,10 @@ Keep [README.md](README.md) consistent with verified tester behavior. Preserve t
 ## Current gates
 
 The foundation and selected suites are developer accepted. Real-backend slice 2 is developer validated; signed-out blocking is GUI verified, and authenticated Chat passed after manual sign-in restoration. Issue #36 is developer validated. See the [backend execution record](../docs/implementation-plans/real-chat-backend.md) for evidence and remaining checks.
+
+Issue #50 phases 1 and 2 plus R1/R2 are developer validated. A later developer-directed change separates compilation from `test:gui`; run the explicit build before use/after source changes. Earlier GUI qualifications below used the build-in-command behavior and do not qualify the changed bootstrap. Renewed interruption qualification passed after deliberate recovery. A full batch with the temporary interpreter alias containing spaces failed Python runtime identity; no selection fix was made. A subsequent explicitly authorized full command using `${PWD}/.venv/bin/python` passed real basic, Git and Python, verified 3.12.15 arm64 identity, preserved all 2,643 protected entries, confirmed owned shutdown, removed disposable resources and released reservations. The developer accepted deferring the spaces edge case; Phase 3 is complete and developer accepted for the direct-venv workflow. Before accepting Phase 3 or further alias/selection work, read the [issue #50 execution record](../docs/implementation-plans/issue-50-gui-suite-command.md). Failed evidence is retained and the temporary alias removed.
+
+The standard CLI isolates Playwright in a worker; the main thread owns SIGINT/SIGTERM cancellation and final reporting. Imported `executeCLI` remains caller-controlled. The installed-launcher non-GUI regression uses an inert Node inspector requiring loopback permission. Real renewed interruption and the direct-venv full batch are verified; space-path runtime identity remains unverified.
 
 Issue #38 phases 1 and 2 are developer validated. Phase-3 tasks P3-T01–P3-T03 and P3-DV are complete under the reconciled standalone-Git scope; the developer explicitly validated phase 3. The developer directed separating Git from combined runs, restoring the previously passing Chat implementation from `b9a4cc4`, and renaming `all` to `basic`. At that acceptance checkpoint, compilation and all 75 non-GUI tests passed. Renamed mocked `basic` and standalone Git GUI checks passed. Real `basic` initially failed on a Copilot error/warning, then passed two consecutive developer-requested reruns without code changes. All runs confirmed owned shutdown and reservation release; failed resources were retained and persistent profiles preserved. See the Git plan for exact reports and historical failures. The earlier expanded combined-startup fix loop remains stopped after four unsuccessful rounds; the directed rollback does not authorize new speculative fixes.
 
