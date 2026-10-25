@@ -4,6 +4,8 @@ Source: [GitHub issue #50](https://github.com/jimthompson5802/ide-tester/issues/
 
 Status: phases 1 and 2 complete and developer validated (2026-10-24). Phase 3 was subsequently authorized and started; interruption qualification failed and the uninterrupted run is blocked by uncertain cleanup. The developer requested the refinement below: R1 investigation/design → R1-DV → R2 repair/verification → R2-DV → deliberate recovery and newly authorized Phase 3 attempts. R1 investigation/design and its proposed worker boundary are developer validated. R2 implementation and non-GUI verification are complete and developer validated. Deliberate recovery and renewed interruption qualification are complete. The alias-based batch failed Python runtime identity. A later authorized direct-venv full batch passed. The developer accepted deferring the spaces edge case; Phase 3 is complete and developer accepted under the revised direct-venv scope; space-path qualification is deferred. Original accepted work and failed-attempt evidence remain recorded below.
 
+Current behavior amendment: after final acceptance, the developer explicitly requested separate compilation. `test:gui` now loads existing compiled output and never runs the tester build. Run `npm --prefix smoke run build` explicitly before first use and after source changes. This supersedes the build-on-invocation requirements below; historical plans, checks and GUI acceptance remain recorded as originally performed. See the post-acceptance execution record at the end.
+
 ## Scope and current state
 
 Deliver `npm --prefix smoke run test:gui -- --build "/Applications/Visual Studio Code.app" --python-interpreter "/absolute/path/to/python"`. Build once, then run `basic --chat-backend real`, standalone `git`, and standalone `python`, sequentially. Stop at the first unsuccessful stage, without retries. Summarize all three entries, including those not run.
@@ -563,3 +565,22 @@ P3-T04 is now complete under the revised scope using the recorded exit-0, three-
 ### P3-DV — final developer acceptance
 
 The developer stated “i confirm phase 3”. Phase 3 is complete and developer accepted under the previously accepted scope revision: repository `${PWD}/.venv/bin/python`, with the spaces edge case deferred. Accepted evidence includes deliberate recovery, passing renewed interruption, the exit-0 ordered real basic/Git/Python batch, Python 3.12.15 arm64 identity, unchanged 2,643 protected entries, owned shutdown, disposable cleanup/reservation release, report agreement and documentation checks. P3-DV is checked. Historical failures and unresolved alias/cache behavior remain documented; no space-path pass is claimed. Earlier pending statements describe their historical handoffs. This acceptance starts no new scope, GUI run, recovery or publication.
+
+
+### Post-acceptance change — explicit build step
+
+The developer requested “I prefer this a separate build and compilation becomes a separate explicit step”. This authorizes the current implementation slice and supersedes the earlier build-on-invocation contract; it does not authorize a new GUI qualification. The previous Phase 3 acceptance remains historical evidence for its tested behavior.
+
+Changed `smoke/scripts/test-gui.mjs` to remove build subprocess creation/signalling and load existing compiled orchestration after syntax validation and durable initial reporting. Missing/unloadable command code or a missing exported entry returns nonzero with `run npm --prefix smoke run build before test:gui`, all suites not_run and no claimed successful compilation. `build.state` remains not_run for compatibility with the aggregate schema. Existing output is intentionally not checked for source freshness; rebuilding is an explicit prerequisite. The `--build` option still selects the installed VS Code `.app`; it is unrelated to compiling the tester.
+
+Cancellation before loading, late cancellation during prerequisite-error persistence, active-suite once-only signalling, atomic aggregate updates, interpreter preflight, sequential suite routing, cleanup gating and output commitment remain covered. No dependency, package-script/prehook, profile, retained environment, runner or worker change was needed. Obsolete build-subprocess tests were removed/replaced by precompiled-loading/prerequisite tests; active npm foreground-group/direct-wrapper cancellation coverage remains. Root/tester READMEs and tester module instructions describe the explicit build and distinguish prior GUI evidence from this bootstrap change.
+
+Red/green: the first exposing bootstrap test asserted zero automatic build calls and failed with observed 1 versus expected 0. Removing the build stage made it pass. The final regression suite consolidates that check into a real filesystem/package fixture whose build script writes an unexpected marker: existing compiled code executes and the build marker stays absent. Missing, syntactically invalid and missing-entry compiled modules each fail with the explicit prerequisite and no suites; persistence failures, cancellation and original invocation-directory routing pass. No GUI application is launched by those checks.
+
+Checks actually performed:
+
+- `npm --prefix smoke run build`: passed lint, formatting and both compilations as an explicit development check. `/private/tmp/issue-50-explicit-build.log`.
+- `npm --prefix smoke run test:unit`: **252 passed, 0 failed, 0 skipped**, 13.935 seconds, with loopback permission for existing HTTP/inert-inspector cases. `/private/tmp/issue-50-explicit-build-unit.log`. Nine current bootstrap tests replace the earlier eleven build-in-command tests; removed build-only cases no longer describe supported behavior.
+- `git diff --check` and relative file targets: passed for changed documentation.
+
+No new actual GUI run, profile access, authentication, environment change or automatic retry was performed. Prior GUI passes do not establish new-bootstrap GUI qualification. This requested change is implemented and non-GUI verified; it does not fix or broaden deferred space-path behavior.

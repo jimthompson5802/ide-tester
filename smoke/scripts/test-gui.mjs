@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseGUIArguments } from './gui-arguments.mjs';
@@ -9,7 +8,7 @@ import {
     formatGUISummary,
 } from './gui-bootstrap-report.mjs';
 
-/** Run before compilation so stale generated code cannot bypass a failed build. */
+/** Run previously compiled suites; compilation is an explicit prerequisite. */
 export async function runGUIBootstrap(argv, services = {}) {
     const packageDirectory =
         services.packageDirectory ?? path.resolve(import.meta.dirname, '..');
@@ -37,9 +36,6 @@ export async function runGUIBootstrap(argv, services = {}) {
     }
     const subscribers = new Set();
     let requested = false;
-    let activeBuild;
-    let buildSignalled = false;
-    let buildSignalError = false;
     const cancellation = {
         get requested() {
             return requested;
@@ -56,14 +52,6 @@ export async function runGUIBootstrap(argv, services = {}) {
         }
         requested = true;
         errorOutput('Cancellation requested; owned shutdown pending');
-        if (activeBuild && !buildSignalled) {
-            buildSignalled = true;
-            try {
-                buildSignalError = !activeBuild.kill('SIGINT');
-            } catch {
-                buildSignalError = true;
-            }
-        }
         for (const listener of subscribers) listener();
     };
     process.on('SIGINT', onSignal);
@@ -76,8 +64,7 @@ export async function runGUIBootstrap(argv, services = {}) {
         )(checkoutDirectory));
     } catch {
         const unavailable = createGUIRecord('Unavailable');
-        unavailable.error =
-            'Aggregate storage unavailable; no build or GUI started';
+        unavailable.error = 'Aggregate storage unavailable; no GUI started';
         unavailable.durationMs = Date.now() - started;
         if (requested)
             unavailable.cancellation = { reason: 'Cancelled by user' };
@@ -90,99 +77,45 @@ export async function runGUIBootstrap(argv, services = {}) {
         batch.durationMs = Date.now() - started;
         await (services.saveReport ?? saveGUIReport)(directory, batch);
     };
-    try {
-        batch.state = 'running';
-        batch.build.state = 'running';
-        batch.activeStage = 'build';
-        await save();
-        if (!requested) {
-            const buildCommand = services.buildCommand ?? {
-                executable: 'npm',
-                args: ['run', 'build'],
-            };
-            const build = services.spawnBuild
-                ? await services.spawnBuild(buildCommand, {
-                      cwd: packageDirectory,
-                  })
-                : await new Promise((resolve) => {
-                      try {
-                          activeBuild = spawn(
-                              buildCommand.executable,
-                              buildCommand.args,
-                              {
-                                  cwd: packageDirectory,
-                                  stdio: 'inherit',
-                                  detached: true,
-                              },
-                          );
-                          activeBuild.once('error', () =>
-                              resolve({
-                                  code: null,
-                                  signal: null,
-                                  error: true,
-                              }),
-                          );
-                          activeBuild.once('close', (code, signal) =>
-                              resolve({ code, signal }),
-                          );
-                      } catch {
-                          resolve({ code: null, signal: null, error: true });
-                      }
-                  });
-            activeBuild = undefined;
-            if (
-                buildSignalError ||
-                build.code !== 0 ||
-                build.signal ||
-                build.error ||
-                requested
-            ) {
-                batch.build.state = 'harness_error';
-                batch.build.error = requested
-                    ? 'Cancelled by user during build'
-                    : 'Build failed; compiled GUI command was not loaded';
-            } else {
-                batch.build.state = 'passed';
-            }
-        } else {
-            batch.build.state = 'harness_error';
-            batch.build.error = 'Cancelled by user before build';
-        }
-        delete batch.activeStage;
+    const finishBeforeLaunch = async (error) => {
+        batch.state = 'completed';
+        batch.outcome = 'harness_error';
+        batch.error = error;
         if (requested) batch.cancellation = { reason: 'Cancelled by user' };
         await save();
-        if (batch.build.state !== 'passed' || requested) {
-            batch.state = 'completed';
-            batch.outcome = 'harness_error';
-            await save();
-            if (requested && !batch.cancellation) {
-                batch.cancellation = { reason: 'Cancelled by user' };
-                await save();
-            }
-            output(formatGUISummary(batch));
-            return { exitCode: 1, batch, directory };
-        }
-        const loaded = await (
-            services.loadCommand ??
-            (() =>
-                import(
-                    pathToFileURL(
-                        path.join(packageDirectory, 'dist/src/gui-command.js'),
-                    ).href
-                ))
-        )();
-        if (requested) {
+        if (requested && !batch.cancellation) {
             batch.cancellation = { reason: 'Cancelled by user' };
-            batch.state = 'completed';
-            batch.outcome = 'harness_error';
             await save();
-            if (requested && !batch.cancellation) {
-                batch.cancellation = { reason: 'Cancelled by user' };
-                await save();
-            }
-            output(formatGUISummary(batch));
-            return { exitCode: 1, batch, directory };
         }
+        output(formatGUISummary(batch));
+        return { exitCode: 1, batch, directory };
+    };
+    try {
+        batch.state = 'running';
+        await save();
+        if (requested) return await finishBeforeLaunch('Cancelled by user');
+        let loaded;
+        try {
+            loaded = await (
+                services.loadCommand ??
+                (() =>
+                    import(
+                        pathToFileURL(
+                            path.join(
+                                packageDirectory,
+                                'dist/src/gui-command.js',
+                            ),
+                        ).href
+                    ))
+            )();
+            if (typeof loaded.runGUICommand !== 'function')
+                throw new Error('Missing compiled entry');
+        } catch {
+            return await finishBeforeLaunch(
+                'Compiled GUI command unavailable; run npm --prefix smoke run build before test:gui',
+            );
+        }
+        if (requested) return await finishBeforeLaunch('Cancelled by user');
         const result = await loaded.runGUICommand(options, {
             batch,
             directory,
@@ -201,7 +134,7 @@ export async function runGUIBootstrap(argv, services = {}) {
         batch.state = 'incomplete';
         delete batch.activeStage;
         batch.error =
-            'Build, aggregate reporting or command loading failed; no subsequent suite started';
+            'Aggregate reporting or command execution failed; no subsequent suite started';
         if (requested) batch.cancellation = { reason: 'Cancelled by user' };
         batch.reportingErrors.push('Aggregate or bootstrap stage failed');
         try {
