@@ -39,6 +39,7 @@ Paths below are relative to `smoke/`:
 | Path | Responsibility |
 | --- | --- |
 | `src/cli.ts`, `src/arguments.ts`, `src/qualify.ts` | CLI execution, option validation, and foundation qualification entry point. |
+| `src/cli-controller.ts`, `src/cli-worker.ts`, `src/cli-protocol.ts` | Standard CLI signal ownership, worker-isolated suite execution and validated result transport; final reporting stays on the main thread. |
 | `src/runner.ts`, `src/app.ts`, `src/workbench.ts` | Suite orchestration, installed VS Code discovery, and Playwright workbench interactions. |
 | `src/git.ts`, `src/git-repository.ts`, `src/git-profile.ts` | Git UI scenario, independent bounded Git verification and owned persistent standalone Git profile lifecycle. |
 | `src/python.ts`, `src/python-interpreter.ts`, `src/python-evidence.ts` | Standalone Python UI scenario, presence-only interpreter resolution and combined saved-source/terminal/program evidence validation. |
@@ -74,6 +75,10 @@ Keep [README.md](README.md) consistent with verified tester behavior. Preserve t
 ## Current gates
 
 The foundation and selected suites are developer accepted. Real-backend slice 2 is developer validated; signed-out blocking is GUI verified, and authenticated Chat passed after manual sign-in restoration. Issue #36 is developer validated. See the [backend execution record](../docs/implementation-plans/real-chat-backend.md) for evidence and remaining checks.
+
+Issue #50 phases 1 and 2 are developer validated. The authorized Phase 3 interruption attempt on 2026-10-24 failed qualification: the owned main process exited, but real `basic` produced no valid final report, the aggregate remained incomplete, and reservation/resources remain retained. Git and Python did not run. The uninterrupted qualification is blocked by cleanup uncertainty; Phase 3 and space-containing Python invocation paths remain GUI-unqualified. Before recovery or resuming qualification, read the [issue #50 execution record](../docs/implementation-plans/issue-50-gui-suite-command.md).
+
+Issue #50 R1 is developer validated. R2 isolates Playwright in a worker for the standard CLI executable so SIGINT/SIGTERM enter main-thread cancellation and final reporting; imported `executeCLI` remains caller-controlled. The installed-launcher regression uses an inert Node inspector and requires loopback permission but opens no IDE. R2 is developer validated; real VS Code requalification and retained-run recovery remain separately gated in the plan.
 
 Issue #38 phases 1 and 2 are developer validated. Phase-3 tasks P3-T01–P3-T03 and P3-DV are complete under the reconciled standalone-Git scope; the developer explicitly validated phase 3. The developer directed separating Git from combined runs, restoring the previously passing Chat implementation from `b9a4cc4`, and renaming `all` to `basic`. At that acceptance checkpoint, compilation and all 75 non-GUI tests passed. Renamed mocked `basic` and standalone Git GUI checks passed. Real `basic` initially failed on a Copilot error/warning, then passed two consecutive developer-requested reruns without code changes. All runs confirmed owned shutdown and reservation release; failed resources were retained and persistent profiles preserved. See the Git plan for exact reports and historical failures. The earlier expanded combined-startup fix loop remains stopped after four unsuccessful rounds; the directed rollback does not authorize new speculative fixes.
 

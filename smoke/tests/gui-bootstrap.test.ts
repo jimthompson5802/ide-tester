@@ -445,10 +445,16 @@ test('npm and direct wrapper interrupts reach actual compiled command suite chil
         await writeFile(interpreter, 'filesystem-only preflight fixture');
         await writeFile(
             path.join(packageDirectory, 'dist/src/cli.js'),
-            `import {writeFileSync,appendFileSync} from 'node:fs';
+            `import {writeFileSync} from 'node:fs';
+import {runCLIController} from ${JSON.stringify(new URL('../src/cli-controller.js', import.meta.url).href)};
 writeFileSync(${JSON.stringify(childPidFile)},String(process.pid));
-process.on('SIGINT',()=>{appendFileSync(${JSON.stringify(signalLog)},'SIGINT\\n');setTimeout(()=>{console.log(JSON.stringify({outcome:'harness_error',suites:'basic',chatBackend:'real',cancellation:{reason:'Cancelled by user'},cleanup:{disposition:'retained',reservationRetained:false,errors:[]}}));process.exitCode=1;clearInterval(keepAlive);},80);});
-const keepAlive=setInterval(()=>{},1000);writeFileSync(${JSON.stringify(ready)},'ready');`,
+process.exitCode=await runCLIController(['--output','json'],${JSON.stringify(root)},{workerURL:new URL('./fixture-worker.mjs',import.meta.url)});`,
+        );
+        await writeFile(
+            path.join(packageDirectory, 'dist/src/fixture-worker.mjs'),
+            `import {parentPort} from 'node:worker_threads';import {writeFileSync,appendFileSync} from 'node:fs';
+parentPort.on('message',()=>{appendFileSync(${JSON.stringify(signalLog)},'CANCEL\\n');setTimeout(()=>{parentPort.postMessage({outcome:'harness_error',suites:'basic',chatBackend:'real',cancellation:{reason:'Cancelled by user'},cleanup:{disposition:'retained',reservationRetained:false,errors:[]}});parentPort.close();},80);});
+writeFileSync(${JSON.stringify(ready)},'ready');`,
         );
         await writeFile(
             path.join(packageDirectory, 'dist/src/gui-command.js'),
@@ -521,7 +527,7 @@ writeFileSync(${JSON.stringify(finished)},JSON.stringify(result));process.exitCo
             result.batch.rows.map((row: { outcome: string }) => row.outcome),
             ['harness_error', 'not_run', 'not_run'],
         );
-        assert.equal(await readFile(signalLog, 'utf8'), 'SIGINT\n');
+        assert.equal(await readFile(signalLog, 'utf8'), 'CANCEL\n');
     }
 });
 

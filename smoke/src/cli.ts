@@ -1,14 +1,10 @@
 import { writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { reportResult } from './report.js';
+import { reportResult, type ReportResult } from './report.js';
 import { parseArguments } from './arguments.js';
 import { createRun, finishRun, type Run } from './resources.js';
-import {
-    Cancellation,
-    CancellationError,
-    installCancellationHandlers,
-} from './cancellation.js';
+import { Cancellation, CancellationError } from './cancellation.js';
 import { runFoundation, runSmoke } from './runner.js';
 
 export const checkoutRoot = resolve(
@@ -22,6 +18,24 @@ export async function executeCLI(
     output: (message: string) => void = console.log,
     cancellation = new Cancellation(),
 ): Promise<number> {
+    const result = await collectCLIResult(
+        args,
+        checkout,
+        qualify,
+        cancellation,
+    );
+    const outputIndex = args.indexOf('--output');
+    const mode =
+        outputIndex >= 0 && args[outputIndex + 1] === 'json' ? 'json' : 'text';
+    return reportResult(result, mode, output, cancellation);
+}
+
+export async function collectCLIResult(
+    args: string[],
+    checkout = checkoutRoot,
+    qualify = false,
+    cancellation = new Cancellation(),
+): Promise<ReportResult> {
     const started = Date.now();
     const suiteIndex = args.indexOf('--suite');
     const requestedSuite = suiteIndex >= 0 ? args[suiteIndex + 1] : undefined;
@@ -38,10 +52,6 @@ export async function executeCLI(
             ? 'real'
             : 'mock';
     const mockApplicable = chatBackend === 'mock' && !standalone;
-    // Recover the requested presentation even when other arguments are invalid.
-    const outputIndex = args.indexOf('--output');
-    const mode =
-        outputIndex >= 0 && args[outputIndex + 1] === 'json' ? 'json' : 'text';
     try {
         cancellation.check();
         let options;
@@ -100,7 +110,7 @@ export async function executeCLI(
                 resultPath,
             };
             await writeFile(resultPath, JSON.stringify(result, null, 2));
-            return await reportResult(result, mode, output, cancellation);
+            return result;
         }
         const result = qualify
             ? await runFoundation(options, checkout, undefined, cancellation)
@@ -111,40 +121,31 @@ export async function executeCLI(
                   undefined,
                   cancellation,
               );
-        return await reportResult(result, mode, output, cancellation);
+        return result;
     } catch (error) {
         // An existing or uncertain reservation must never be removed on this path.
-        return await reportResult(
-            {
-                chatBackend,
-                chatSelected,
-                mockRequestEvidence: mockApplicable
-                    ? 'applicable'
-                    : 'inapplicable',
-                mockRequestCount: mockApplicable ? 0 : null,
-                requests: mockApplicable ? [] : null,
-                outcome: 'harness_error',
-                error: cancellation.requested
-                    ? 'Cancelled by user'
-                    : String(error),
-                ...(cancellation.requested
-                    ? {
-                          cancellation: { reason: 'Cancelled by user' },
-                          ...(!(error instanceof CancellationError)
-                              ? {
-                                    originating: {
-                                        outcome: 'harness_error',
-                                        error: String(error),
-                                    },
-                                }
-                              : {}),
-                      }
-                    : {}),
-            },
-            mode,
-            output,
-            cancellation,
-        );
+        return {
+            chatBackend,
+            chatSelected,
+            mockRequestEvidence: mockApplicable ? 'applicable' : 'inapplicable',
+            mockRequestCount: mockApplicable ? 0 : null,
+            requests: mockApplicable ? [] : null,
+            outcome: 'harness_error',
+            error: cancellation.requested ? 'Cancelled by user' : String(error),
+            ...(cancellation.requested
+                ? {
+                      cancellation: { reason: 'Cancelled by user' },
+                      ...(!(error instanceof CancellationError)
+                          ? {
+                                originating: {
+                                    outcome: 'harness_error',
+                                    error: String(error),
+                                },
+                            }
+                          : {}),
+                  }
+                : {}),
+        };
     }
 }
 
@@ -152,19 +153,9 @@ if (
     process.argv[1] &&
     import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 ) {
-    const cancellation = new Cancellation();
-    const dispose = installCancellationHandlers(cancellation, (message) => {
-        process.stderr.write(message + '\n');
-    });
-    try {
-        process.exitCode = await executeCLI(
-            process.argv.slice(2),
-            undefined,
-            false,
-            undefined,
-            cancellation,
-        );
-    } finally {
-        dispose();
-    }
+    const { runCLIController } = await import('./cli-controller.js');
+    process.exitCode = await runCLIController(
+        process.argv.slice(2),
+        checkoutRoot,
+    );
 }
